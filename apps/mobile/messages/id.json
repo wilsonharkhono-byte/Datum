@@ -1,0 +1,10 @@
+{
+  "login": {
+    "title": "Masuk ke DATUM",
+    "email": "Email",
+    "password": "Kata sandi",
+    "submit": "Masuk",
+    "error": "Email atau kata sandi salah.",
+    "loading": "Memuat..."
+  }
+}

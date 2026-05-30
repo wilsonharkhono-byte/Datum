@@ -1,0 +1,10 @@
+{
+  "login": {
+    "title": "Sign in to DATUM",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "error": "Invalid email or password.",
+    "loading": "Loading..."
+  }
+}
