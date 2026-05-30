@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "DATUM",
+    "slug": "datum",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "scheme": "datum",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": true },
+    "ios": { "supportsTablet": false, "bundleIdentifier": "studio.wha.datum" },
+    "android": { "package": "studio.wha.datum" }
+  }
+}

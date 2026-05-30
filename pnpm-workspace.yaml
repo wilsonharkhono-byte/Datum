@@ -6,3 +6,4 @@ allowBuilds:
   supabase: true
   sharp: true
   unrs-resolver: true
+  msgpackr-extract: true
