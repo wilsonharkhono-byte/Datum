@@ -13,7 +13,7 @@
       "@datum/db": ["../../packages/db/src"],
       "@datum/db/*": ["../../packages/db/src/*"]
     },
-    "types": ["react-native"]
+    "types": ["react-native", "jest"]
   },
   "include": [
     "**/*.ts",
