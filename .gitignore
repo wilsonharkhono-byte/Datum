@@ -34,8 +34,6 @@ test-results/
 **/supabase/.branches/
 **/supabase/.temp/
 
-# generated (committed explicitly via git add -f after generation)
-packages/db/src/types.generated.ts
 
 # session-specific (random screenshots, transient files)
 image.png
