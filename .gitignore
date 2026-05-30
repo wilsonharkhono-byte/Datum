@@ -1,0 +1,45 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build
+.next/
+.expo/
+.turbo/
+dist/
+*.tsbuildinfo
+
+# env (NEVER commit real env files — already exist with secrets)
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# tests
+coverage/
+playwright-report/
+test-results/
+
+# supabase local
+**/.supabase/
+**/supabase/.branches/
+**/supabase/.temp/
+
+# generated (committed explicitly via git add -f after generation)
+packages/db/src/types.generated.ts
+
+# session-specific (random screenshots, transient files)
+image.png
+*.screenshot.png
+
+# session helper file from setup
+.dropbox-ignore-list
