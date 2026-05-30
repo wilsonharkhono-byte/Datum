@@ -16,14 +16,26 @@ const admin = createClient<Database>(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+async function findUserByEmail(email: string): Promise<string | undefined> {
+  let page = 1;
+  const perPage = 200;
+  for (;;) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const found = data?.users.find((u) => u.email === email);
+    if (found) return found.id;
+    if (!data || data.users.length < perPage) return undefined; // last page
+    page++;
+  }
+}
+
 async function upsertAuthUser(
   email: string,
   password: string,
   fullName: string,
 ): Promise<string> {
-  const { data: existing } = await admin.auth.admin.listUsers();
-  const found = existing?.users.find((u) => u.email === email);
-  if (found) return found.id;
+  const existingId = await findUserByEmail(email);
+  if (existingId) return existingId;
 
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -272,7 +284,11 @@ async function main() {
   if (pgErr) throw pgErr;
   console.log(`  ${projectGates.length} project_gates initialized`);
 
-  const { data: allAreas } = await admin.from("areas").select("id, project_id");
+  const pilotProjectIds = projectRows!.map((p) => p.id);
+  const { data: allAreas } = await admin
+    .from("areas")
+    .select("id, project_id")
+    .in("project_id", pilotProjectIds);
   const cells = (allAreas ?? []).flatMap((a) =>
     gateCodes.map((gate_code) => ({
       project_id: a.project_id,
