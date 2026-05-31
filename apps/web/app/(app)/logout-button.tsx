@@ -19,9 +19,9 @@ export function LogoutButton() {
           router.push("/login");
         })
       }
-      className="text-sm text-stone-600 underline disabled:opacity-50"
+      className="h-10 rounded-[8px] border border-[#B5AFA8] px-4 text-sm font-semibold text-[#524E49] transition hover:bg-[#F2EFE9] disabled:opacity-50"
     >
-      Logout
+      Keluar
     </button>
   );
 }
