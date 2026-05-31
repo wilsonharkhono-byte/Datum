@@ -50,3 +50,9 @@ export type CardEventKind    = Enums["card_event_kind"];
 export type CardStatus       = Enums["card_status"];
 export type CardLinkRelation = Enums["card_link_relation"];
 export type CardEventSource  = Enums["card_event_source"];
+
+// Slice 1.1 — assistant audit (tables created in 20260601000007)
+export type AssistantSession      = Tables["assistant_sessions"]["Row"];
+export type AssistantMessage      = Tables["assistant_messages"]["Row"];
+export type AssistantQueryAudit   = Tables["assistant_query_audit"]["Row"];
+export type AssistantMessageRole  = Enums["assistant_message_role"];

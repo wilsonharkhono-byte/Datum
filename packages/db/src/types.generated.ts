@@ -371,6 +371,146 @@ export type Database = {
           },
         ]
       }
+      assistant_messages: {
+        Row: {
+          content: string
+          created_at: string
+          estimated_cost_usd: number | null
+          id: string
+          role: Database["public"]["Enums"]["assistant_message_role"]
+          session_id: string
+          sources_jsonb: Json
+          staff_id: string | null
+          token_count: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          role: Database["public"]["Enums"]["assistant_message_role"]
+          session_id: string
+          sources_jsonb?: Json
+          staff_id?: string | null
+          token_count?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          role?: Database["public"]["Enums"]["assistant_message_role"]
+          session_id?: string
+          sources_jsonb?: Json
+          staff_id?: string | null
+          token_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assistant_messages_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_query_audit: {
+        Row: {
+          answer_summary: string | null
+          created_at: string
+          estimated_cost_usd: number | null
+          id: string
+          included_unapproved_drafts: boolean
+          project_scope_jsonb: Json
+          question: string
+          records_accessed_jsonb: Json
+          staff_id: string | null
+        }
+        Insert: {
+          answer_summary?: string | null
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          included_unapproved_drafts?: boolean
+          project_scope_jsonb?: Json
+          question: string
+          records_accessed_jsonb?: Json
+          staff_id?: string | null
+        }
+        Update: {
+          answer_summary?: string | null
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          included_unapproved_drafts?: boolean
+          project_scope_jsonb?: Json
+          question?: string
+          records_accessed_jsonb?: Json
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_query_audit_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string | null
+          project_id: string | null
+          staff_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          project_id?: string | null
+          staff_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          project_id?: string | null
+          staff_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_sessions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assistant_sessions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attachments: {
         Row: {
           caption: string | null
@@ -2038,6 +2178,7 @@ export type Database = {
         | "circulation"
         | "utility"
         | "general"
+      assistant_message_role: "user" | "assistant" | "system"
       attachment_kind: "photo" | "drawing" | "document" | "other"
       blocker_status: "open" | "resolved" | "cancelled"
       blocker_type:
@@ -2344,6 +2485,7 @@ export const Constants = {
         "utility",
         "general",
       ],
+      assistant_message_role: ["user", "assistant", "system"],
       attachment_kind: ["photo", "drawing", "document", "other"],
       blocker_status: ["open", "resolved", "cancelled"],
       blocker_type: [

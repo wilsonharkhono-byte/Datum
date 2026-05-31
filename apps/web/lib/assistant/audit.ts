@@ -1,26 +1,19 @@
 // apps/web/lib/assistant/audit.ts
-// Note: assistant_sessions, assistant_messages, assistant_query_audit tables are
-// defined in the Slice 1.1 migration (not yet reflected in types.generated.ts).
-// The `as any` casts on `.from()` calls will be removed once types are regenerated.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@datum/db";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyClient = SupabaseClient<any>;
+import type { Database, Json } from "@datum/db";
 
 export async function ensureSession(
   supabase: SupabaseClient<Database>,
   args: { staffId: string; projectId: string; sessionId?: string },
 ): Promise<string> {
   if (args.sessionId) return args.sessionId;
-  const db = supabase as AnyClient;
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from("assistant_sessions")
     .insert({ staff_id: args.staffId, project_id: args.projectId, title: "Chat" })
     .select("id")
     .single();
   if (error) throw error;
-  return (data as { id: string }).id;
+  return data.id;
 }
 
 export async function recordExchange(
@@ -35,32 +28,30 @@ export async function recordExchange(
     usage: { input_tokens: number; output_tokens: number };
   },
 ): Promise<void> {
-  const db = supabase as AnyClient;
-
-  await db.from("assistant_messages").insert([
+  await supabase.from("assistant_messages").insert([
     {
       session_id: args.sessionId,
       staff_id: args.staffId,
-      role: "user",
+      role: "user" as const,
       content: args.question,
       token_count: args.usage.input_tokens,
     },
     {
       session_id: args.sessionId,
       staff_id: args.staffId,
-      role: "assistant",
+      role: "assistant" as const,
       content: args.answer,
-      sources_jsonb: args.citations as unknown as Record<string, unknown>,
+      sources_jsonb: args.citations as unknown as Json,
       token_count: args.usage.output_tokens,
     },
   ]);
 
-  await db.from("assistant_query_audit").insert({
+  await supabase.from("assistant_query_audit").insert({
     staff_id: args.staffId,
     project_scope_jsonb: { project_id: args.projectId },
     question: args.question,
     answer_summary: args.answer.slice(0, 400),
-    records_accessed_jsonb: args.citations as unknown as Record<string, unknown>,
+    records_accessed_jsonb: args.citations as unknown as Json,
     included_unapproved_drafts: false,
   });
 }
