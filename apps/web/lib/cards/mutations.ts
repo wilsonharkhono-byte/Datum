@@ -271,6 +271,78 @@ export async function deleteComment(formData: FormData): Promise<CreateCommentRe
   return { ok: true };
 }
 
+// ─── attachToEvent ────────────────────────────────────────────────────────────
+
+const AttachToEventInput = z.object({
+  cardEventId: z.string().uuid(),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+  storagePath: z.string().min(1),
+  mimeType:    z.string().min(1),
+});
+
+export type AttachToEventResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function attachToEvent(formData: FormData): Promise<AttachToEventResult> {
+  let input;
+  try {
+    input = AttachToEventInput.parse({
+      cardEventId: formData.get("cardEventId"),
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+      storagePath: formData.get("storagePath"),
+      mimeType:    formData.get("mimeType"),
+    });
+  } catch {
+    return { ok: false, error: "Lampiran tidak valid" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  const { error } = await supabase.from("card_attachments").insert({
+    card_event_id: input.cardEventId,
+    storage_path:  input.storagePath,
+    mime_type:     input.mimeType,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  return { ok: true };
+}
+
+// ─── signAttachment ───────────────────────────────────────────────────────────
+
+const SignAttachmentInput = z.object({
+  storagePath: z.string().min(1),
+});
+
+export type SignAttachmentResult =
+  | { ok: true; url: string }
+  | { ok: false; error: string };
+
+export async function signAttachment(formData: FormData): Promise<SignAttachmentResult> {
+  let input;
+  try {
+    input = SignAttachmentInput.parse({
+      storagePath: formData.get("storagePath"),
+    });
+  } catch {
+    return { ok: false, error: "Lampiran tidak valid" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.storage
+    .from("card-attachments")
+    .createSignedUrl(input.storagePath, 60 * 10); // 10 minutes
+  if (error || !data) return { ok: false, error: error?.message ?? "Gagal membuat URL" };
+
+  return { ok: true, url: data.signedUrl };
+}
+
 // ─── updateCard ───────────────────────────────────────────────────────────────
 
 const UpdateCardInput = z.object({
