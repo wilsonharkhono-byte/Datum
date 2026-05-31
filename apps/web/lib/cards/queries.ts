@@ -5,6 +5,7 @@ import type {
   Topic,
   Card,
   CardEvent,
+  CardComment,
 } from "@datum/db";
 
 export type BoardColumn = { topic: Topic; cards: Card[] };
@@ -77,4 +78,18 @@ export async function getCardWithTimeline(
   if (evErr) throw evErr;
 
   return { card, events: events ?? [] };
+}
+
+export async function getCardComments(
+  supabase: SupabaseClient<Database>,
+  cardId: string,
+): Promise<CardComment[]> {
+  const { data, error } = await supabase
+    .from("card_comments")
+    .select("*")
+    .eq("card_id", cardId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 }

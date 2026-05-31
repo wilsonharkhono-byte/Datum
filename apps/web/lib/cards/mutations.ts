@@ -164,3 +164,109 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
 }
+
+// ─── createComment ────────────────────────────────────────────────────────────
+
+const CreateCommentInput = z.object({
+  cardId:      z.string().uuid(),
+  projectId:   z.string().uuid(),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+  body:        z.string().min(1).max(4000),
+});
+
+export type CreateCommentResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function createComment(formData: FormData): Promise<CreateCommentResult> {
+  let input;
+  try {
+    input = CreateCommentInput.parse({
+      cardId:      formData.get("cardId"),
+      projectId:   formData.get("projectId"),
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+      body:        formData.get("body"),
+    });
+  } catch {
+    return { ok: false, error: "Komentar tidak boleh kosong" };
+  }
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
+
+  const { error } = await supabase.from("card_comments").insert({
+    card_id:             input.cardId,
+    project_id:          input.projectId,
+    body:                input.body,
+    created_by_staff_id: user.id,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  return { ok: true };
+}
+
+// ─── editComment ──────────────────────────────────────────────────────────────
+
+const EditCommentInput = z.object({
+  commentId:   z.string().uuid(),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+  body:        z.string().min(1).max(4000),
+});
+
+export async function editComment(formData: FormData): Promise<CreateCommentResult> {
+  let input;
+  try {
+    input = EditCommentInput.parse({
+      commentId:   formData.get("commentId"),
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+      body:        formData.get("body"),
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  const { error } = await supabase.from("card_comments")
+    .update({ body: input.body, edited_at: new Date().toISOString() })
+    .eq("id", input.commentId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  return { ok: true };
+}
+
+// ─── deleteComment ────────────────────────────────────────────────────────────
+
+const DeleteCommentInput = z.object({
+  commentId:   z.string().uuid(),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+});
+
+export async function deleteComment(formData: FormData): Promise<CreateCommentResult> {
+  let input;
+  try {
+    input = DeleteCommentInput.parse({
+      commentId:   formData.get("commentId"),
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  const { error } = await supabase.from("card_comments")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", input.commentId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  return { ok: true };
+}

@@ -4,6 +4,7 @@ import { getCardWithTimeline } from "@/lib/cards/queries";
 import { CardHeader } from "@/components/board/CardHeader";
 import { Timeline } from "@/components/board/Timeline";
 import { AddEventForm } from "@/components/board/AddEventForm";
+import { CommentsSection } from "@/components/board/CommentsSection";
 
 export default async function CardDetailPage({
   params,
@@ -12,6 +13,8 @@ export default async function CardDetailPage({
 }) {
   const { slug, cardSlug } = await params;
   const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const currentStaffId = user?.id ?? null;
 
   const { data: project } = await supabase
     .from("projects").select("id, project_code, project_name")
@@ -45,6 +48,13 @@ export default async function CardDetailPage({
         cardSlug={cardSlug}
       />
       <Timeline events={detail.events} />
+      <CommentsSection
+        cardId={detail.card.id}
+        projectId={project.id}
+        projectCode={slug}
+        cardSlug={cardSlug}
+        currentStaffId={currentStaffId}
+      />
     </div>
   );
 }

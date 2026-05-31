@@ -56,3 +56,6 @@ export type AssistantSession      = Tables["assistant_sessions"]["Row"];
 export type AssistantMessage      = Tables["assistant_messages"]["Row"];
 export type AssistantQueryAudit   = Tables["assistant_query_audit"]["Row"];
 export type AssistantMessageRole  = Enums["assistant_message_role"];
+
+// Slice 1.1.3 — comments
+export type CardComment = Tables["card_comments"]["Row"];

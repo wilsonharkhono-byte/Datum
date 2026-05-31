@@ -655,6 +655,64 @@ export type Database = {
           },
         ]
       }
+      card_comments: {
+        Row: {
+          body: string
+          card_id: string
+          created_at: string
+          created_by_staff_id: string | null
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          mentions: string[]
+          project_id: string
+        }
+        Insert: {
+          body: string
+          card_id: string
+          created_at?: string
+          created_by_staff_id?: string | null
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          mentions?: string[]
+          project_id: string
+        }
+        Update: {
+          body?: string
+          card_id?: string
+          created_at?: string
+          created_by_staff_id?: string | null
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          mentions?: string[]
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_comments_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_comments_created_by_staff_id_fkey"
+            columns: ["created_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_events: {
         Row: {
           card_id: string
