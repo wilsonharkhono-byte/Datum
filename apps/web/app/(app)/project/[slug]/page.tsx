@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBoardForProject } from "@/lib/cards/queries";
 import { Board } from "@/components/board/Board";
+import { ChatDock } from "@/components/chat/ChatDock";
 
 export default async function ProjectBoardPage({
   params,
@@ -31,7 +32,10 @@ export default async function ProjectBoardPage({
           {board.project.project_code} · {board.project.project_name}
         </h1>
       </header>
-      <Board board={board} />
+      <div className="flex-1 overflow-hidden">
+        <Board board={board} />
+      </div>
+      <ChatDock projectId={board.project.id} />
     </div>
   );
 }
