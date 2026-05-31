@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AreaGateMatrix } from "@/components/matrix/area-gate-matrix";
 import { fetchMatrix } from "@/lib/matrix/fetch-matrix";
@@ -99,10 +100,11 @@ export default async function HomePage() {
           </div>
           <ul className="divide-y divide-[#B5AFA8]/70">
         {projects.map((p) => (
-          <li
-            key={p.id}
-                className="px-4 py-4"
-          >
+          <li key={p.id}>
+            <Link
+              href={`/project/${p.project_code}`}
+              className="block px-4 py-4 hover:bg-[#F4EFE6]/40"
+            >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="font-semibold text-[#141210]">
@@ -122,6 +124,7 @@ export default async function HomePage() {
                     Target serah terima: {p.target_handover}
                   </div>
                 )}
+            </Link>
               </li>
             ))}
           </ul>
