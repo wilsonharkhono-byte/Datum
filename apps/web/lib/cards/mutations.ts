@@ -90,7 +90,7 @@ const CreateCardEventInput = z.object({
 });
 
 export type CreateCardEventResult =
-  | { ok: true }
+  | { ok: true; eventId: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 function collectPayload(formData: FormData): Record<string, unknown> {
@@ -149,7 +149,7 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
     ? new Date(input.occurredAt).toISOString()
     : new Date().toISOString();
 
-  const { error } = await supabase.from("card_events").insert({
+  const { data, error } = await supabase.from("card_events").insert({
     card_id:            input.cardId,
     project_id:         input.projectId,
     event_kind:         input.eventKind,
@@ -158,11 +158,11 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
     logged_by_staff_id: user.id,
     source_kind:        "manual",
     cost_visible:       COST_VISIBLE_KINDS.has(input.eventKind),
-  });
+  }).select("id").single();
   if (error) return { ok: false, error: error.message };
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
-  return { ok: true };
+  return { ok: true, eventId: data.id };
 }
 
 // ─── createComment ────────────────────────────────────────────────────────────

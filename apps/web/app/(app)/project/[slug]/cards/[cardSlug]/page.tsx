@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCardWithTimeline } from "@/lib/cards/queries";
+import { getCardWithTimeline, getCardAttachments } from "@/lib/cards/queries";
 import { CardHeader } from "@/components/board/CardHeader";
 import { Timeline } from "@/components/board/Timeline";
 import { AddEventForm } from "@/components/board/AddEventForm";
@@ -35,6 +35,8 @@ export default async function CardDetailPage({
     );
   }
 
+  const attachmentsByEvent = await getCardAttachments(supabase, detail.card.id);
+
   return (
     <div className="mx-auto max-w-3xl p-4">
       <Link href={`/project/${slug}`} className="text-xs text-stone-500 hover:underline">
@@ -52,7 +54,7 @@ export default async function CardDetailPage({
         projectCode={slug}
         cardSlug={cardSlug}
       />
-      <Timeline events={detail.events} />
+      <Timeline events={detail.events} attachmentsByEvent={attachmentsByEvent} />
       <CommentsSection
         cardId={detail.card.id}
         projectId={project.id}

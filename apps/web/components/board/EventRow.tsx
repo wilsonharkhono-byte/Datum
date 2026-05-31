@@ -1,4 +1,5 @@
-import type { CardEvent } from "@datum/db";
+import type { CardEvent, CardAttachment } from "@datum/db";
+import { EventAttachments } from "./EventAttachments";
 
 const KIND_LABEL: Record<string, string> = {
   decision: "keputusan",
@@ -38,16 +39,25 @@ function summarize(ev: CardEvent): string {
   }
 }
 
-export function EventRow({ event }: { event: CardEvent }) {
+export function EventRow({
+  event,
+  attachments,
+}: {
+  event: CardEvent;
+  attachments: CardAttachment[];
+}) {
   return (
-    <li className="flex gap-3 rounded border border-stone-200 bg-white px-3 py-2 text-sm">
-      <span className="w-24 flex-shrink-0 text-[11px] uppercase tracking-wide text-amber-800">
-        {KIND_LABEL[event.event_kind] ?? event.event_kind}
-      </span>
-      <span className="w-24 flex-shrink-0 text-[11px] text-stone-500">
-        {new Date(event.occurred_at).toLocaleDateString("id-ID", { year: "2-digit", month: "short", day: "numeric" })}
-      </span>
-      <span className="flex-1 text-stone-800">{summarize(event)}</span>
+    <li className="rounded border border-stone-200 bg-white px-3 py-2 text-sm">
+      <div className="flex gap-3">
+        <span className="w-24 flex-shrink-0 text-[11px] uppercase tracking-wide text-amber-800">
+          {KIND_LABEL[event.event_kind] ?? event.event_kind}
+        </span>
+        <span className="w-24 flex-shrink-0 text-[11px] text-stone-500">
+          {new Date(event.occurred_at).toLocaleDateString("id-ID", { year: "2-digit", month: "short", day: "numeric" })}
+        </span>
+        <span className="flex-1 text-stone-800">{summarize(event)}</span>
+      </div>
+      <EventAttachments attachments={attachments} />
     </li>
   );
 }

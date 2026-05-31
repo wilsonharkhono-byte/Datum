@@ -6,6 +6,7 @@ import type {
   Card,
   CardEvent,
   CardComment,
+  CardAttachment,
 } from "@datum/db";
 
 export type BoardColumn = { topic: Topic; cards: Card[] };
@@ -78,6 +79,35 @@ export async function getCardWithTimeline(
   if (evErr) throw evErr;
 
   return { card, events: events ?? [] };
+}
+
+export async function getCardAttachments(
+  supabase: SupabaseClient<Database>,
+  cardId: string,
+): Promise<Map<string, CardAttachment[]>> {
+  // Two-query approach to avoid type-inference issues with nested join syntax.
+  const { data: events, error: evErr } = await supabase
+    .from("card_events")
+    .select("id")
+    .eq("card_id", cardId);
+  if (evErr) throw evErr;
+
+  const eventIds = (events ?? []).map((e) => e.id);
+  if (eventIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from("card_attachments")
+    .select("*")
+    .in("card_event_id", eventIds);
+  if (error) throw error;
+
+  const byEvent = new Map<string, CardAttachment[]>();
+  for (const a of data ?? []) {
+    const arr = byEvent.get(a.card_event_id) ?? [];
+    arr.push(a as CardAttachment);
+    byEvent.set(a.card_event_id, arr);
+  }
+  return byEvent;
 }
 
 export async function getCardComments(

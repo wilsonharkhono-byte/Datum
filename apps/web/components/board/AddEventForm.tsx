@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition, type ReactNode } from "react";
-import { createCardEvent } from "@/lib/cards/mutations";
+import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
+import { uploadCardAttachment } from "@/lib/cards/upload";
 import type { EventKind } from "@datum/types";
 
 const KIND_LABELS: Record<EventKind, string> = {
@@ -163,11 +164,15 @@ export function AddEventForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [formKey, setFormKey] = useState(0); // bump to reset form values on kind change
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "done" | "error">("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
+    setUploadError(null);
     const fd = new FormData(e.currentTarget);
     fd.set("cardId", cardId);
     fd.set("projectId", projectId);
@@ -177,14 +182,46 @@ export function AddEventForm({
     if (occurredAt) fd.set("occurredAt", occurredAt);
     startTransition(async () => {
       const res = await createCardEvent(fd);
-      if (res.ok) {
-        setOpen(false);
-        setOccurredAt("");
-        setFormKey((k) => k + 1);
-      } else {
+      if (!res.ok) {
         setError(res.error);
         if (res.fieldErrors) setFieldErrors(res.fieldErrors);
+        return;
       }
+      // Event created. If files were selected, upload them in series.
+      if (files.length > 0) {
+        setUploadState("uploading");
+        for (const file of files) {
+          const up = await uploadCardAttachment({
+            file,
+            projectId,
+            cardId,
+            cardEventId: res.eventId,
+          });
+          if (!up.ok) {
+            setUploadError(`Upload gagal: ${file.name} — ${up.error}`);
+            setUploadState("error");
+            return; // leave the form open so user sees what failed
+          }
+          const aFd = new FormData();
+          aFd.set("cardEventId", res.eventId);
+          aFd.set("projectCode", projectCode);
+          aFd.set("cardSlug", cardSlug);
+          aFd.set("storagePath", up.storagePath);
+          aFd.set("mimeType", up.mimeType);
+          const a = await attachToEvent(aFd);
+          if (!a.ok) {
+            setUploadError(`Simpan lampiran gagal: ${file.name} — ${a.error}`);
+            setUploadState("error");
+            return;
+          }
+        }
+        setUploadState("done");
+      }
+      setOpen(false);
+      setOccurredAt("");
+      setFiles([]);
+      setUploadState("idle");
+      setFormKey((k) => k + 1);
     });
   }
 
@@ -247,6 +284,30 @@ export function AddEventForm({
         })}
       </div>
 
+      <div className="mt-3 border-t border-stone-200 pt-3">
+        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
+          Lampiran (opsional) — foto / PDF, maks 20MB per file
+        </label>
+        <input
+          type="file"
+          multiple
+          accept="image/*,application/pdf"
+          disabled={pending || uploadState === "uploading"}
+          onChange={(e) => {
+            const list = Array.from(e.target.files ?? []);
+            setFiles(list);
+            setUploadError(null);
+          }}
+          className="block w-full text-xs text-[#524E49] file:mr-3 file:rounded file:border file:border-[#B5AFA8] file:bg-white file:px-3 file:py-1 file:text-[10px] file:font-semibold file:uppercase file:tracking-wide file:text-[#524E49] hover:file:bg-[#FDFAF6]"
+        />
+        {files.length > 0 ? (
+          <div className="mt-1 text-[10px] text-[#847E78]">
+            {files.length} file dipilih: {files.map((f) => f.name).join(", ")}
+          </div>
+        ) : null}
+        {uploadError ? <div className="mt-1 text-[10px] text-red-700">{uploadError}</div> : null}
+      </div>
+
       <div className="mt-3 flex items-center gap-2">
         <label className="text-[10px] uppercase tracking-wide text-[#7A6B56]">
           Tanggal:
@@ -269,7 +330,7 @@ export function AddEventForm({
           disabled={pending}
           className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-stone-400"
         >
-          {pending ? "Menyimpan…" : "Simpan"}
+          {pending && uploadState === "uploading" ? "Mengupload…" : pending ? "Menyimpan…" : "Simpan"}
         </button>
         <button
           type="button"
@@ -278,6 +339,9 @@ export function AddEventForm({
             setOccurredAt("");
             setFieldErrors({});
             setError(null);
+            setFiles([]);
+            setUploadState("idle");
+            setUploadError(null);
             setFormKey((k) => k + 1);
           }}
           disabled={pending}
