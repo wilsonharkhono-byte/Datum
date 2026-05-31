@@ -1,11 +1,14 @@
 import type { BoardColumn } from "@/lib/cards/queries";
 import { MiniCard } from "./MiniCard";
+import { AddCardForm } from "./AddCardForm";
 
 export function Column({
   column,
+  projectId,
   projectCode,
 }: {
   column: BoardColumn;
+  projectId: string;
   projectCode: string;
 }) {
   return (
@@ -21,6 +24,7 @@ export function Column({
             <MiniCard key={card.id} card={card} projectCode={projectCode} />
           ))
         )}
+        <AddCardForm projectId={projectId} topicId={column.topic.id} projectCode={projectCode} />
       </div>
     </div>
   );
