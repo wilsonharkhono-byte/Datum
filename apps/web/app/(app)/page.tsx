@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { AreaGateMatrix } from "@/components/matrix/area-gate-matrix";
-import { fetchMatrix } from "@/lib/matrix/fetch-matrix";
 
 const statusLabel: Record<string, string> = {
   design: "Desain",
@@ -33,111 +31,55 @@ export default async function HomePage() {
     );
   }
 
-  const primaryProject = projects[0]!;
-  const matrix = await fetchMatrix(primaryProject.id);
-
   return (
     <div className="grid gap-6">
-      <section className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">
-            Dashboard proyek
-          </p>
-          <h1 className="max-w-3xl text-3xl font-semibold leading-tight text-[#141210]">
-            Kontrol finishing harian untuk area, gate, dan prioritas lapangan.
-          </h1>
-        </div>
-        <div className="rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6] p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B56]">
-            Fokus hari ini
-          </div>
-          <div className="mt-3 text-lg font-semibold text-[#141210]">
-            {primaryProject.project_code}
-          </div>
-          <div className="mt-1 text-sm text-[#524E49]">
-            {primaryProject.project_name}
-          </div>
-        </div>
+      <section>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">
+          DATUM
+        </p>
+        <h1 className="max-w-2xl text-3xl font-semibold leading-tight text-[#141210]">
+          Pilih proyek untuk membuka papan kartu dan asisten.
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm text-[#524E49]">
+          {projects.length} proyek aktif. Klik salah satu untuk melihat semua kartu per topik, timeline keputusan, dan bertanya pada asisten.
+        </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6] p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B56]">
-            Proyek aktif
-          </div>
-          <div className="mt-3 text-3xl font-semibold text-[#141210]">{projects.length}</div>
-        </div>
-        <div className="rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6] p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B56]">
-            Area fokus
-          </div>
-          <div className="mt-3 text-3xl font-semibold text-[#141210]">
-            {matrix?.areas.length ?? 0}
-          </div>
-        </div>
-        <div className="rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6] p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B56]">
-            Gate aktif
-          </div>
-          <div className="mt-3 text-3xl font-semibold text-[#141210]">
-            {matrix?.gates.length ?? 0}
-          </div>
-        </div>
-        <div className="rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6] p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B56]">
-            Status utama
-          </div>
-          <div className="mt-3 text-lg font-semibold text-[#141210]">
-            {statusLabel[primaryProject.status] ?? primaryProject.status}
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[360px_1fr]">
-        <div className="rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6]">
+      <section>
+        <div className="overflow-hidden rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6]">
           <div className="border-b border-[#B5AFA8] bg-[#141210] px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#FDFAF6]">
-            Proyek aktif
+            Proyek Aktif
           </div>
           <ul className="divide-y divide-[#B5AFA8]/70">
-        {projects.map((p) => (
-          <li key={p.id}>
-            <Link
-              href={`/project/${p.project_code}`}
-              className="block px-4 py-4 hover:bg-[#F4EFE6]/40"
-            >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="font-semibold text-[#141210]">
-              {p.project_code} · {p.project_name}
-            </div>
-                    <div className="mt-1 text-sm leading-5 text-[#524E49]">
-                      Client: {p.client_name ?? "-"}
-                      {p.location && ` · ${p.location}`}
+            {projects.map((p) => (
+              <li key={p.id}>
+                <Link
+                  href={`/project/${p.project_code}`}
+                  className="block px-4 py-4 transition-colors hover:bg-[#F4EFE6]/40"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="font-semibold text-[#141210]">
+                        {p.project_code} · {p.project_name}
+                      </div>
+                      <div className="mt-1 text-sm leading-5 text-[#524E49]">
+                        Client: {p.client_name ?? "-"}
+                        {p.location && ` · ${p.location}`}
+                      </div>
                     </div>
+                    <span className="rounded-[5px] bg-[#B29F86]/15 px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">
+                      {statusLabel[p.status] ?? p.status}
+                    </span>
                   </div>
-                  <span className="rounded-[5px] bg-[#B29F86]/15 px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">
-                    {statusLabel[p.status] ?? p.status}
-                  </span>
-                </div>
-                {p.target_handover && (
-                  <div className="mt-3 text-xs font-medium text-[#847E78]">
-                    Target serah terima: {p.target_handover}
-                  </div>
-                )}
-            </Link>
+                  {p.target_handover && (
+                    <div className="mt-3 text-xs font-medium text-[#847E78]">
+                      Target serah terima: {p.target_handover}
+                    </div>
+                  )}
+                </Link>
               </li>
             ))}
           </ul>
-        </div>
-
-        <div className="min-w-0 rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6] p-4">
-          {matrix ? (
-            <AreaGateMatrix data={matrix} />
-          ) : (
-            <div className="text-sm text-[#524E49]">
-              Matrix belum tersedia untuk proyek ini.
-            </div>
-          )}
         </div>
       </section>
     </div>
