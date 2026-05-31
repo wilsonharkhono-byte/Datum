@@ -308,6 +308,10 @@ async function main() {
   console.log("Test credentials:");
   console.log("  wilson@datum.local / datum-pilot-2026   (Principal, cost-visible)");
   console.log("  carissa@datum.local / datum-pilot-2026  (Designer)");
+
+  // Slice 1.1: sample cards
+  const { execSync } = await import("node:child_process");
+  execSync("npx tsx " + resolve(__dirname, "seed-cards.ts"), { stdio: "inherit" });
 }
 
 main().catch((err) => {

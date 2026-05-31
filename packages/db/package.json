@@ -10,7 +10,8 @@
     "migrate": "cd supabase && supabase db push",
     "reset": "cd supabase && supabase db reset --linked",
     "types": "supabase gen types typescript --linked 2>/dev/null > src/types.generated.ts",
-    "seed": "tsx scripts/seed-pilot.ts"
+    "seed": "tsx scripts/seed-pilot.ts",
+    "seed:cards": "tsx scripts/seed-cards.ts"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
