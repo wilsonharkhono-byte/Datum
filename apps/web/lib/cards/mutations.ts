@@ -270,3 +270,56 @@ export async function deleteComment(formData: FormData): Promise<CreateCommentRe
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
 }
+
+// ─── updateCard ───────────────────────────────────────────────────────────────
+
+const UpdateCardInput = z.object({
+  cardId:         z.string().uuid(),
+  projectId:      z.string().uuid(),
+  projectCode:    z.string().min(1),
+  cardSlug:       z.string().min(1),
+  title:          z.string().min(1).max(120).optional(),
+  currentSummary: z.string().max(2000).nullable().optional(),
+  status:         z.enum(["active", "dormant", "closed"]).optional(),
+});
+
+export type UpdateCardResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function updateCard(formData: FormData): Promise<UpdateCardResult> {
+  let input;
+  try {
+    const rawSummary = formData.get("currentSummary");
+    input = UpdateCardInput.parse({
+      cardId:      formData.get("cardId"),
+      projectId:   formData.get("projectId"),
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+      title:       formData.get("title") || undefined,
+      // empty string → null (clear summary); not present → leave alone
+      currentSummary: rawSummary === null ? undefined : (rawSummary === "" ? null : rawSummary),
+      status:      formData.get("status") || undefined,
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
+
+  const patch: Database["public"]["Tables"]["cards"]["Update"] = {};
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.currentSummary !== undefined) patch.current_summary = input.currentSummary;
+  if (input.status !== undefined) patch.status = input.status;
+
+  if (Object.keys(patch).length === 0) return { ok: true };
+
+  const { error } = await supabase.from("cards").update(patch).eq("id", input.cardId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  revalidatePath(`/project/${input.projectCode}`);
+  return { ok: true };
+}

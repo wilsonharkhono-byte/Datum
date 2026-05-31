@@ -40,7 +40,12 @@ export default async function CardDetailPage({
       <Link href={`/project/${slug}`} className="text-xs text-stone-500 hover:underline">
         ← {project.project_code}
       </Link>
-      <CardHeader card={detail.card} />
+      <CardHeader
+        card={detail.card}
+        projectId={project.id}
+        projectCode={slug}
+        cardSlug={cardSlug}
+      />
       <AddEventForm
         cardId={detail.card.id}
         projectId={project.id}
