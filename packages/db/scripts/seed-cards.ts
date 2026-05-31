@@ -108,7 +108,7 @@ async function main() {
         card_id:    cardId,
         project_id: proj.id,
         event_kind: ev.kind,
-        payload:    ev.payload,
+        payload:    ev.payload as Database["public"]["Tables"]["card_events"]["Insert"]["payload"],
         occurred_at: ev.occurredAt,
         logged_by_staff_id: wilsonId,
         source_kind: "manual",
