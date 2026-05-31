@@ -41,3 +41,6 @@ image.png
 
 # session helper file from setup
 .dropbox-ignore-list
+
+# brainstorming visual companion (transient mockups)
+.superpowers/
