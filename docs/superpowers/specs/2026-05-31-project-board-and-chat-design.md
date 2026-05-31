@@ -83,7 +83,7 @@ All new tables follow Slice 0 conventions: `uuid` primary keys, `created_at` / `
 create table public.cards (
   id                uuid primary key default gen_random_uuid(),
   project_id        uuid not null references public.projects(id),
-  topic_id          uuid not null references public.project_topics(id),
+  topic_id          uuid not null references public.topics(id),
   title             text not null,
   slug              text not null,                     -- url-friendly, unique within project
   status            text not null default 'active'
@@ -211,7 +211,7 @@ const VendorQuotePayload = z.object({
 
 ### 4.3 Topic (column) seed
 
-On project creation, seed `project_topics` with the standard taxonomy derived from the CAD checklist and the Trello exports:
+On project creation, seed `topics` with the standard taxonomy derived from the CAD checklist and the Trello exports:
 
 ```
 A01-03 — DTP (Denah, Tampak, Potongan)
@@ -339,7 +339,7 @@ The matrix UI from `apps/web/components/matrix/*` is removed from primary nav. T
 | `apps/web/components/matrix/*`, `apps/web/lib/matrix/*` | Removed from primary nav. Code retained behind `/project/[slug]/schedule` as an internal debug view. |
 | `area_gate_status` | Kept, repurposed as backend readiness store, recomputed from `card_events` |
 | `decisions`, `vendors`, `vendor_quotes`, `invoices` | Kept. Write paths route through `card_events`; payloads mirror into these typed tables where applicable for cross-card SQL queries. Read paths can still query these directly. |
-| `project_topics` | Kept — becomes the "column" table. Standard taxonomy seeded on project creation (§4.3). |
+| `topics` | Kept — becomes the "column" table. Standard taxonomy seeded on project creation (§4.3). |
 | `data_drafts`, `review_queue` | Kept and extended — every chat-captured event flows through here for high-risk items |
 | `project_events`, `record_revisions` | Kept — append-only audit unchanged |
 | RLS policies, `current_cost_visible_for()` | Kept; extended with policies for new `cards`, `card_events`, `card_attachments`, `card_comments`, `card_members`, `card_links` |
