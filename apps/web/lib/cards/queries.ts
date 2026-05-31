@@ -60,13 +60,13 @@ export async function getCardWithTimeline(
   projectId: string,
   cardSlug: string,
 ): Promise<CardDetail> {
-  const { data: cards, error: cardErr } = await supabase
+  const { data: card, error: cardErr } = await supabase
     .from("cards")
     .select("*")
     .eq("project_id", projectId)
-    .order("slug", { ascending: true });
+    .eq("slug", cardSlug)
+    .maybeSingle();
   if (cardErr) throw cardErr;
-  const card = (cards ?? []).find((c) => c.slug === cardSlug) ?? null;
   if (!card) throw new Error(`Card not found: ${cardSlug}`);
 
   const { data: events, error: evErr } = await supabase

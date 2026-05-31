@@ -1,20 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { getBoardForProject, getCardWithTimeline } from "@/lib/cards/queries";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 
 function fakeClient(map: Record<string, unknown>) {
+  function chain(table: string): any {
+    const data = map[table];
+    const builder: any = {
+      eq: () => builder,
+      order: () => Promise.resolve({ data, error: null }),
+      single: () => Promise.resolve({ data: (data as any)?.[0], error: null }),
+      maybeSingle: () => Promise.resolve({ data: (data as any)?.[0] ?? null, error: null }),
+      then: (cb: any) => cb({ data, error: null }),
+    };
+    return builder;
+  }
   return {
     from(table: string) {
       return {
-        select: () => ({
-          eq: () => ({
-            order: () => ({ then: (cb: any) => cb({ data: map[table], error: null }) }),
-            single: () => ({ then: (cb: any) => cb({ data: (map[table] as any)?.[0], error: null }) }),
-            maybeSingle: () => ({ then: (cb: any) => cb({ data: (map[table] as any)?.[0] ?? null, error: null }) }),
-          }),
-          order: () => ({ then: (cb: any) => cb({ data: map[table], error: null }) }),
-        }),
+        select: () => chain(table),
       };
     },
   } as unknown as SupabaseClient<Database>;
@@ -36,8 +40,8 @@ describe("getBoardForProject", () => {
     const board = await getBoardForProject(supa, "bdg-h1");
     expect(board.project.project_code).toBe("BDG-H1");
     expect(board.columns).toHaveLength(2);
-    expect(board.columns[0].topic.code).toBe("A05");
-    expect(board.columns[0].cards.map((c) => c.slug)).toEqual(["pintu"]);
+    expect(board.columns[0]!.topic.code).toBe("A05");
+    expect(board.columns[0]!.cards.map((c) => c.slug)).toEqual(["pintu"]);
   });
 });
 
@@ -53,6 +57,6 @@ describe("getCardWithTimeline", () => {
     const detail = await getCardWithTimeline(supa, "p1", "master");
     expect(detail.card.title).toBe("Master bath");
     expect(detail.events).toHaveLength(1);
-    expect(detail.events[0].event_kind).toBe("decision");
+    expect(detail.events[0]!.event_kind).toBe("decision");
   });
 });
