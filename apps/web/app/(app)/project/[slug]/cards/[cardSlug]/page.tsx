@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCardWithTimeline } from "@/lib/cards/queries";
 import { CardHeader } from "@/components/board/CardHeader";
 import { Timeline } from "@/components/board/Timeline";
+import { AddNoteForm } from "@/components/board/AddNoteForm";
 
 export default async function CardDetailPage({
   params,
@@ -37,6 +38,12 @@ export default async function CardDetailPage({
         ← {project.project_code}
       </Link>
       <CardHeader card={detail.card} />
+      <AddNoteForm
+        cardId={detail.card.id}
+        projectId={project.id}
+        projectCode={slug}
+        cardSlug={cardSlug}
+      />
       <Timeline events={detail.events} />
     </div>
   );
