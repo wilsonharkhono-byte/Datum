@@ -35,7 +35,7 @@ export default async function ProjectBoardPage({
       <div className="flex-1 overflow-hidden">
         <Board board={board} />
       </div>
-      <ChatDock projectId={board.project.id} />
+      <ChatDock projectId={board.project.id} projectCode={board.project.project_code} />
     </div>
   );
 }

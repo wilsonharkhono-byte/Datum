@@ -1,7 +1,15 @@
 "use client";
 import { useState } from "react";
 
-export function MessageInput({ onSend, disabled }: { onSend: (q: string) => void; disabled: boolean }) {
+export function MessageInput({
+  onSend,
+  disabled,
+  placeholder = "Tanya atau cari di kartu…",
+}: {
+  onSend: (q: string) => void;
+  disabled: boolean;
+  placeholder?: string;
+}) {
   const [value, setValue] = useState("");
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -16,7 +24,7 @@ export function MessageInput({ onSend, disabled }: { onSend: (q: string) => void
         value={value}
         onChange={(e) => setValue(e.target.value)}
         disabled={disabled}
-        placeholder="Tanya atau cari di kartu…"
+        placeholder={placeholder}
         className="flex-1 rounded border border-stone-300 px-3 py-1.5 text-sm focus:border-amber-700 focus:outline-none"
       />
       <button
