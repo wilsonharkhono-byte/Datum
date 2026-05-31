@@ -447,6 +447,261 @@ export type Database = {
           },
         ]
       }
+      card_areas: {
+        Row: {
+          area_id: string
+          card_id: string
+        }
+        Insert: {
+          area_id: string
+          card_id: string
+        }
+        Update: {
+          area_id?: string
+          card_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_areas_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_areas_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_attachments: {
+        Row: {
+          ai_caption: string | null
+          ai_extracted: Json | null
+          card_event_id: string
+          created_at: string
+          id: string
+          mime_type: string
+          storage_path: string
+        }
+        Insert: {
+          ai_caption?: string | null
+          ai_extracted?: Json | null
+          card_event_id: string
+          created_at?: string
+          id?: string
+          mime_type: string
+          storage_path: string
+        }
+        Update: {
+          ai_caption?: string | null
+          ai_extracted?: Json | null
+          card_event_id?: string
+          created_at?: string
+          id?: string
+          mime_type?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_attachments_card_event_id_fkey"
+            columns: ["card_event_id"]
+            isOneToOne: false
+            referencedRelation: "card_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_events: {
+        Row: {
+          card_id: string
+          cost_visible: boolean
+          created_at: string
+          draft_id: string | null
+          event_kind: Database["public"]["Enums"]["card_event_kind"]
+          id: string
+          logged_by_staff_id: string | null
+          occurred_at: string
+          payload: Json
+          project_id: string
+          source_id: string | null
+          source_kind: Database["public"]["Enums"]["card_event_source"]
+        }
+        Insert: {
+          card_id: string
+          cost_visible?: boolean
+          created_at?: string
+          draft_id?: string | null
+          event_kind: Database["public"]["Enums"]["card_event_kind"]
+          id?: string
+          logged_by_staff_id?: string | null
+          occurred_at: string
+          payload?: Json
+          project_id: string
+          source_id?: string | null
+          source_kind: Database["public"]["Enums"]["card_event_source"]
+        }
+        Update: {
+          card_id?: string
+          cost_visible?: boolean
+          created_at?: string
+          draft_id?: string | null
+          event_kind?: Database["public"]["Enums"]["card_event_kind"]
+          id?: string
+          logged_by_staff_id?: string | null
+          occurred_at?: string
+          payload?: Json
+          project_id?: string
+          source_id?: string | null
+          source_kind?: Database["public"]["Enums"]["card_event_source"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_events_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_events_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "data_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_events_logged_by_staff_id_fkey"
+            columns: ["logged_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_links: {
+        Row: {
+          created_at: string
+          created_by_staff_id: string | null
+          from_card_id: string
+          relation: Database["public"]["Enums"]["card_link_relation"]
+          to_card_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_staff_id?: string | null
+          from_card_id: string
+          relation: Database["public"]["Enums"]["card_link_relation"]
+          to_card_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_staff_id?: string | null
+          from_card_id?: string
+          relation?: Database["public"]["Enums"]["card_link_relation"]
+          to_card_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_links_created_by_staff_id_fkey"
+            columns: ["created_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_links_from_card_id_fkey"
+            columns: ["from_card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_links_to_card_id_fkey"
+            columns: ["to_card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards: {
+        Row: {
+          created_at: string
+          created_by_staff_id: string | null
+          current_summary: string | null
+          id: string
+          last_event_at: string | null
+          project_id: string
+          properties: Json
+          slug: string
+          status: Database["public"]["Enums"]["card_status"]
+          title: string
+          topic_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_staff_id?: string | null
+          current_summary?: string | null
+          id?: string
+          last_event_at?: string | null
+          project_id: string
+          properties?: Json
+          slug: string
+          status?: Database["public"]["Enums"]["card_status"]
+          title: string
+          topic_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_staff_id?: string | null
+          current_summary?: string | null
+          id?: string
+          last_event_at?: string | null
+          project_id?: string
+          properties?: Json
+          slug?: string
+          status?: Database["public"]["Enums"]["card_status"]
+          title?: string
+          topic_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_created_by_staff_id_fkey"
+            columns: ["created_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_drafts: {
         Row: {
           approval_required_role:
@@ -1767,6 +2022,10 @@ export type Database = {
       current_has_cross_project_read: { Args: never; Returns: boolean }
       current_is_assigned: { Args: { p_project_id: string }; Returns: boolean }
       current_staff_id: { Args: never; Returns: string }
+      seed_default_topics: {
+        Args: { p_project_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       area_type:
@@ -1790,6 +2049,29 @@ export type Database = {
         | "quality_failed"
         | "shop_drawing_pending"
         | "other"
+      card_event_kind:
+        | "decision"
+        | "drawing"
+        | "survey"
+        | "vendor_quote"
+        | "vendor_pick"
+        | "material"
+        | "worker_assigned"
+        | "progress"
+        | "defect"
+        | "photo"
+        | "document"
+        | "client_request"
+        | "note"
+        | "pending"
+      card_event_source:
+        | "chat"
+        | "manual"
+        | "import"
+        | "ai_extraction"
+        | "external_pdf"
+      card_link_relation: "depends_on" | "blocks" | "related_to" | "supersedes"
+      card_status: "active" | "dormant" | "closed"
       checkpoint_status: "pending" | "passed" | "failed" | "not_applicable"
       decision_category:
         | "material"
@@ -2074,6 +2356,31 @@ export const Constants = {
         "shop_drawing_pending",
         "other",
       ],
+      card_event_kind: [
+        "decision",
+        "drawing",
+        "survey",
+        "vendor_quote",
+        "vendor_pick",
+        "material",
+        "worker_assigned",
+        "progress",
+        "defect",
+        "photo",
+        "document",
+        "client_request",
+        "note",
+        "pending",
+      ],
+      card_event_source: [
+        "chat",
+        "manual",
+        "import",
+        "ai_extraction",
+        "external_pdf",
+      ],
+      card_link_relation: ["depends_on", "blocks", "related_to", "supersedes"],
+      card_status: ["active", "dormant", "closed"],
       checkpoint_status: ["pending", "passed", "failed", "not_applicable"],
       decision_category: [
         "material",

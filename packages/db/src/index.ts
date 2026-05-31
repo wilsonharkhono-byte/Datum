@@ -39,3 +39,14 @@ export type Invoice = Tables["invoices"]["Row"];
 // Slice 1.0 — drafts + review
 export type DataDraft = Tables["data_drafts"]["Row"];
 export type ReviewQueueItem = Tables["review_queue"]["Row"];
+
+// Slice 1.1 — cards layer
+export type Card             = Tables["cards"]["Row"];
+export type CardArea         = Tables["card_areas"]["Row"];
+export type CardEvent        = Tables["card_events"]["Row"];
+export type CardAttachment   = Tables["card_attachments"]["Row"];
+export type CardLink         = Tables["card_links"]["Row"];
+export type CardEventKind    = Enums["card_event_kind"];
+export type CardStatus       = Enums["card_status"];
+export type CardLinkRelation = Enums["card_link_relation"];
+export type CardEventSource  = Enums["card_event_source"];
