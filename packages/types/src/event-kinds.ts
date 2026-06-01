@@ -19,7 +19,7 @@ const DecisionPayload = z.object({
 const DrawingPayload = z.object({
   drawing_code: z.string().optional(),
   revision: z.string().optional(),
-  description: z.string(),
+  description: z.string().min(1),
   file_ref: z.string().optional(),
 });
 
@@ -35,7 +35,7 @@ const VendorQuotePayload = z.object({
   vendor_name: z.string().min(1),
   amount: z.number().nonnegative(),
   currency: z.literal("IDR").default("IDR"),
-  quote_date: z.string(),
+  quote_date: z.string().min(1),
   expires_at: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -126,8 +126,20 @@ export function parseEventPayload<K extends EventKind>(
   payload: unknown,
 ): EventPayloadByKind[K] {
   const schema = EventPayloadSchemas[kind];
+  if (!schema) {
+    throw new Error(`Unknown event_kind: ${String(kind)}`);
+  }
   return schema.parse(payload) as EventPayloadByKind[K];
 }
+
+// Type-level assertion that EVENT_KINDS covers every card_event_kind from the DB.
+// If a future DB migration adds a new enum value, regenerate types and this
+// assertion will fail at compile time, forcing EVENT_KINDS + schemas to be
+// updated in lockstep. Resolved at compile time only; no runtime cost.
+//
+// We can't import the DB type from @datum/db here (would create a circular
+// dep: db package depends on types package). Instead the consuming app should
+// add a parallel assertion. See apps/web/lib/cards/event-kind-drift.ts.
 
 // Kinds that always carry cost-sensitive data → card_events.cost_visible = true.
 export const COST_VISIBLE_KINDS: ReadonlySet<EventKind> = new Set([
