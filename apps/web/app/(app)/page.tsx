@@ -61,6 +61,9 @@ export default async function HomePage() {
           <Link href="/brief" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
             📋 Morning brief
           </Link>
+          <Link href="/search" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
+            🔍 Cari
+          </Link>
         </div>
       </section>
 
