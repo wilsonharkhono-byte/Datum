@@ -27,7 +27,15 @@ export default async function ProjectBoardPage({
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col">
       <header className="border-b border-stone-200 bg-white px-4 py-2">
-        <Link href="/" className="text-xs text-stone-500 hover:underline">← Proyek</Link>
+        <div className="flex items-center justify-between">
+          <Link href="/" className="text-xs text-stone-500 hover:underline">← Proyek</Link>
+          <Link
+            href={`/project/${board.project.project_code}/schedule`}
+            className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+          >
+            Jadwal & Readiness →
+          </Link>
+        </div>
         <h1 className="text-lg font-semibold text-stone-900">
           {board.project.project_code} · {board.project.project_name}
         </h1>
