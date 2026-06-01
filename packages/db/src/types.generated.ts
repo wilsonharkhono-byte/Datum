@@ -1595,6 +1595,104 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          actor_staff_id: string | null
+          card_comment_id: string | null
+          card_event_id: string | null
+          card_id: string | null
+          created_at: string
+          draft_id: string | null
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          link: string
+          project_id: string | null
+          read_at: string | null
+          recipient_staff_id: string
+          summary: string
+        }
+        Insert: {
+          actor_staff_id?: string | null
+          card_comment_id?: string | null
+          card_event_id?: string | null
+          card_id?: string | null
+          created_at?: string
+          draft_id?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          link: string
+          project_id?: string | null
+          read_at?: string | null
+          recipient_staff_id: string
+          summary: string
+        }
+        Update: {
+          actor_staff_id?: string | null
+          card_comment_id?: string | null
+          card_event_id?: string | null
+          card_id?: string | null
+          created_at?: string
+          draft_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          link?: string
+          project_id?: string | null
+          read_at?: string | null
+          recipient_staff_id?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_staff_id_fkey"
+            columns: ["actor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_card_comment_id_fkey"
+            columns: ["card_comment_id"]
+            isOneToOne: false
+            referencedRelation: "card_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_card_event_id_fkey"
+            columns: ["card_event_id"]
+            isOneToOne: false
+            referencedRelation: "card_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "data_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_staff_id_fkey"
+            columns: ["recipient_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_events: {
         Row: {
           actor_staff_id: string | null
@@ -2409,6 +2507,14 @@ export type Database = {
         | "installed"
         | "rejected"
       note_official_status: "draft" | "approved" | "rejected"
+      notification_kind:
+        | "mention"
+        | "watcher_event"
+        | "card_status"
+        | "draft_pending"
+        | "draft_approved"
+        | "draft_rejected"
+        | "review_assigned"
       project_status:
         | "design"
         | "construction"
@@ -2729,6 +2835,15 @@ export const Constants = {
         "rejected",
       ],
       note_official_status: ["draft", "approved", "rejected"],
+      notification_kind: [
+        "mention",
+        "watcher_event",
+        "card_status",
+        "draft_pending",
+        "draft_approved",
+        "draft_rejected",
+        "review_assigned",
+      ],
       project_status: [
         "design",
         "construction",

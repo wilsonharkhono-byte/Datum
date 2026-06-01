@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { getCurrentStaff } from "@/lib/auth/get-current-user";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
+import { NotificationBadge } from "@/components/notifications/NotificationBadge";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const staff = await getCurrentStaff();
@@ -23,7 +24,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-2">
+            <NotificationBadge />
+            <LogoutButton />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8">{children}</main>

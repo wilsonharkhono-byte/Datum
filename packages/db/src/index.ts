@@ -63,3 +63,7 @@ export type CardComment = Tables["card_comments"]["Row"];
 // Slice 1.2a — members
 export type CardMember     = Tables["card_members"]["Row"];
 export type CardMemberRole = Enums["card_member_role"];
+
+// Slice 1.4a — notifications
+export type Notification     = Tables["notifications"]["Row"];
+export type NotificationKind = Enums["notification_kind"];
