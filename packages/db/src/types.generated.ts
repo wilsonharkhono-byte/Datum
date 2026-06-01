@@ -833,6 +833,55 @@ export type Database = {
           },
         ]
       }
+      card_members: {
+        Row: {
+          added_at: string
+          added_by_staff_id: string | null
+          card_id: string
+          removed_at: string | null
+          role: Database["public"]["Enums"]["card_member_role"]
+          staff_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by_staff_id?: string | null
+          card_id: string
+          removed_at?: string | null
+          role?: Database["public"]["Enums"]["card_member_role"]
+          staff_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by_staff_id?: string | null
+          card_id?: string
+          removed_at?: string | null
+          role?: Database["public"]["Enums"]["card_member_role"]
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_members_added_by_staff_id_fkey"
+            columns: ["added_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_members_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cards: {
         Row: {
           created_at: string
@@ -2220,6 +2269,7 @@ export type Database = {
       current_has_cross_project_read: { Args: never; Returns: boolean }
       current_is_assigned: { Args: { p_project_id: string }; Returns: boolean }
       current_staff_id: { Args: never; Returns: string }
+      path_project_id: { Args: { p_path: string }; Returns: string }
       seed_default_topics: {
         Args: { p_project_id: string }
         Returns: undefined
@@ -2270,6 +2320,7 @@ export type Database = {
         | "ai_extraction"
         | "external_pdf"
       card_link_relation: "depends_on" | "blocks" | "related_to" | "supersedes"
+      card_member_role: "owner" | "watcher" | "assignee"
       card_status: "active" | "dormant" | "closed"
       checkpoint_status: "pending" | "passed" | "failed" | "not_applicable"
       decision_category:
@@ -2580,6 +2631,7 @@ export const Constants = {
         "external_pdf",
       ],
       card_link_relation: ["depends_on", "blocks", "related_to", "supersedes"],
+      card_member_role: ["owner", "watcher", "assignee"],
       card_status: ["active", "dormant", "closed"],
       checkpoint_status: ["pending", "passed", "failed", "not_applicable"],
       decision_category: [

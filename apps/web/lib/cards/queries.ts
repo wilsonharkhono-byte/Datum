@@ -7,6 +7,8 @@ import type {
   CardEvent,
   CardComment,
   CardAttachment,
+  CardMember,
+  Staff,
 } from "@datum/db";
 
 export type BoardColumn = { topic: Topic; cards: Card[] };
@@ -122,4 +124,38 @@ export async function getCardComments(
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data ?? [];
+}
+
+// ─── Slice 1.2a — card members ────────────────────────────────────────────────
+
+export type CardMemberWithStaff = CardMember & {
+  staff: Pick<Staff, "id" | "full_name" | "role"> | null;
+};
+
+export async function getCardMembers(
+  supabase: SupabaseClient<Database>,
+  cardId: string,
+): Promise<CardMemberWithStaff[]> {
+  const { data, error } = await supabase
+    .from("card_members")
+    .select("*, staff:staff_id (id, full_name, role)")
+    .eq("card_id", cardId)
+    .is("removed_at", null)
+    .order("added_at", { ascending: true });
+  if (error) throw error;
+  return (data as unknown as CardMemberWithStaff[]) ?? [];
+}
+
+export async function getProjectStaff(
+  supabase: SupabaseClient<Database>,
+  projectId: string,
+): Promise<Pick<Staff, "id" | "full_name" | "role">[]> {
+  // Staff assigned to this project plus cross-project-read roles
+  const { data, error } = await supabase
+    .from("staff")
+    .select("id, full_name, role")
+    .eq("active", true)
+    .order("full_name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Pick<Staff, "id" | "full_name" | "role">[];
 }

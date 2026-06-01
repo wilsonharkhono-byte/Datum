@@ -59,3 +59,7 @@ export type AssistantMessageRole  = Enums["assistant_message_role"];
 
 // Slice 1.1.3 — comments
 export type CardComment = Tables["card_comments"]["Row"];
+
+// Slice 1.2a — members
+export type CardMember     = Tables["card_members"]["Row"];
+export type CardMemberRole = Enums["card_member_role"];

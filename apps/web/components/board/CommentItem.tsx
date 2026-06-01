@@ -3,6 +3,26 @@ import { useState, useTransition } from "react";
 import type { CardComment } from "@datum/db";
 import { editComment, deleteComment } from "@/lib/cards/mutations";
 
+function renderBody(body: string): React.ReactNode[] {
+  // Split on @mention tokens and decorate them
+  const parts: React.ReactNode[] = [];
+  const re = /@([a-zA-Z][a-zA-Z0-9_-]{1,30})/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = re.exec(body)) !== null) {
+    if (match.index > last) parts.push(body.slice(last, match.index));
+    parts.push(
+      <span key={`m${key++}`} className="rounded bg-amber-100 px-1 text-amber-900">
+        @{match[1]}
+      </span>
+    );
+    last = match.index + match[0].length;
+  }
+  if (last < body.length) parts.push(body.slice(last));
+  return parts;
+}
+
 export function CommentItem({
   comment,
   projectCode,
@@ -90,7 +110,7 @@ export function CommentItem({
           </div>
         </form>
       ) : (
-        <p className="whitespace-pre-wrap text-[#141210]">{comment.body}</p>
+        <p className="whitespace-pre-wrap text-[#141210]">{renderBody(comment.body)}</p>
       )}
     </li>
   );

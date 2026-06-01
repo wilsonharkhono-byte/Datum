@@ -196,10 +196,29 @@ export async function createComment(formData: FormData): Promise<CreateCommentRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
 
+  // Parse @mentions — extract @<first-name-token>, resolve to active staff by case-insensitive first-name match
+  const mentionTokens = Array.from(new Set(
+    (input.body.match(/@([a-zA-Z][a-zA-Z0-9_-]{1,30})/g) ?? [])
+      .map((m) => m.slice(1).toLowerCase())
+  ));
+
+  let mentionedStaffIds: string[] = [];
+  if (mentionTokens.length > 0) {
+    const { data: candidates } = await supabase
+      .from("staff").select("id, full_name").eq("active", true);
+    const ids = new Set<string>();
+    for (const cand of candidates ?? []) {
+      const first = (cand.full_name ?? "").split(/\s+/)[0]?.toLowerCase();
+      if (first && mentionTokens.includes(first)) ids.add(cand.id);
+    }
+    mentionedStaffIds = Array.from(ids);
+  }
+
   const { error } = await supabase.from("card_comments").insert({
     card_id:             input.cardId,
     project_id:          input.projectId,
     body:                input.body,
+    mentions:            mentionedStaffIds,
     created_by_staff_id: user.id,
   });
   if (error) return { ok: false, error: error.message };
@@ -232,8 +251,25 @@ export async function editComment(formData: FormData): Promise<CreateCommentResu
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
+  // Re-extract mentions from the edited body
+  const mentionTokens = Array.from(new Set(
+    (input.body.match(/@([a-zA-Z][a-zA-Z0-9_-]{1,30})/g) ?? [])
+      .map((m) => m.slice(1).toLowerCase())
+  ));
+  let mentionedStaffIds: string[] = [];
+  if (mentionTokens.length > 0) {
+    const { data: candidates } = await supabase
+      .from("staff").select("id, full_name").eq("active", true);
+    const ids = new Set<string>();
+    for (const cand of candidates ?? []) {
+      const first = (cand.full_name ?? "").split(/\s+/)[0]?.toLowerCase();
+      if (first && mentionTokens.includes(first)) ids.add(cand.id);
+    }
+    mentionedStaffIds = Array.from(ids);
+  }
+
   const { error } = await supabase.from("card_comments")
-    .update({ body: input.body, edited_at: new Date().toISOString() })
+    .update({ body: input.body, edited_at: new Date().toISOString(), mentions: mentionedStaffIds })
     .eq("id", input.commentId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
@@ -341,6 +377,93 @@ export async function signAttachment(formData: FormData): Promise<SignAttachment
   if (error || !data) return { ok: false, error: error?.message ?? "Gagal membuat URL" };
 
   return { ok: true, url: data.signedUrl };
+}
+
+// ─── Slice 1.2a — card members ────────────────────────────────────────────────
+
+const AddMemberInput = z.object({
+  cardId:      z.string().uuid(),
+  staffId:     z.string().uuid(),
+  role:        z.enum(["owner","watcher","assignee"]).default("watcher"),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+});
+
+export type MemberResult = { ok: true } | { ok: false; error: string };
+
+export async function addCardMember(formData: FormData): Promise<MemberResult> {
+  let input;
+  try {
+    input = AddMemberInput.parse({
+      cardId:      formData.get("cardId"),
+      staffId:     formData.get("staffId"),
+      role:        formData.get("role") || "watcher",
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  // Upsert pattern: if a soft-removed row exists, un-remove it; otherwise insert.
+  const { data: existing } = await supabase.from("card_members")
+    .select("removed_at")
+    .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role)
+    .maybeSingle();
+
+  let dbErr;
+  if (existing) {
+    const { error } = await supabase.from("card_members")
+      .update({ removed_at: null, added_at: new Date().toISOString(), added_by_staff_id: user.id })
+      .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role);
+    dbErr = error;
+  } else {
+    const { error } = await supabase.from("card_members").insert({
+      card_id:           input.cardId,
+      staff_id:          input.staffId,
+      role:              input.role,
+      added_by_staff_id: user.id,
+    });
+    dbErr = error;
+  }
+  if (dbErr) return { ok: false, error: dbErr.message };
+
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  return { ok: true };
+}
+
+const RemoveMemberInput = z.object({
+  cardId:      z.string().uuid(),
+  staffId:     z.string().uuid(),
+  role:        z.enum(["owner","watcher","assignee"]),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+});
+
+export async function removeCardMember(formData: FormData): Promise<MemberResult> {
+  let input;
+  try {
+    input = RemoveMemberInput.parse({
+      cardId:      formData.get("cardId"),
+      staffId:     formData.get("staffId"),
+      role:        formData.get("role"),
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("card_members")
+    .update({ removed_at: new Date().toISOString() })
+    .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role)
+    .is("removed_at", null);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  return { ok: true };
 }
 
 // ─── updateCard ───────────────────────────────────────────────────────────────

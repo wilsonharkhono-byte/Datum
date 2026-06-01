@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCardWithTimeline, getCardAttachments } from "@/lib/cards/queries";
+import { getCardWithTimeline, getCardAttachments, getCardMembers, getProjectStaff } from "@/lib/cards/queries";
 import { CardHeader } from "@/components/board/CardHeader";
+import { CardMembers } from "@/components/board/CardMembers";
 import { Timeline } from "@/components/board/Timeline";
 import { AddEventForm } from "@/components/board/AddEventForm";
 import { CommentsSection } from "@/components/board/CommentsSection";
@@ -35,7 +36,12 @@ export default async function CardDetailPage({
     );
   }
 
-  const attachmentsByEvent = await getCardAttachments(supabase, detail.card.id);
+  const [attachmentsByEvent, memberRows, candidates] = await Promise.all([
+    getCardAttachments(supabase, detail.card.id),
+    getCardMembers(supabase, detail.card.id),
+    getProjectStaff(supabase, project.id),
+  ]);
+  const members = memberRows.map((m) => ({ staff_id: m.staff_id, role: m.role, staff: m.staff }));
 
   return (
     <div className="mx-auto max-w-3xl p-4">
@@ -47,6 +53,13 @@ export default async function CardDetailPage({
         projectId={project.id}
         projectCode={slug}
         cardSlug={cardSlug}
+      />
+      <CardMembers
+        cardId={detail.card.id}
+        projectCode={slug}
+        cardSlug={cardSlug}
+        members={members}
+        candidates={candidates}
       />
       <AddEventForm
         cardId={detail.card.id}
