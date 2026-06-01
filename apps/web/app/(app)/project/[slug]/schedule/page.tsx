@@ -29,6 +29,13 @@ export default async function ProjectSchedulePage({
 
   const matrix = await fetchMatrix(project.id);
 
+  // Count stale cells
+  const { count: staleCount } = await supabase
+    .from("area_gate_status")
+    .select("*", { count: "exact", head: true })
+    .eq("project_id", project.id)
+    .eq("stale", true);
+
   // Latest recompute time across all cells
   const { data: latest } = await supabase
     .from("area_gate_status")
@@ -46,6 +53,12 @@ export default async function ProjectSchedulePage({
         </Link>
         <RecomputeButton projectId={project.id} projectCode={project.project_code} />
       </div>
+
+      {staleCount && staleCount > 0 ? (
+        <div className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          🔄 {staleCount} sel butuh recompute — klik tombol di atas untuk update.
+        </div>
+      ) : null}
 
       <header className="mb-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">

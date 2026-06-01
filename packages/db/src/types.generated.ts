@@ -256,6 +256,7 @@ export type Database = {
           last_recomputed_at: string | null
           project_id: string
           readiness_score: number | null
+          stale: boolean
           status: Database["public"]["Enums"]["readiness_state"]
           target_end_date: string | null
           target_start_date: string | null
@@ -272,6 +273,7 @@ export type Database = {
           last_recomputed_at?: string | null
           project_id: string
           readiness_score?: number | null
+          stale?: boolean
           status?: Database["public"]["Enums"]["readiness_state"]
           target_end_date?: string | null
           target_start_date?: string | null
@@ -288,6 +290,7 @@ export type Database = {
           last_recomputed_at?: string | null
           project_id?: string
           readiness_score?: number | null
+          stale?: boolean
           status?: Database["public"]["Enums"]["readiness_state"]
           target_end_date?: string | null
           target_start_date?: string | null
@@ -2269,6 +2272,10 @@ export type Database = {
       current_has_cross_project_read: { Args: never; Returns: boolean }
       current_is_assigned: { Args: { p_project_id: string }; Returns: boolean }
       current_staff_id: { Args: never; Returns: string }
+      mark_areas_stale_for_card: {
+        Args: { p_card_id: string }
+        Returns: undefined
+      }
       path_project_id: { Args: { p_path: string }; Returns: string }
       seed_default_topics: {
         Args: { p_project_id: string }

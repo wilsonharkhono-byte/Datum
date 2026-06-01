@@ -85,6 +85,7 @@ export async function recomputeAreaGateStatus(formData: FormData): Promise<Recom
         readiness_score:      result.readinessScore,
         blocking_reason:      result.blockingReason,
         last_recomputed_at:   now,
+        stale:                false,
       }, { onConflict: "project_id,area_id,gate_code" });
       if (uErr) return { ok: false, error: `${gate}/${area.id}: ${uErr.message}` };
       cellsUpdated++;
