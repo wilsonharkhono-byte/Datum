@@ -133,3 +133,13 @@ export function parseEventPayload<K extends EventKind>(
 export const COST_VISIBLE_KINDS: ReadonlySet<EventKind> = new Set([
   "vendor_quote",
 ]);
+
+// Kinds that require human approval when captured via AI chat
+// (cost-sensitive + client-facing + high-impact items)
+export const HIGH_RISK_KINDS: ReadonlySet<EventKind> = new Set([
+  "vendor_quote",
+  "vendor_pick",
+  "decision",
+  "defect",
+  "client_request",
+]);

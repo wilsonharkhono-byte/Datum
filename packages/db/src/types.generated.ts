@@ -2362,6 +2362,7 @@ export type Database = {
         | "progress_update"
         | "cost_quote"
         | "invoice"
+        | "card_event"
       drawing_status:
         | "required"
         | "issued"
@@ -2676,6 +2677,7 @@ export const Constants = {
         "progress_update",
         "cost_quote",
         "invoice",
+        "card_event",
       ],
       drawing_status: [
         "required",

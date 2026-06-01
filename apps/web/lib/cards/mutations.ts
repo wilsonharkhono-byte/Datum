@@ -7,6 +7,7 @@ import {
   EVENT_KINDS,
   EventPayloadSchemas,
   COST_VISIBLE_KINDS,
+  HIGH_RISK_KINDS,
   type EventKind,
 } from "@datum/types";
 import type { Database } from "@datum/db";
@@ -565,5 +566,177 @@ export async function moveCard(formData: FormData): Promise<MoveCardResult> {
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   revalidatePath(`/project/${input.projectCode}`);
+  return { ok: true };
+}
+
+// ─── Slice 1.2d — draft/approval flow for high-risk chat captures ─────────────
+
+const CreateCardEventDraftInput = z.object({
+  cardId:       z.string().uuid(),
+  projectId:    z.string().uuid(),
+  projectCode:  z.string().min(1),
+  cardSlug:     z.string().min(1),
+  eventKind:    z.enum(EVENT_KINDS),
+  occurredAt:   z.string().optional(),
+  rationale:    z.string().optional(),
+  originalText: z.string().max(4000).optional(),
+});
+
+export type CreateDraftResult =
+  | { ok: true; draftId: string }
+  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+export async function createCardEventDraft(formData: FormData): Promise<CreateDraftResult> {
+  let input;
+  try {
+    input = CreateCardEventDraftInput.parse({
+      cardId:       formData.get("cardId"),
+      projectId:    formData.get("projectId"),
+      projectCode:  formData.get("projectCode"),
+      cardSlug:     formData.get("cardSlug"),
+      eventKind:    formData.get("eventKind"),
+      occurredAt:   formData.get("occurredAt") || undefined,
+      rationale:    formData.get("rationale") || undefined,
+      originalText: formData.get("originalText") || undefined,
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+
+  const rawPayload = collectPayload(formData);
+  const schema = EventPayloadSchemas[input.eventKind];
+  const parsed = schema.safeParse(rawPayload);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      if (issue.path[0] && typeof issue.path[0] === "string") {
+        fieldErrors[issue.path[0]] = issue.message;
+      }
+    }
+    return { ok: false, error: "Isi data wajib", fieldErrors };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  const proposed = {
+    kind:        input.eventKind,
+    payload:     parsed.data,
+    card_id:     input.cardId,
+    occurred_at: input.occurredAt ?? new Date().toISOString(),
+    rationale:   input.rationale ?? null,
+  };
+
+  const { data, error } = await supabase.from("data_drafts").insert({
+    project_id:          input.projectId,
+    draft_type:          "card_event",
+    proposed_payload:    proposed as unknown as Database["public"]["Tables"]["data_drafts"]["Insert"]["proposed_payload"],
+    risk_level:          HIGH_RISK_KINDS.has(input.eventKind) ? "high" : "medium",
+    source_type:         "assistant_chat",
+    original_input_text: input.originalText ?? null,
+    created_by_staff_id: user.id,
+  }).select("id").single();
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  revalidatePath("/review");
+  return { ok: true, draftId: data.id };
+}
+
+const ApproveDraftInput = z.object({
+  draftId: z.string().uuid(),
+});
+
+export type ApproveDraftResult =
+  | { ok: true; eventId: string }
+  | { ok: false; error: string };
+
+export async function approveCardEventDraft(formData: FormData): Promise<ApproveDraftResult> {
+  let input;
+  try {
+    input = ApproveDraftInput.parse({ draftId: formData.get("draftId") });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  // Load the draft
+  const { data: draft, error: dErr } = await supabase
+    .from("data_drafts").select("*").eq("id", input.draftId).maybeSingle();
+  if (dErr || !draft) return { ok: false, error: "Draft tidak ditemukan" };
+  if (draft.status !== "draft") return { ok: false, error: `Draft sudah ${draft.status}` };
+  if (draft.draft_type !== "card_event") return { ok: false, error: "Draft bukan card_event" };
+
+  const proposed = draft.proposed_payload as {
+    kind: string;
+    payload: Record<string, unknown>;
+    card_id: string;
+    occurred_at: string;
+  };
+
+  // Re-validate the payload defensively
+  const schema = EventPayloadSchemas[proposed.kind as keyof typeof EventPayloadSchemas];
+  if (!schema) return { ok: false, error: `Kind tidak valid: ${proposed.kind}` };
+  const recheck = schema.safeParse(proposed.payload);
+  if (!recheck.success) return { ok: false, error: "Payload tidak lolos validasi ulang" };
+
+  // Insert the card_event
+  const { data: ev, error: evErr } = await supabase.from("card_events").insert({
+    card_id:            proposed.card_id,
+    project_id:         draft.project_id,
+    event_kind:         proposed.kind as Database["public"]["Enums"]["card_event_kind"],
+    payload:            proposed.payload as unknown as Database["public"]["Tables"]["card_events"]["Insert"]["payload"],
+    occurred_at:        proposed.occurred_at,
+    logged_by_staff_id: draft.created_by_staff_id,
+    source_kind:        "chat",
+    cost_visible:       COST_VISIBLE_KINDS.has(proposed.kind as EventKind),
+    draft_id:           draft.id,
+  }).select("id").single();
+  if (evErr) return { ok: false, error: evErr.message };
+
+  // Mark the draft approved + record promotion
+  await supabase.from("data_drafts").update({
+    status:               "approved",
+    approved_by_staff_id: user.id,
+    approved_at:          new Date().toISOString(),
+    promoted_record_type: "card_events",
+    promoted_record_id:   ev.id,
+  }).eq("id", draft.id);
+
+  revalidatePath("/review");
+  return { ok: true, eventId: ev.id };
+}
+
+const RejectDraftInput = z.object({
+  draftId: z.string().uuid(),
+  reason:  z.string().max(500).optional(),
+});
+
+export async function rejectCardEventDraft(formData: FormData): Promise<MemberResult> {
+  let input;
+  try {
+    input = RejectDraftInput.parse({
+      draftId: formData.get("draftId"),
+      reason:  formData.get("reason") || undefined,
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  const { error } = await supabase.from("data_drafts").update({
+    status:               "rejected",
+    rejected_by_staff_id: user.id,
+    rejected_at:          new Date().toISOString(),
+    rejection_reason:     input.reason ?? null,
+  }).eq("id", input.draftId).eq("status", "draft");
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/review");
   return { ok: true };
 }

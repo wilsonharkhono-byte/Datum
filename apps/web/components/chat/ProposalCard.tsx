@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
-import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
+import { createCardEvent, attachToEvent, createCardEventDraft } from "@/lib/cards/mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
+import { HIGH_RISK_KINDS, type EventKind } from "@datum/types";
 
 export type Proposal = {
   projectId:  string;
@@ -40,24 +41,55 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  const isHighRisk = HIGH_RISK_KINDS.has(proposal.eventKind as EventKind);
+
   function commit() {
     setError(null);
     setStatus("saving");
-    const fd = new FormData();
-    fd.set("cardId",      proposal.cardId);
-    fd.set("projectId",   proposal.projectId);
-    fd.set("projectCode", proposal.projectCode);
-    fd.set("cardSlug",    proposal.cardSlug);
-    fd.set("eventKind",   proposal.eventKind);
-    for (const [k, v] of Object.entries(proposal.payload)) {
-      const value = Array.isArray(v)
-        ? v.join(",")
-        : v == null
-        ? ""
-        : String(v);
-      fd.set(`payload_${k}`, value);
-    }
+
     startTransition(async () => {
+      if (isHighRisk) {
+        // High-risk path: stage as draft, skip file upload (follow-up)
+        const dfd = new FormData();
+        dfd.set("cardId",      proposal.cardId);
+        dfd.set("projectId",   proposal.projectId);
+        dfd.set("projectCode", proposal.projectCode);
+        dfd.set("cardSlug",    proposal.cardSlug);
+        dfd.set("eventKind",   proposal.eventKind);
+        if (proposal.rationale) dfd.set("rationale", proposal.rationale);
+        for (const [k, v] of Object.entries(proposal.payload)) {
+          const value = Array.isArray(v)
+            ? v.join(",")
+            : v == null
+            ? ""
+            : String(v);
+          dfd.set(`payload_${k}`, value);
+        }
+        const dres = await createCardEventDraft(dfd);
+        if (!dres.ok) {
+          setStatus("error");
+          setError(dres.error);
+          return;
+        }
+        setStatus("saved");
+        return;
+      }
+
+      // Low-risk path: commit directly as card_event
+      const fd = new FormData();
+      fd.set("cardId",      proposal.cardId);
+      fd.set("projectId",   proposal.projectId);
+      fd.set("projectCode", proposal.projectCode);
+      fd.set("cardSlug",    proposal.cardSlug);
+      fd.set("eventKind",   proposal.eventKind);
+      for (const [k, v] of Object.entries(proposal.payload)) {
+        const value = Array.isArray(v)
+          ? v.join(",")
+          : v == null
+          ? ""
+          : String(v);
+        fd.set(`payload_${k}`, value);
+      }
       const res = await createCardEvent(fd);
       if (!res.ok) {
         setStatus("error");
@@ -126,6 +158,11 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
       {proposal.rationale ? (
         <p className="mb-2 text-[10px] italic text-stone-600">"{proposal.rationale}"</p>
       ) : null}
+      {isHighRisk ? (
+        <div className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-900">
+          🔒 Kategori berisiko tinggi — akan dikirim ke /review untuk approval principal
+        </div>
+      ) : null}
       {error ? <div className="mb-2 text-[10px] text-red-700">{error}</div> : null}
       {status === "pending" || status === "error" ? (
         <div className="flex gap-1.5">
@@ -147,7 +184,11 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
       ) : status === "saving" ? (
         <div className="text-[10px] text-stone-600">Menyimpan…</div>
       ) : status === "saved" ? (
-        <div className="text-[10px] text-green-700">&#10003; Tersimpan di kartu.</div>
+        <div className="text-[10px] text-green-700">
+          {isHighRisk
+            ? "✓ Tersimpan sebagai draft. Menunggu approval di /review."
+            : "✓ Tersimpan di kartu."}
+        </div>
       ) : (
         <div className="text-[10px] text-stone-500">Dibatalkan.</div>
       )}

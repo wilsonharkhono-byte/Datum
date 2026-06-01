@@ -16,6 +16,12 @@ export default async function HomePage() {
     .select("id, project_code, project_name, client_name, location, status, target_handover")
     .order("project_code");
 
+  const { count: pendingDraftCount } = await supabase
+    .from("data_drafts")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "draft")
+    .eq("draft_type", "card_event");
+
   if (error) {
     return (
       <div className="rounded-[8px] border border-[#C62828]/25 bg-[rgba(198,40,40,0.08)] p-4 text-sm font-medium text-[#C62828]">
@@ -43,6 +49,11 @@ export default async function HomePage() {
         <p className="mt-2 max-w-2xl text-sm text-[#524E49]">
           {projects.length} proyek aktif. Klik salah satu untuk melihat semua kartu per topik, timeline keputusan, dan bertanya pada asisten.
         </p>
+        {pendingDraftCount && pendingDraftCount > 0 ? (
+          <Link href="/review" className="mt-2 inline-block rounded bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200">
+            🔔 {pendingDraftCount} draft menunggu review →
+          </Link>
+        ) : null}
       </section>
 
       <section>
