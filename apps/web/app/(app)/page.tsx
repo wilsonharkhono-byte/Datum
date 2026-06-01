@@ -54,6 +54,11 @@ export default async function HomePage() {
             🔔 {pendingDraftCount} draft menunggu review →
           </Link>
         ) : null}
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/activity" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
+            📋 Aktivitas terbaru
+          </Link>
+        </div>
       </section>
 
       <section>
