@@ -11,11 +11,12 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [pending, setPending] = useState(false);
 
-  async function send(input: string) {
-    setMessages((m) => [...m, { role: "user", content: input }]);
+  async function send(input: string, file: File | null) {
+    setMessages((m) => [...m, { role: "user", content: input + (file ? " 📎" : "") }]);
     setPending(true);
     try {
       if (mode === "tanya") {
+        // File ignored in Tanya mode (could be a future enhancement)
         const res = await fetch("/api/assistant/message", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -29,14 +30,21 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         const res = await fetch("/api/assistant/capture", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId, text: input }),
+          body: JSON.stringify({
+            projectId,
+            text: input,
+            file: file ? { name: file.name, mime: file.type || "application/octet-stream", size: file.size } : undefined,
+          }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!data.ok) {
           setMessages((m) => [...m, { role: "assistant", content: `Tidak bisa mencatat: ${data.error}` }]);
         } else {
-          setMessages((m) => [...m, { role: "assistant", proposal: { ...data.proposal, projectCode } }]);
+          // Stash the actual File object on the proposal so ProposalCard can upload it on commit
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const proposalWithFile = { ...data.proposal, projectCode, pendingFile: file ?? undefined } as any;
+          setMessages((m) => [...m, { role: "assistant", proposal: proposalWithFile }]);
         }
       }
     } catch (e) {
@@ -82,10 +90,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
       <MessageInput
         onSend={send}
         disabled={pending}
+        acceptFiles={mode === "catat"}
         placeholder={
           mode === "tanya"
             ? "Tanya atau cari di kartu…"
-            : "Catat sesuatu — mis. 'marmer Statuario disetujui klien'"
+            : "Catat sesuatu atau drop file…"
         }
       />
     </div>

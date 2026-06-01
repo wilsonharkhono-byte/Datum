@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
-import { createCardEvent } from "@/lib/cards/mutations";
+import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
+import { uploadCardAttachment } from "@/lib/cards/upload";
 
 export type Proposal = {
   projectId:  string;
@@ -13,6 +14,8 @@ export type Proposal = {
   rationale:  string;
   confidence: number;
   projectCode: string;
+  fileMeta?:  { name: string; mime: string; size: number } | null;
+  pendingFile?: File;
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -56,12 +59,38 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
     }
     startTransition(async () => {
       const res = await createCardEvent(fd);
-      if (res.ok) {
-        setStatus("saved");
-      } else {
+      if (!res.ok) {
         setStatus("error");
         setError(res.error);
+        return;
       }
+      // Upload pending file if present
+      if (proposal.pendingFile) {
+        const up = await uploadCardAttachment({
+          file: proposal.pendingFile,
+          projectId: proposal.projectId,
+          cardId: proposal.cardId,
+          cardEventId: res.eventId,
+        });
+        if (!up.ok) {
+          setStatus("error");
+          setError(`Event tersimpan tapi upload gagal: ${up.error}`);
+          return;
+        }
+        const aFd = new FormData();
+        aFd.set("cardEventId", res.eventId);
+        aFd.set("projectCode", proposal.projectCode);
+        aFd.set("cardSlug", proposal.cardSlug);
+        aFd.set("storagePath", up.storagePath);
+        aFd.set("mimeType", up.mimeType);
+        const a = await attachToEvent(aFd);
+        if (!a.ok) {
+          setStatus("error");
+          setError(`Event tersimpan tapi simpan lampiran gagal: ${a.error}`);
+          return;
+        }
+      }
+      setStatus("saved");
     });
   }
 
@@ -85,6 +114,12 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
       <div className="mb-2 text-[10px] uppercase tracking-wide text-amber-800">
         {KIND_LABELS[proposal.eventKind] ?? proposal.eventKind}
       </div>
+      {proposal.fileMeta || proposal.pendingFile ? (
+        <div className="mb-2 rounded border border-amber-200 bg-white px-2 py-1 text-[10px] text-stone-700">
+          📎 {proposal.fileMeta?.name ?? proposal.pendingFile?.name} —
+          akan diupload setelah ✓ Simpan
+        </div>
+      ) : null}
       <pre className="mb-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-amber-200 bg-white p-2 text-[10px] text-stone-800">
         {JSON.stringify(proposal.payload, null, 2)}
       </pre>

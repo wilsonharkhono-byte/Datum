@@ -8,6 +8,11 @@ import { EVENT_KINDS, EventPayloadSchemas, type EventKind } from "@datum/types";
 const Body = z.object({
   projectId: z.string().uuid(),
   text:      z.string().min(1).max(4000),
+  file:      z.object({
+    name: z.string().min(1).max(255),
+    mime: z.string().min(1).max(120),
+    size: z.number().int().nonnegative().max(20_971_520), // 20MB
+  }).optional(),
 });
 
 const CAPTURE_SYSTEM = `Anda adalah asisten internal DATUM untuk WHAstudio.
@@ -78,13 +83,17 @@ export async function POST(req: Request) {
     `- card_id=${card.id} | topic="${topicName}" | title="${card.title}"${card.current_summary ? ` | summary="${card.current_summary}"` : ""}`
   ).join("\n");
 
+  const fileHint = body.file
+    ? `\n\nLAMPIRAN FILE TERLAMPIR:\n- Nama: ${body.file.name}\n- Mime: ${body.file.mime}\n- Ukuran: ${Math.round(body.file.size / 1024)} KB\nPilih event_kind "photo" untuk gambar (image/*) atau "document" untuk PDF, kecuali konteks input jelas-jelas berbeda.`
+    : "";
+
   const res = await getClient().messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1024,
     system: CAPTURE_SYSTEM,
     messages: [{
       role: "user",
-      content: `KARTU TERSEDIA:\n${cardList}\n\nINPUT PENGGUNA:\n${body.text}`,
+      content: `KARTU TERSEDIA:\n${cardList}\n\nINPUT PENGGUNA:\n${body.text}${fileHint}`,
     }],
   });
 
@@ -146,6 +155,7 @@ export async function POST(req: Request) {
       payload:    payloadCheck.data,
       rationale:  typeof parsed.rationale === "string" ? parsed.rationale : "",
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0,
+      fileMeta:   body.file ? { name: body.file.name, mime: body.file.mime, size: body.file.size } : null,
     },
   });
 }
