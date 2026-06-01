@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCardWithTimeline, getCardAttachments, getCardMembers, getProjectStaff } from "@/lib/cards/queries";
+import { getCardWithTimeline, getCardAttachments, getCardMembers, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
 import { CardHeader } from "@/components/board/CardHeader";
 import { CardMembers } from "@/components/board/CardMembers";
+import { MoveCardControl } from "@/components/board/MoveCardControl";
 import { Timeline } from "@/components/board/Timeline";
 import { AddEventForm } from "@/components/board/AddEventForm";
 import { CommentsSection } from "@/components/board/CommentsSection";
@@ -36,18 +37,29 @@ export default async function CardDetailPage({
     );
   }
 
-  const [attachmentsByEvent, memberRows, candidates] = await Promise.all([
+  const [attachmentsByEvent, memberRows, candidates, topics] = await Promise.all([
     getCardAttachments(supabase, detail.card.id),
     getCardMembers(supabase, detail.card.id),
     getProjectStaff(supabase, project.id),
+    getProjectTopics(supabase, project.id),
   ]);
   const members = memberRows.map((m) => ({ staff_id: m.staff_id, role: m.role, staff: m.staff }));
 
   return (
     <div className="mx-auto max-w-3xl p-4">
-      <Link href={`/project/${slug}`} className="text-xs text-stone-500 hover:underline">
-        ← {project.project_code}
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href={`/project/${slug}`} className="text-xs text-stone-500 hover:underline">
+          ← {project.project_code}
+        </Link>
+        <MoveCardControl
+          cardId={detail.card.id}
+          projectId={project.id}
+          projectCode={slug}
+          cardSlug={cardSlug}
+          currentTopicId={detail.card.topic_id}
+          topics={topics}
+        />
+      </div>
       <CardHeader
         card={detail.card}
         projectId={project.id}

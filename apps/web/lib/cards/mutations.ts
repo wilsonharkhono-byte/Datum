@@ -518,3 +518,52 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
   revalidatePath(`/project/${input.projectCode}`);
   return { ok: true };
 }
+
+// ─── moveCard — Slice 1.2b ────────────────────────────────────────────────────
+
+const MoveCardInput = z.object({
+  cardId:       z.string().uuid(),
+  newTopicId:   z.string().uuid(),
+  projectId:    z.string().uuid(),
+  projectCode:  z.string().min(1),
+  cardSlug:     z.string().min(1),
+});
+
+export type MoveCardResult = { ok: true } | { ok: false; error: string };
+
+export async function moveCard(formData: FormData): Promise<MoveCardResult> {
+  let input;
+  try {
+    input = MoveCardInput.parse({
+      cardId:      formData.get("cardId"),
+      newTopicId:  formData.get("newTopicId"),
+      projectId:   formData.get("projectId"),
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  // Sanity: the target topic must belong to the same project
+  const { data: topic } = await supabase
+    .from("topics").select("id, project_id")
+    .eq("id", input.newTopicId).maybeSingle();
+  if (!topic) return { ok: false, error: "Kolom tujuan tidak ditemukan" };
+  if (topic.project_id !== input.projectId) {
+    return { ok: false, error: "Kolom tujuan ada di proyek lain" };
+  }
+
+  const { error } = await supabase.from("cards")
+    .update({ topic_id: input.newTopicId })
+    .eq("id", input.cardId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  revalidatePath(`/project/${input.projectCode}`);
+  return { ok: true };
+}

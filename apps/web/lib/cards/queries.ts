@@ -159,3 +159,18 @@ export async function getProjectStaff(
   if (error) throw error;
   return (data ?? []) as Pick<Staff, "id" | "full_name" | "role">[];
 }
+
+// ─── Slice 1.2b — move card ───────────────────────────────────────────────────
+
+export async function getProjectTopics(
+  supabase: SupabaseClient<Database>,
+  projectId: string,
+): Promise<Topic[]> {
+  const { data, error } = await supabase
+    .from("topics")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
