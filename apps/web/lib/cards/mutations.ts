@@ -11,6 +11,14 @@ import {
   type EventKind,
 } from "@datum/types";
 import type { Database } from "@datum/db";
+import {
+  notifyMentions,
+  notifyWatchersOfEvent,
+  notifyCardStatusChange,
+  notifyDraftApproved,
+  notifyDraftRejected,
+  notifyDraftPending,
+} from "@/lib/notifications/producers";
 
 const CreateCardInput = z.object({
   projectId:   z.string().uuid(),
@@ -162,6 +170,21 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   }).select("id").single();
   if (error) return { ok: false, error: error.message };
 
+  const { data: cardRow } = await supabase
+    .from("cards").select("title, slug").eq("id", input.cardId).maybeSingle();
+  if (cardRow) {
+    await notifyWatchersOfEvent(supabase, {
+      eventId: data.id,
+      eventKind: input.eventKind,
+      actorId: user.id,
+      projectId: input.projectId,
+      projectCode: input.projectCode,
+      cardId: input.cardId,
+      cardSlug: cardRow.slug,
+      cardTitle: cardRow.title,
+    });
+  }
+
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true, eventId: data.id };
 }
@@ -215,14 +238,27 @@ export async function createComment(formData: FormData): Promise<CreateCommentRe
     mentionedStaffIds = Array.from(ids);
   }
 
-  const { error } = await supabase.from("card_comments").insert({
+  const { data: inserted, error } = await supabase.from("card_comments").insert({
     card_id:             input.cardId,
     project_id:          input.projectId,
     body:                input.body,
     mentions:            mentionedStaffIds,
     created_by_staff_id: user.id,
-  });
+  }).select("id").single();
   if (error) return { ok: false, error: error.message };
+
+  if (inserted?.id) {
+    await notifyMentions(supabase, {
+      mentionedStaffIds,
+      actorId: user.id,
+      projectId: input.projectId,
+      cardId: input.cardId,
+      cardSlug: input.cardSlug,
+      cardComment: { id: inserted.id, body: input.body },
+      projectCode: input.projectCode,
+    });
+  }
+
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
 }
@@ -269,10 +305,25 @@ export async function editComment(formData: FormData): Promise<CreateCommentResu
     mentionedStaffIds = Array.from(ids);
   }
 
-  const { error } = await supabase.from("card_comments")
+  const { data: updatedComment, error } = await supabase.from("card_comments")
     .update({ body: input.body, edited_at: new Date().toISOString(), mentions: mentionedStaffIds })
-    .eq("id", input.commentId);
+    .eq("id", input.commentId)
+    .select("id, card_id, project_id")
+    .single();
   if (error) return { ok: false, error: error.message };
+
+  if (updatedComment?.id && updatedComment.card_id && updatedComment.project_id) {
+    await notifyMentions(supabase, {
+      mentionedStaffIds,
+      actorId: user.id,
+      projectId: updatedComment.project_id,
+      cardId: updatedComment.card_id,
+      cardSlug: input.cardSlug,
+      cardComment: { id: updatedComment.id, body: input.body },
+      projectCode: input.projectCode,
+    });
+  }
+
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
 }
@@ -515,6 +566,22 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
   const { error } = await supabase.from("cards").update(patch).eq("id", input.cardId);
   if (error) return { ok: false, error: error.message };
 
+  if (input.status !== undefined) {
+    const { data: cardRow } = await supabase
+      .from("cards").select("title").eq("id", input.cardId).maybeSingle();
+    if (cardRow) {
+      await notifyCardStatusChange(supabase, {
+        cardId: input.cardId,
+        cardTitle: cardRow.title,
+        cardSlug: input.cardSlug,
+        projectId: input.projectId,
+        projectCode: input.projectCode,
+        newStatus: input.status,
+        actorId: user.id,
+      });
+    }
+  }
+
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   revalidatePath(`/project/${input.projectCode}`);
   return { ok: true };
@@ -639,6 +706,19 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
   }).select("id").single();
   if (error) return { ok: false, error: error.message };
 
+  const { data: cardRow } = await supabase
+    .from("cards").select("title").eq("id", input.cardId).maybeSingle();
+  if (cardRow) {
+    await notifyDraftPending(supabase, {
+      draftId: data.id,
+      actorId: user.id,
+      projectId: input.projectId,
+      eventKind: input.eventKind,
+      cardTitle: cardRow.title,
+      cardId: input.cardId,
+    });
+  }
+
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   revalidatePath("/review");
   return { ok: true, draftId: data.id };
@@ -706,6 +786,23 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
     promoted_record_id:   ev.id,
   }).eq("id", draft.id);
 
+  const { data: cardRow } = await supabase
+    .from("cards").select("slug").eq("id", proposed.card_id).maybeSingle();
+  const { data: projRow } = await supabase
+    .from("projects").select("project_code").eq("id", draft.project_id).maybeSingle();
+  if (cardRow && projRow && draft.created_by_staff_id) {
+    await notifyDraftApproved(supabase, {
+      draftId: draft.id,
+      draftAuthorId: draft.created_by_staff_id,
+      approverActorId: user.id,
+      projectId: draft.project_id,
+      projectCode: projRow.project_code,
+      cardId: proposed.card_id,
+      cardSlug: cardRow.slug,
+      eventKind: proposed.kind,
+    });
+  }
+
   revalidatePath("/review");
   return { ok: true, eventId: ev.id };
 }
@@ -736,6 +833,20 @@ export async function rejectCardEventDraft(formData: FormData): Promise<MemberRe
     rejection_reason:     input.reason ?? null,
   }).eq("id", input.draftId).eq("status", "draft");
   if (error) return { ok: false, error: error.message };
+
+  const { data: draft } = await supabase
+    .from("data_drafts").select("project_id, created_by_staff_id, proposed_payload").eq("id", input.draftId).maybeSingle();
+  if (draft && draft.created_by_staff_id) {
+    const kind = (draft.proposed_payload as { kind?: string })?.kind ?? "card_event";
+    await notifyDraftRejected(supabase, {
+      draftId: input.draftId,
+      draftAuthorId: draft.created_by_staff_id,
+      rejectorActorId: user.id,
+      projectId: draft.project_id ?? "",
+      reason: input.reason ?? null,
+      eventKind: kind,
+    });
+  }
 
   revalidatePath("/review");
   return { ok: true };
