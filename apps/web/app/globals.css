@@ -115,3 +115,168 @@ body {
   padding: 0.25rem 1.5rem 0.25rem 0.5rem;
   font-size: 0.75rem;  /* 12px */
 }
+
+/* Segmented control — Trello-style tab group.
+   A darker oat pill that contains the buttons. The active button is a
+   warm-white surface that visually "lifts" via a soft warm shadow.
+   Usage:
+     <div class="seg"><button class="seg-btn seg-active">…</button>…</div> */
+.seg {
+  display: inline-flex;
+  align-items: stretch;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--oat-deep);
+  border: 1px solid color-mix(in oklch, var(--border) 70%, var(--oat-deep));
+  gap: 2px;
+}
+
+.seg-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--text-secondary) 75%, transparent);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 120ms ease-out, background-color 120ms ease-out,
+    font-weight 120ms ease-out;
+  white-space: nowrap;
+}
+
+.seg-btn:hover:not(.seg-active) {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--surface) 50%, transparent);
+}
+
+.seg-active {
+  color: var(--foreground);
+  background: var(--surface);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  box-shadow:
+    inset 0 -2px 0 var(--sand-dark),
+    0 1px 0 color-mix(in oklch, var(--foreground) 10%, transparent),
+    0 3px 6px -1px color-mix(in oklch, #7a6b56 30%, transparent);
+}
+
+/* Strong input — used on the assistant chat input where the focus state
+   must feel like a confident, tactile target, not just a hairline border
+   color swap. Pairs a sand-tinted outer ring with a warm lift shadow.
+   Usage: <input class="input-strong"> */
+.input-strong {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  transition: border-color 120ms ease-out, box-shadow 160ms ease-out,
+    background-color 120ms ease-out;
+}
+
+.input-strong::placeholder {
+  color: var(--text-muted);
+}
+
+.input-strong:hover:not(:focus) {
+  border-color: var(--text-secondary);
+}
+
+.input-strong:focus,
+.input-strong:focus-visible {
+  outline: none;
+  border-color: var(--sand-dark);
+  background: #ffffff;
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--sand) 28%, transparent),
+    0 6px 16px -6px color-mix(in oklch, var(--sand-dark) 45%, transparent),
+    inset 0 1px 0 color-mix(in oklch, #ffffff 60%, transparent);
+}
+
+/* Filter chip — single chip outside a segmented group. Used for status
+   ladders (Aktif / Tertunda / Selesai) and event-kind chips on the
+   timeline. Active state is a confident dark fill with a warm shadow. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.625rem;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 120ms ease-out, background-color 120ms ease-out,
+    border-color 120ms ease-out, box-shadow 120ms ease-out;
+  white-space: nowrap;
+}
+
+.chip:hover:not(.chip-on) {
+  color: var(--foreground);
+  border-color: var(--text-secondary);
+}
+
+.chip-on {
+  background: var(--foreground);
+  color: var(--text-inverse);
+  border-color: var(--foreground);
+  box-shadow: 0 1px 3px color-mix(in oklch, #7a6b56 35%, transparent);
+}
+
+.chip-sand {
+  background: var(--sand-dark);
+  color: var(--text-inverse);
+  border-color: var(--sand-dark);
+  box-shadow: 0 1px 3px color-mix(in oklch, #7a6b56 30%, transparent);
+}
+
+/* === PRINT (PDF export via browser ctrl-P) ============================== */
+@media print {
+  :root {
+    /* Force light, print-safe surfaces regardless of OS preference */
+    --background: #ffffff;
+    --surface: #ffffff;
+    --surface-alt: #f7f5ef;
+  }
+  body {
+    background: #ffffff;
+    color: #141210;
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+  /* Hide all chrome that isn't part of the printable content */
+  .print-hide { display: none !important; }
+  /* The .print-page wrapper sets margins + max width so it fits A4 cleanly */
+  .print-page {
+    max-width: 180mm;
+    margin: 0 auto;
+    padding: 0;
+  }
+  /* Page break helpers */
+  .print-break-before { break-before: page; page-break-before: always; }
+  .print-break-avoid  { break-inside: avoid; page-break-inside: avoid; }
+  /* Hyperlinks in print should not look hover-blue */
+  a, a:visited { color: #524e49; text-decoration: none; }
+  /* Tighten table grids */
+  table { font-size: 9pt; }
+  @page {
+    size: A4;
+    margin: 15mm 15mm 18mm 15mm;
+  }
+}
+/* Always-applicable: don't print these by default */
+.print-only { display: none; }
+@media print { .print-only { display: block; } }

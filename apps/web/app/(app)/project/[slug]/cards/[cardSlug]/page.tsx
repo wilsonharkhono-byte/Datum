@@ -44,49 +44,106 @@ export default async function CardDetailPage({
     getProjectTopics(supabase, project.id),
   ]);
   const members = memberRows.map((m) => ({ staff_id: m.staff_id, role: m.role, staff: m.staff }));
+  const topicName = topics.find((t) => t.id === detail.card.topic_id)?.name ?? "—";
 
   return (
-    <div className="mx-auto max-w-3xl p-4">
-      <div className="flex items-center justify-between">
-        <Link href={`/project/${slug}`} className="text-xs text-[var(--text-muted)] hover:underline">
-          ← {project.project_code}
-        </Link>
-        <MoveCardControl
-          cardId={detail.card.id}
-          projectId={project.id}
-          projectCode={slug}
-          cardSlug={cardSlug}
-          currentTopicId={detail.card.topic_id}
-          topics={topics}
-        />
+    <div className="bg-[var(--background)] py-4 md:py-6">
+      <div className="mx-auto max-w-6xl px-3 md:px-4">
+        {/* Trello-style modal shell — warm-white surface, dark signature header,
+            focused 2-column body on desktop, stacks to one column on mobile. */}
+        <div className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_8px_24px_-12px_rgba(122,107,86,0.35)]">
+          {/* Modal-style header — brand's signature dark bar, like the homepage Projek Aktif row */}
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2.5 text-[var(--text-inverse)] md:px-6">
+            <Link
+              href={`/project/${slug}`}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
+            >
+              ← {project.project_code}
+            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/project/${slug}/cards/${cardSlug}/print`}
+                className="text-xs font-semibold uppercase tracking-wide text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
+              >
+                Cetak →
+              </Link>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-inverse-secondary)]">
+                {topicName} · Detail Kartu
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-0 md:grid-cols-[1fr_280px]">
+            {/* Main column — the focused content */}
+            <div className="border-b border-[var(--border)] px-4 py-4 md:border-b-0 md:border-r md:px-6 md:py-5">
+              <CardHeader
+                card={detail.card}
+                projectId={project.id}
+                projectCode={slug}
+                cardSlug={cardSlug}
+              />
+              <div className="mt-5">
+                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
+                  Tambah aktivitas
+                </h2>
+                <AddEventForm
+                  cardId={detail.card.id}
+                  projectId={project.id}
+                  projectCode={slug}
+                  cardSlug={cardSlug}
+                />
+              </div>
+              <div className="mt-6 border-t border-[var(--border)] pt-4">
+                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
+                  Timeline aktivitas
+                </h2>
+                <Timeline events={detail.events} attachmentsByEvent={attachmentsByEvent} />
+              </div>
+              <div className="mt-6 border-t border-[var(--border)] pt-4">
+                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
+                  Diskusi
+                </h2>
+                <CommentsSection
+                  cardId={detail.card.id}
+                  projectId={project.id}
+                  projectCode={slug}
+                  cardSlug={cardSlug}
+                  currentStaffId={currentStaffId}
+                />
+              </div>
+            </div>
+
+            {/* Sidebar — Trello-style actions/members panel */}
+            <aside className="bg-[var(--surface-alt)] px-4 py-4 md:py-5">
+              <div>
+                <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sand-dark)]">
+                  Pindah kolom
+                </h2>
+                <MoveCardControl
+                  cardId={detail.card.id}
+                  projectId={project.id}
+                  projectCode={slug}
+                  cardSlug={cardSlug}
+                  currentTopicId={detail.card.topic_id}
+                  topics={topics}
+                />
+              </div>
+              <div className="mt-5 border-t border-[var(--border)] pt-4">
+                <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sand-dark)]">
+                  Anggota kartu
+                </h2>
+                <CardMembers
+                  cardId={detail.card.id}
+                  projectCode={slug}
+                  cardSlug={cardSlug}
+                  members={members}
+                  candidates={candidates}
+                />
+              </div>
+            </aside>
+          </div>
+        </div>
       </div>
-      <CardHeader
-        card={detail.card}
-        projectId={project.id}
-        projectCode={slug}
-        cardSlug={cardSlug}
-      />
-      <CardMembers
-        cardId={detail.card.id}
-        projectCode={slug}
-        cardSlug={cardSlug}
-        members={members}
-        candidates={candidates}
-      />
-      <AddEventForm
-        cardId={detail.card.id}
-        projectId={project.id}
-        projectCode={slug}
-        cardSlug={cardSlug}
-      />
-      <Timeline events={detail.events} attachmentsByEvent={attachmentsByEvent} />
-      <CommentsSection
-        cardId={detail.card.id}
-        projectId={project.id}
-        projectCode={slug}
-        cardSlug={cardSlug}
-        currentStaffId={currentStaffId}
-      />
     </div>
   );
 }
