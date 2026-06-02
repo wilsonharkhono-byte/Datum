@@ -25,8 +25,11 @@ export default async function ActivityPage() {
       </p>
 
       {groups.size === 0 ? (
-        <div className="mt-6 rounded border border-dashed border-[#B5AFA8] p-6 text-center text-sm italic text-[#847E78]">
-          Belum ada aktivitas.
+        <div className="mt-6 rounded border border-dashed border-[#B5AFA8] p-6 text-center">
+          <p className="text-sm italic text-[#524E49]">Belum ada aktivitas.</p>
+          <p className="mt-1 text-xs text-[#847E78]">
+            Buat kartu pertama atau tambah catatan di kartu yang sudah ada untuk mulai melihat aktivitas di sini.
+          </p>
         </div>
       ) : null}
 

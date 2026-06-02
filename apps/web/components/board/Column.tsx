@@ -18,7 +18,10 @@ export function Column({
       </h2>
       <div className="flex-1 space-y-1.5 overflow-y-auto">
         {column.cards.length === 0 ? (
-          <p className="px-1 text-[11px] italic text-[var(--text-muted)]">Belum ada kartu</p>
+          <div className="rounded border border-dashed border-[var(--border)] p-6">
+            <p className="text-[11px] italic text-[var(--text-secondary)]">Belum ada kartu di kolom ini</p>
+            <p className="mt-1 text-[10px] text-[var(--text-muted)]">Klik &ldquo;+ tambah kartu&rdquo; di bawah untuk membuat.</p>
+          </div>
         ) : (
           column.cards.map((card) => (
             <MiniCard key={card.id} card={card} projectCode={projectCode} />

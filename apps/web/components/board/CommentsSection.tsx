@@ -27,8 +27,9 @@ export async function CommentsSection({
 
       <ol className="space-y-2">
         {comments.length === 0 ? (
-          <li className="rounded border border-dashed border-[#B5AFA8] px-3 py-3 text-xs italic text-[#847E78]">
-            Belum ada komentar. Mulai diskusi di bawah.
+          <li className="rounded border border-dashed border-[#B5AFA8] p-6">
+            <p className="text-xs italic text-[#524E49]">Belum ada komentar. Mulai diskusi di bawah.</p>
+            <p className="mt-1 text-[10px] text-[#847E78]">Gunakan @nama untuk menyebut rekan kerja.</p>
           </li>
         ) : null}
         {comments.map((c) => (

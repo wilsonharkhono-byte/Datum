@@ -24,7 +24,14 @@ export default async function BriefPage() {
           emoji="📝"
           count={brief.pendingDrafts.count}
           items={brief.pendingDrafts.items}
-          emptyMessage="Tidak ada draft yang menunggu."
+          emptyMessage={
+            <>
+              <p className="text-xs italic text-[#524E49]">Tidak ada draft yang menunggu.</p>
+              <p className="mt-1 text-[10px] text-[#847E78]">
+                Asisten mencatat di sini saat ada vendor quote / decision / defect berisiko tinggi.
+              </p>
+            </>
+          }
           showAllHref="/review"
         />
         <BriefSection
@@ -32,21 +39,42 @@ export default async function BriefPage() {
           emoji="⏳"
           count={brief.openPendings.count}
           items={brief.openPendings.items}
-          emptyMessage="Tidak ada item pending."
+          emptyMessage={
+            <>
+              <p className="text-xs italic text-[#524E49]">Tidak ada item pending.</p>
+              <p className="mt-1 text-[10px] text-[#847E78]">
+                Item pending muncul saat seseorang mencatat &ldquo;pending&rdquo; sebagai jenis aktivitas di kartu.
+              </p>
+            </>
+          }
         />
         <BriefSection
           title="Defect aktif (30 hari)"
           emoji="🚧"
           count={brief.defects.count}
           items={brief.defects.items}
-          emptyMessage="Tidak ada defect terbaru."
+          emptyMessage={
+            <>
+              <p className="text-xs italic text-[#524E49]">Tidak ada defect terbaru.</p>
+              <p className="mt-1 text-[10px] text-[#847E78]">
+                Catat defect dengan severity dan lokasi di kartu untuk muncul di sini.
+              </p>
+            </>
+          }
         />
         <BriefSection
           title="Permintaan klien"
           emoji="📨"
           count={brief.awaitingClient.count}
           items={brief.awaitingClient.items}
-          emptyMessage="Tidak ada permintaan klien aktif."
+          emptyMessage={
+            <>
+              <p className="text-xs italic text-[#524E49]">Tidak ada permintaan klien aktif.</p>
+              <p className="mt-1 text-[10px] text-[#847E78]">
+                Catat permintaan klien (kind: permintaan klien) di kartu agar tidak terlupakan.
+              </p>
+            </>
+          }
         />
       </div>
 

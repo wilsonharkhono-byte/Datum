@@ -36,22 +36,30 @@ export function NotificationList({ items }: { items: Notification[] }) {
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-[#524E49]">
-          {items.length === 0 ? "Tidak ada notifikasi." : `${unread} belum dibaca dari ${items.length} terbaru`}
-        </p>
-        {unread > 0 ? (
-          <button
-            type="button"
-            onClick={markAll}
-            disabled={busy}
-            aria-label="Tandai semua notifikasi sebagai dibaca"
-            className="rounded border border-[#B5AFA8] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56] disabled:opacity-50"
-          >
-            tandai semua dibaca
-          </button>
-        ) : null}
-      </div>
+      {items.length === 0 ? (
+        <div className="rounded border border-dashed border-[#B5AFA8] p-6">
+          <p className="italic text-sm text-[#524E49]">Tidak ada notifikasi.</p>
+          <p className="mt-1 text-xs text-[#847E78]">
+            Notifikasi muncul saat ada @mention, draft yang menunggu approval, atau aktivitas di kartu yang Anda tonton.
+          </p>
+        </div>
+      ) : null}
+      {items.length > 0 ? (
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-sm text-[#524E49]">{unread} belum dibaca dari {items.length} terbaru</p>
+          {unread > 0 ? (
+            <button
+              type="button"
+              onClick={markAll}
+              disabled={busy}
+              aria-label="Tandai semua notifikasi sebagai dibaca"
+              className="rounded border border-[#B5AFA8] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56] disabled:opacity-50"
+            >
+              tandai semua dibaca
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <ol className="space-y-2">
         {items.map((n) => {
           const isUnread = n.read_at === null;

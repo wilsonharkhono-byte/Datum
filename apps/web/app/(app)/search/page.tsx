@@ -37,11 +37,15 @@ export default async function SearchPage({
       </div>
 
       {q.trim().length === 0 ? (
-        <p className="mt-8 text-sm italic text-[#847E78]">Ketik minimal 2 karakter.</p>
+        <div className="mt-8 rounded border border-dashed border-[#B5AFA8] p-6">
+          <p className="text-sm italic text-[#524E49]">Ketik di kotak di atas untuk mencari kartu, aktivitas, atau komentar.</p>
+          <p className="mt-1 text-xs text-[#847E78]">Pencarian berbasis teks di seluruh proyek yang Anda akses.</p>
+        </div>
       ) : total === 0 ? (
-        <p className="mt-8 text-sm italic text-[#847E78]">
-          Tidak ada hasil untuk &ldquo;{q}&rdquo;.
-        </p>
+        <div className="mt-8 rounded border border-dashed border-[#B5AFA8] p-6">
+          <p className="text-sm italic text-[#524E49]">Tidak ada hasil untuk &ldquo;{q}&rdquo;.</p>
+          <p className="mt-1 text-xs text-[#847E78]">Coba kata kunci yang lebih pendek atau cek ejaan.</p>
+        </div>
       ) : (
         <p className="mt-6 text-xs text-[#7A6B56]">{total} hasil ditemukan</p>
       )}

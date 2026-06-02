@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { BriefItem } from "@/lib/brief/queries";
+import type React from "react";
 
 export function BriefSection({
   title,
@@ -13,7 +14,7 @@ export function BriefSection({
   emoji: string;
   count: number;
   items: BriefItem[];
-  emptyMessage: string;
+  emptyMessage: React.ReactNode;
   showAllHref?: string;
 }) {
   return (
@@ -29,7 +30,9 @@ export function BriefSection({
         ) : null}
       </div>
       {items.length === 0 ? (
-        <p className="text-xs italic text-[#847E78]">{emptyMessage}</p>
+        <div className="rounded border border-dashed border-[#B5AFA8] p-6">
+          {emptyMessage}
+        </div>
       ) : (
         <ol className="space-y-1.5">
           {items.map((it) => (

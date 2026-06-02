@@ -32,8 +32,11 @@ export default async function ReviewPage() {
 
       <ol className="mt-6 space-y-3">
         {(drafts ?? []).length === 0 ? (
-          <li className="rounded border border-dashed border-[#B5AFA8] px-4 py-6 text-center text-sm italic text-[#847E78]">
-            Tidak ada draft yang menunggu review.
+          <li className="rounded border border-dashed border-[#B5AFA8] p-6 text-center">
+            <p className="text-sm italic text-[#524E49]">Tidak ada draft yang menunggu review.</p>
+            <p className="mt-1 text-xs text-[#847E78]">
+              Draft muncul di sini saat asisten mencatat sesuatu yang berisiko tinggi (vendor_quote, decision, defect, dll) dan menunggu persetujuan principal.
+            </p>
           </li>
         ) : null}
         {(drafts ?? []).map((d) => (

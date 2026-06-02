@@ -51,7 +51,17 @@ export function Timeline({
   );
 
   if (events.length === 0) {
-    return <p className="mt-6 italic text-[var(--text-muted)]">Belum ada aktivitas tercatat.</p>;
+    return (
+      <div className="mt-6 rounded border border-dashed border-[var(--border)] p-6">
+        <p className="italic text-[var(--text-secondary)]">Belum ada aktivitas tercatat.</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Klik &ldquo;+ tambah aktivitas&rdquo; di atas untuk mencatat keputusan, gambar, vendor, atau item lainnya.
+        </p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Atau gunakan Asisten (mode Catat) untuk mencatat lebih cepat.
+        </p>
+      </div>
+    );
   }
 
   return (
