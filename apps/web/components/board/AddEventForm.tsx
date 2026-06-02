@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, useId, type ReactNode } from "react";
 import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
 import type { EventKind } from "@datum/types";
@@ -157,6 +157,7 @@ export function AddEventForm({
   projectCode: string;
   cardSlug: string;
 }) {
+  const formId = useId();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<EventKind>("note");
   const [occurredAt, setOccurredAt] = useState("");
@@ -230,6 +231,7 @@ export function AddEventForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        aria-label="Tambah aktivitas baru"
         className="mt-4 w-full rounded border border-dashed border-[#B5AFA8] px-3 py-2 text-left text-xs font-medium text-[#7A6B56] hover:border-[#7A6B56] hover:bg-[#FDFAF6]"
       >
         + tambah aktivitas
@@ -238,6 +240,9 @@ export function AddEventForm({
   }
 
   const fields = FIELDS_BY_KIND[kind];
+  const kindSelectId = `${formId}-kind`;
+  const dateInputId = `${formId}-occurred-at`;
+  const attachInputId = `${formId}-attachment`;
 
   return (
     <form
@@ -246,10 +251,11 @@ export function AddEventForm({
       className="mt-4 rounded border border-[#B5AFA8] bg-[#FDFAF6] p-3"
     >
       <div className="mb-3 flex items-center gap-2">
-        <label className="text-[10px] uppercase tracking-wide text-[#7A6B56]">
+        <label htmlFor={kindSelectId} className="text-[10px] uppercase tracking-wide text-[#7A6B56]">
           Jenis:
         </label>
         <select
+          id={kindSelectId}
           value={kind}
           onChange={(e) => {
             setKind(e.target.value as EventKind);
@@ -268,14 +274,15 @@ export function AddEventForm({
       <div className="space-y-2.5">
         {fields.map((f) => {
           const errMsg = fieldErrors[f.name];
+          const fieldId = `${formId}-payload-${f.name}`;
           const baseInput =
             "w-full rounded border border-[var(--border)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none";
           return (
             <div key={f.name}>
-              <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
+              <label htmlFor={fieldId} className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
                 {f.label}{f.required ? " *" : ""}
               </label>
-              {renderInput(f, baseInput, pending)}
+              {renderInput(f, fieldId, baseInput, pending)}
               {errMsg ? (
                 <div className="mt-0.5 text-[10px] text-red-700">{errMsg}</div>
               ) : null}
@@ -285,10 +292,11 @@ export function AddEventForm({
       </div>
 
       <div className="mt-3 border-t border-[var(--border)] pt-3">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
+        <label htmlFor={attachInputId} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
           Lampiran (opsional) — foto / PDF, maks 20MB per file
         </label>
         <input
+          id={attachInputId}
           type="file"
           multiple
           accept="image/*,application/pdf"
@@ -309,10 +317,11 @@ export function AddEventForm({
       </div>
 
       <div className="mt-3 flex items-center gap-2">
-        <label className="text-[10px] uppercase tracking-wide text-[#7A6B56]">
+        <label htmlFor={dateInputId} className="text-[10px] uppercase tracking-wide text-[#7A6B56]">
           Tanggal:
         </label>
         <input
+          id={dateInputId}
           type="date"
           value={occurredAt}
           onChange={(e) => setOccurredAt(e.target.value)}
@@ -328,6 +337,7 @@ export function AddEventForm({
         <button
           type="submit"
           disabled={pending}
+          aria-label="Simpan aktivitas baru"
           className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
         >
           {pending && uploadState === "uploading" ? "Mengupload…" : pending ? "Menyimpan…" : "Simpan"}
@@ -345,6 +355,7 @@ export function AddEventForm({
             setFormKey((k) => k + 1);
           }}
           disabled={pending}
+          aria-label="Batal tambah aktivitas"
           className="rounded px-3 py-1.5 text-[11px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
         >
           Batal
@@ -354,27 +365,27 @@ export function AddEventForm({
   );
 }
 
-function renderInput(f: FieldDef, cls: string, disabled: boolean): ReactNode {
+function renderInput(f: FieldDef, id: string, cls: string, disabled: boolean): ReactNode {
   switch (f.type) {
     case "text":
-      return <input name={`payload_${f.name}`} type="text" defaultValue=""
+      return <input id={id} name={`payload_${f.name}`} type="text" defaultValue=""
         placeholder={f.placeholder} disabled={disabled} className={cls} />;
     case "textarea":
-      return <textarea name={`payload_${f.name}`} rows={f.rows ?? 3} defaultValue=""
+      return <textarea id={id} name={`payload_${f.name}`} rows={f.rows ?? 3} defaultValue=""
         placeholder={f.placeholder} disabled={disabled} className={cls} />;
     case "number":
-      return <input name={`payload_${f.name}`} type="number" defaultValue=""
+      return <input id={id} name={`payload_${f.name}`} type="number" defaultValue=""
         min={f.min} max={f.max} step={f.step} placeholder={f.placeholder}
         disabled={disabled} className={cls} />;
     case "date":
-      return <input name={`payload_${f.name}`} type="date" defaultValue=""
+      return <input id={id} name={`payload_${f.name}`} type="date" defaultValue=""
         disabled={disabled} className={cls} />;
     case "csv":
-      return <input name={`payload_${f.name}`} type="text" defaultValue=""
+      return <input id={id} name={`payload_${f.name}`} type="text" defaultValue=""
         placeholder={f.placeholder} disabled={disabled} className={cls} />;
     case "select":
       return (
-        <select name={`payload_${f.name}`} defaultValue={f.options[0]?.value ?? ""}
+        <select id={id} name={`payload_${f.name}`} defaultValue={f.options[0]?.value ?? ""}
           disabled={disabled} className={cls}>
           {f.options.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>

@@ -84,25 +84,30 @@ export function ReviewItem({ draft }: { draft: Draft }) {
       {status === "pending" || status === "error" ? (
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={approve}
+            aria-label="Setujui draft ini"
             className="rounded bg-green-700 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-green-800">
-            ✓ Setujui
+            <span aria-hidden="true">✓</span> Setujui
           </button>
           {showReject ? (
             <div className="flex gap-1">
               <input value={reason} onChange={(e) => setReason(e.target.value)}
                 placeholder="alasan (opsional)"
+                aria-label="Alasan penolakan (opsional)"
                 className="rounded border border-[var(--border)] px-2 py-1 text-xs" />
               <button type="button" onClick={reject}
+                aria-label="Konfirmasi tolak draft ini"
                 className="rounded bg-red-700 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white">
                 Tolak
               </button>
               <button type="button" onClick={() => setShowReject(false)}
-                className="text-[10px] text-[var(--text-muted)] hover:underline">batal</button>
+                aria-label="Batal tolak draft"
+                className="px-2 py-1 text-xs text-[var(--text-muted)] hover:underline">batal</button>
             </div>
           ) : (
             <button type="button" onClick={() => setShowReject(true)}
+              aria-label="Tolak draft ini"
               className="rounded border border-[var(--border)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]">
-              ✗ Tolak
+              <span aria-hidden="true">✗</span> Tolak
             </button>
           )}
         </div>

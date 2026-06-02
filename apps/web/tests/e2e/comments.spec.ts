@@ -29,10 +29,12 @@ test("comment add → edit → soft-delete cycle on a card", async ({ page }) =>
   await commentRow.getByRole("button", { name: "Simpan" }).click();
   await expect(page.getByText(edited).first()).toBeVisible({ timeout: 10_000 });
 
-  // 3. Soft-delete: clicking "hapus" triggers a confirm() — accept it.
-  page.once("dialog", (dialog) => dialog.accept());
+  // 3. Soft-delete: clicking "hapus" now shows an inline confirm strip (no browser dialog).
   const editedRow = page.locator(`li:has-text("${edited}")`).last();
   await editedRow.getByText("hapus").click();
+
+  // Inline confirm strip should appear — click "Ya, hapus" to confirm deletion.
+  await editedRow.getByRole("button", { name: /Ya, hapus/i }).click();
 
   // After soft-delete, the server re-renders the comment list excluding deleted rows.
   await expect(page.getByText(edited)).toHaveCount(0, { timeout: 10_000 });

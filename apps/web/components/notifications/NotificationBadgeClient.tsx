@@ -41,13 +41,17 @@ export function NotificationBadgeClient({
     return unsubscribe;
   }, [staffId]);
 
+  const ariaLabel = count > 0
+    ? `Notifikasi (${count} belum dibaca)`
+    : "Notifikasi";
+
   return (
     <Link
       href="/notifications"
+      aria-label={ariaLabel}
       className="relative inline-flex items-center rounded border border-[#B5AFA8] bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]"
-      title="Notifikasi"
     >
-      🔔
+      <span aria-hidden="true">🔔</span>
       {count > 0 ? (
         <span className="ml-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--flag-warning)] px-1 text-[10px] font-bold text-white">
           {count > 99 ? "99+" : count}

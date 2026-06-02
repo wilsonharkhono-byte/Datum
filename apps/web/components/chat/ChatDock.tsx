@@ -63,6 +63,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             <button
               type="button"
               onClick={() => setMode("tanya")}
+              aria-label="Mode tanya"
+              aria-pressed={mode === "tanya"}
               className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                 mode === "tanya" ? "bg-foreground text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
               }`}
@@ -72,6 +74,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             <button
               type="button"
               onClick={() => setMode("catat")}
+              aria-label="Mode catat"
+              aria-pressed={mode === "catat"}
               className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                 mode === "catat" ? "bg-foreground text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
               }`}

@@ -35,6 +35,7 @@ export function CommentItem({
   canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [body, setBody] = useState(comment.body);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,6 @@ export function CommentItem({
   }
 
   function softDelete() {
-    if (!confirm("Hapus komentar ini?")) return;
     setError(null);
     const fd = new FormData();
     fd.set("commentId", comment.id);
@@ -77,15 +77,40 @@ export function CommentItem({
           })}
           {comment.edited_at ? <span className="ml-1 italic">(diedit)</span> : null}
         </span>
-        {canEdit && !editing ? (
+        {canEdit && !editing && !confirmingDelete ? (
           <span className="flex gap-2">
             <button type="button" onClick={() => setEditing(true)}
-              className="text-[#7A6B56] hover:underline">edit</button>
-            <button type="button" onClick={softDelete} disabled={pending}
-              className="text-red-700 hover:underline">hapus</button>
+              aria-label="Edit komentar"
+              className="px-2 py-1 text-xs text-[#7A6B56] hover:underline">edit</button>
+            <button type="button" onClick={() => setConfirmingDelete(true)} disabled={pending}
+              aria-label="Hapus komentar"
+              className="px-2 py-1 text-xs text-red-700 hover:underline">hapus</button>
           </span>
         ) : null}
       </div>
+      {confirmingDelete ? (
+        <div className="mt-1 flex items-center gap-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs">
+          <span className="text-red-800">Yakin hapus?</span>
+          <button
+            type="button"
+            onClick={softDelete}
+            disabled={pending}
+            aria-label="Ya, hapus komentar ini"
+            className="rounded bg-red-700 px-2 py-1 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+          >
+            {pending ? "Menghapus…" : "Ya, hapus"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(false)}
+            disabled={pending}
+            aria-label="Batal hapus komentar"
+            className="rounded px-2 py-1 text-xs font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
+          >
+            Batal
+          </button>
+        </div>
+      ) : null}
       {editing ? (
         <form onSubmit={saveEdit}>
           <textarea
@@ -99,12 +124,14 @@ export function CommentItem({
           {error ? <div className="mt-1 text-[10px] text-red-700">{error}</div> : null}
           <div className="mt-1.5 flex gap-2">
             <button type="submit" disabled={pending || !body.trim()}
-              className="rounded bg-[#141210] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]">
+              aria-label="Simpan perubahan komentar"
+              className="rounded bg-[#141210] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]">
               {pending ? "Menyimpan…" : "Simpan"}
             </button>
             <button type="button" onClick={() => { setEditing(false); setBody(comment.body); }}
               disabled={pending}
-              className="rounded px-3 py-1 text-[10px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]">
+              aria-label="Batal edit komentar"
+              className="rounded px-3 py-1 text-xs font-medium text-[#524E49] hover:bg-[var(--surface-alt)]">
               Batal
             </button>
           </div>
@@ -112,6 +139,7 @@ export function CommentItem({
       ) : (
         <p className="whitespace-pre-wrap text-[#141210]">{renderBody(comment.body)}</p>
       )}
+      {error && !editing ? <div className="mt-1 text-[10px] text-red-700">{error}</div> : null}
     </li>
   );
 }

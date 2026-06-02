@@ -74,7 +74,8 @@ export function CardMembers({
             onClick={() => remove(m)}
             disabled={pending}
             title={`${m.staff?.full_name ?? "(unknown)"} — klik untuk hapus`}
-            className="flex items-center gap-1 rounded-full border border-[#B5AFA8] bg-white px-2 py-0.5 text-[10px] font-medium text-[#524E49] hover:border-red-400 hover:text-red-700"
+            aria-label={`Hapus anggota ${m.staff?.full_name ?? "(unknown)"}`}
+            className="flex items-center gap-1 rounded-full border border-[#B5AFA8] bg-white px-2 py-0.5 text-xs font-medium text-[#524E49] hover:border-red-400 hover:text-red-700"
           >
             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#B29F86]/30 text-[8px] font-bold text-[#524E49]">
               {initials(m.staff?.full_name)}
@@ -87,7 +88,8 @@ export function CardMembers({
           type="button"
           onClick={() => setPicking((p) => !p)}
           disabled={pending || addable.length === 0}
-          className="rounded-full border border-dashed border-[#B5AFA8] px-2 py-0.5 text-[10px] font-medium text-[#7A6B56] hover:border-[#7A6B56] disabled:opacity-50"
+          aria-label={picking ? "Tutup pemilih anggota" : "Tambah anggota"}
+          className="rounded-full border border-dashed border-[#B5AFA8] px-2 py-0.5 text-xs font-medium text-[#7A6B56] hover:border-[#7A6B56] disabled:opacity-50"
         >
           {picking ? "× tutup" : "+ tambah"}
         </button>
@@ -103,7 +105,8 @@ export function CardMembers({
               type="button"
               onClick={() => add(s.id)}
               disabled={pending}
-              className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] font-medium text-[#141210] hover:border-[var(--sand-dark)]"
+              aria-label={`Tambah ${s.full_name ?? "(unknown)"} sebagai anggota`}
+              className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-[#141210] hover:border-[var(--sand-dark)]"
             >
               {s.full_name ?? "(unknown)"}
             </button>

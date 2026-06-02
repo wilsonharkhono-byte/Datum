@@ -30,7 +30,8 @@ export function MoveCardControl({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded border border-[#B5AFA8] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#524E49] hover:bg-[#FDFAF6]"
+        aria-label={`Pindahkan kartu (sekarang di: ${currentName})`}
+        className="rounded border border-[#B5AFA8] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:bg-[#FDFAF6]"
         title={`Sekarang di: ${currentName}`}
       >
         pindahkan
@@ -59,7 +60,9 @@ export function MoveCardControl({
 
   return (
     <div className="flex items-center gap-1.5">
+      <label htmlFor="move-card-column" className="sr-only">Kolom tujuan</label>
       <select
+        id="move-card-column"
         value={targetId}
         onChange={(e) => setTargetId(e.target.value)}
         disabled={pending}
@@ -73,7 +76,8 @@ export function MoveCardControl({
         type="button"
         onClick={submit}
         disabled={pending || targetId === currentTopicId}
-        className="rounded bg-[#141210] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
+        aria-label="Pindah kartu ke kolom yang dipilih"
+        className="rounded bg-[#141210] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
       >
         {pending ? "…" : "pindah"}
       </button>
@@ -81,7 +85,8 @@ export function MoveCardControl({
         type="button"
         onClick={() => { setOpen(false); setTargetId(currentTopicId); setError(null); }}
         disabled={pending}
-        className="rounded px-2 py-1 text-[10px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
+        aria-label="Batal pindahkan kartu"
+        className="rounded px-2 py-1 text-xs font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
       >
         batal
       </button>

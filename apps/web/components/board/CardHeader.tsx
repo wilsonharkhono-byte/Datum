@@ -63,7 +63,8 @@ export function CardHeader({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded border border-[#B5AFA8] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#524E49] hover:bg-[#FDFAF6]"
+            aria-label="Edit kartu"
+            className="rounded border border-[#B5AFA8] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:bg-[#FDFAF6]"
           >
             edit
           </button>
@@ -96,8 +97,9 @@ export function CardHeader({
         />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <label className="text-[10px] uppercase tracking-wide text-[#7A6B56]">Status:</label>
+        <label htmlFor="card-status" className="text-[10px] uppercase tracking-wide text-[#7A6B56]">Status:</label>
         <select
+          id="card-status"
           value={status}
           onChange={(e) => setStatus(e.target.value as "active" | "dormant" | "closed")}
           disabled={pending}
@@ -122,6 +124,7 @@ export function CardHeader({
         <button
           type="submit"
           disabled={pending || !title.trim()}
+          aria-label="Simpan perubahan kartu"
           className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
         >
           {pending ? "Menyimpan…" : "Simpan"}
@@ -130,6 +133,7 @@ export function CardHeader({
           type="button"
           onClick={cancel}
           disabled={pending}
+          aria-label="Batal edit kartu"
           className="rounded px-3 py-1.5 text-[11px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
         >
           Batal

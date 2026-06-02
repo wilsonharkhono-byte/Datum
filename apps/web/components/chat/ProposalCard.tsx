@@ -169,16 +169,18 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
           <button
             type="button"
             onClick={commit}
+            aria-label="Simpan proposal ke kartu"
             className="rounded bg-foreground px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
           >
-            &#10003; Simpan
+            <span aria-hidden="true">&#10003;</span> Simpan
           </button>
           <button
             type="button"
             onClick={discard}
+            aria-label="Batalkan proposal"
             className="rounded px-3 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
           >
-            &#10007; Batal
+            <span aria-hidden="true">&#10007;</span> Batal
           </button>
         </div>
       ) : status === "saving" ? (

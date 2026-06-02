@@ -50,19 +50,19 @@ export default async function HomePage() {
           {projects.length} proyek aktif. Klik salah satu untuk melihat semua kartu per topik, timeline keputusan, dan bertanya pada asisten.
         </p>
         {pendingDraftCount && pendingDraftCount > 0 ? (
-          <Link href="/review" className="mt-2 inline-block rounded bg-[var(--sand-tint)] px-3 py-1 text-xs font-semibold text-[var(--sand-dark)] hover:bg-[var(--sand)]/20">
-            🔔 {pendingDraftCount} draft menunggu review →
+          <Link href="/review" aria-label={`${pendingDraftCount} draft menunggu review`} className="mt-2 inline-block rounded bg-[var(--sand-tint)] px-3 py-1 text-xs font-semibold text-[var(--sand-dark)] hover:bg-[var(--sand)]/20">
+            <span aria-hidden="true">🔔</span> {pendingDraftCount} draft menunggu review →
           </Link>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Link href="/activity" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
-            📋 Aktivitas terbaru
+          <Link href="/activity" aria-label="Aktivitas terbaru" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
+            <span aria-hidden="true">📋</span> Aktivitas terbaru
           </Link>
-          <Link href="/brief" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
-            📋 Morning brief
+          <Link href="/brief" aria-label="Morning brief" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
+            <span aria-hidden="true">📋</span> Morning brief
           </Link>
-          <Link href="/search" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
-            🔍 Cari
+          <Link href="/search" aria-label="Cari" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
+            <span aria-hidden="true">🔍</span> Cari
           </Link>
         </div>
       </section>

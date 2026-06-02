@@ -49,8 +49,8 @@ export function TimelineFilter({
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1 text-[10px]">
-      <span className="mr-1 font-semibold uppercase tracking-wide text-[#7A6B56]">filter:</span>
+    <div className="mt-3 flex flex-wrap items-center gap-1 text-xs">
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">filter:</span>
       {shown.map((k) => {
         const on = active.has(k);
         return (
@@ -58,8 +58,10 @@ export function TimelineFilter({
             key={k}
             type="button"
             onClick={() => toggle(k)}
+            aria-label={`Filter ${KIND_LABELS[k]}${on ? " (aktif)" : ""}`}
+            aria-pressed={on}
             className={
-              "rounded border px-2 py-0.5 font-semibold uppercase tracking-wide " +
+              "rounded border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide " +
               (on
                 ? "border-[var(--sand-dark)] bg-[var(--sand-tint)] text-[var(--sand-dark)]"
                 : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--text-secondary)]")
@@ -73,14 +75,16 @@ export function TimelineFilter({
         <button
           type="button"
           onClick={onAll}
-          className="rounded px-2 py-0.5 text-[10px] text-[#7A6B56] hover:underline"
+          aria-label="Tampilkan semua jenis aktivitas"
+          className="rounded px-2 py-0.5 text-xs text-[#7A6B56] hover:underline"
         >
           semua
         </button>
         <button
           type="button"
           onClick={onNone}
-          className="rounded px-2 py-0.5 text-[10px] text-[#7A6B56] hover:underline"
+          aria-label="Sembunyikan semua jenis aktivitas"
+          className="rounded px-2 py-0.5 text-xs text-[#7A6B56] hover:underline"
         >
           tidak ada
         </button>

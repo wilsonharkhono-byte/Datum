@@ -38,10 +38,10 @@ export function MessageInput({
         />
         {acceptFiles ? (
           <label
+            aria-label="Lampirkan foto atau PDF"
             className="flex cursor-pointer items-center rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--sand-dark)] hover:text-[var(--sand-dark)]"
-            title="Lampirkan foto atau PDF"
           >
-            📎
+            <span aria-hidden="true">📎</span>
             <input
               ref={fileInputRef}
               type="file"
@@ -62,9 +62,10 @@ export function MessageInput({
       </div>
       {file ? (
         <div className="border-t border-[var(--border)] bg-[var(--surface-alt)] px-4 py-1 text-[10px] text-[var(--text-secondary)]">
-          📎 {file.name} ({Math.round(file.size / 1024)} KB) · <button
+          <span aria-hidden="true">📎</span> {file.name} ({Math.round(file.size / 1024)} KB) · <button
             type="button"
             onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+            aria-label="Hapus lampiran yang dipilih"
             className="text-red-700 hover:underline"
           >hapus</button>
         </div>
