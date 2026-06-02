@@ -12,7 +12,8 @@
     "types": "supabase gen types typescript --linked 2>/dev/null > src/types.generated.ts",
     "seed": "tsx scripts/seed-pilot.ts",
     "seed:cards": "tsx scripts/seed-cards.ts",
-    "import:trello": "tsx scripts/import-trello.ts"
+    "import:trello": "tsx scripts/import-trello.ts",
+    "import:trello-attachments": "tsx scripts/import-trello-attachments.ts"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
