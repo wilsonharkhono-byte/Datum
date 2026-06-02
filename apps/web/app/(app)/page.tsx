@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ProjectEditDialog } from "@/components/projects/ProjectEditDialog";
 
 const statusLabel: Record<string, string> = {
   design: "Desain",
@@ -55,6 +56,9 @@ export default async function HomePage() {
           </Link>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link href="/projects/new" aria-label="Buat proyek baru" className="rounded bg-[var(--foreground)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-inverse)] hover:bg-[var(--sand-dark)]">
+            + Buat proyek
+          </Link>
           <Link href="/activity" aria-label="Aktivitas terbaru" className="rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
             <span aria-hidden="true">📋</span> Aktivitas terbaru
           </Link>
@@ -74,31 +78,34 @@ export default async function HomePage() {
           </div>
           <ul className="divide-y divide-[#B5AFA8]/70">
             {projects.map((p) => (
-              <li key={p.id}>
-                <Link
-                  href={`/project/${p.project_code}`}
-                  className="block px-4 py-4 transition-colors hover:bg-[#F4EFE6]/40"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="font-semibold text-[#141210]">
-                        {p.project_code} · {p.project_name}
+              <li key={p.id} className="px-4 py-3">
+                <div className="flex items-start gap-2">
+                  <Link
+                    href={`/project/${p.project_code}`}
+                    className="block flex-1 transition-colors hover:opacity-80"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="font-semibold text-[#141210]">
+                          {p.project_code} · {p.project_name}
+                        </div>
+                        <div className="mt-1 text-sm leading-5 text-[#524E49]">
+                          Client: {p.client_name ?? "-"}
+                          {p.location && ` · ${p.location}`}
+                        </div>
                       </div>
-                      <div className="mt-1 text-sm leading-5 text-[#524E49]">
-                        Client: {p.client_name ?? "-"}
-                        {p.location && ` · ${p.location}`}
+                      <span className="rounded-[5px] bg-[#B29F86]/15 px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">
+                        {statusLabel[p.status] ?? p.status}
+                      </span>
+                    </div>
+                    {p.target_handover && (
+                      <div className="mt-2 text-xs font-medium text-[#847E78]">
+                        Target serah terima: {p.target_handover}
                       </div>
-                    </div>
-                    <span className="rounded-[5px] bg-[#B29F86]/15 px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">
-                      {statusLabel[p.status] ?? p.status}
-                    </span>
-                  </div>
-                  {p.target_handover && (
-                    <div className="mt-3 text-xs font-medium text-[#847E78]">
-                      Target serah terima: {p.target_handover}
-                    </div>
-                  )}
-                </Link>
+                    )}
+                  </Link>
+                  <ProjectEditDialog project={p} />
+                </div>
               </li>
             ))}
           </ul>
