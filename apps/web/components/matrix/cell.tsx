@@ -18,6 +18,16 @@ const symbolByStatus: Record<MatrixCell["status"], string> = {
   not_applicable: "—",
 };
 
+const labelByStatus: Record<MatrixCell["status"], string> = {
+  not_started: "Belum",
+  in_progress: "Jalan",
+  ready_for_handoff: "Siap",
+  blocked: "Blokir",
+  passed: "Lulus",
+  not_applicable: "N/A",
+};
+
+/** Table-cell variant (used in the md+ matrix table) */
 export function Cell({ cell }: { cell: MatrixCell | undefined }) {
   if (!cell) return <td className="border border-[#B5AFA8] bg-[#F2EFE9] px-2 py-2 text-center text-[#847E78]">.</td>;
   const cls = colorByStatus[cell.status];
@@ -30,5 +40,32 @@ export function Cell({ cell }: { cell: MatrixCell | undefined }) {
     >
       {sym}
     </td>
+  );
+}
+
+/** Compact chip variant (used in mobile stacked cards) */
+export function CellChip({
+  cell,
+  gate,
+}: {
+  cell: MatrixCell | undefined | null;
+  gate: string;
+}) {
+  const status = cell?.status ?? "not_started";
+  const cls = colorByStatus[status];
+  const sym = symbolByStatus[status];
+  const label = labelByStatus[status];
+  const title = cell?.blocking_reason
+    ? `Gate ${gate} · ${status}: ${cell.blocking_reason}`
+    : `Gate ${gate} · ${status}`;
+  return (
+    <span
+      title={title}
+      className={`inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-[10px] font-semibold ${cls}`}
+    >
+      <span aria-hidden="true">{sym}</span>
+      <span>G{gate}</span>
+      <span className="sr-only">{label}</span>
+    </span>
   );
 }

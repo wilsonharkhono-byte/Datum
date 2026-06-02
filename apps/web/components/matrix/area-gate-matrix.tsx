@@ -1,6 +1,6 @@
 import type { MatrixData } from "@/lib/matrix/fetch-matrix";
 import { Fragment } from "react";
-import { Cell } from "./cell";
+import { Cell, CellChip } from "./cell";
 import { StatusLegend } from "./status-legend";
 
 export function AreaGateMatrix({ data }: { data: MatrixData }) {
@@ -27,7 +27,40 @@ export function AreaGateMatrix({ data }: { data: MatrixData }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile: stacked area cards (below md) */}
+      <div className="md:hidden">
+        {Array.from(byFloor.entries()).map(([floor, areas]) => (
+          <div key={floor}>
+            <div className="mb-2 mt-3 px-1 text-xs font-semibold uppercase tracking-[0.1em] text-[#7A6B56]">
+              {floor}
+            </div>
+            {areas.map((area) => (
+              <div
+                key={area.id}
+                className="mb-3 rounded border border-[#B5AFA8] bg-[#FDFAF6] p-3"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-semibold text-[#141210]">{area.area_name}</span>
+                  <span className="text-xs text-[#7A6B56]">{area.area_code}</span>
+                </div>
+                <ul className="flex flex-wrap gap-1.5">
+                  {data.gates.map((gate) => {
+                    const cell = data.cells.get(`${area.id}|${gate}`);
+                    return (
+                      <li key={gate}>
+                        <CellChip cell={cell ?? null} gate={gate} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: matrix table (md+) */}
+      <div className="hidden overflow-x-auto md:block">
         <table className="min-w-[760px] border-collapse text-sm">
           <thead>
             <tr>

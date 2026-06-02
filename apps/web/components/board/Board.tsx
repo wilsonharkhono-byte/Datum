@@ -39,7 +39,7 @@ export function Board({ board }: { board: BoardData }) {
         matched={matchedTotal}
         total={totalCards}
       />
-      <div className="flex flex-1 gap-2 overflow-x-auto overflow-y-hidden bg-[var(--surface-alt)] p-3">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-[var(--surface-alt)] p-3 md:flex-row md:gap-2 md:overflow-x-auto md:overflow-y-hidden">
         {filteredColumns.length === 0 ? (
           <div className="m-auto text-sm italic text-[var(--text-muted)]">
             Tidak ada kartu cocok. Coba ubah filter atau kata kunci.
