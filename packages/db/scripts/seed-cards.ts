@@ -35,13 +35,13 @@ const SEED: SeedCard[] = [
     events: [
       { kind: "drawing", occurredAt: "2026-02-11T10:00:00Z",
         payload: { description: "Survei Galleria — sample marmer", drawing_code: "A09" } },
-      { kind: "vendor_quote", occurredAt: "2026-05-18T09:00:00Z",
-        payload: { vendor_name: "PT Galleria", amount: 2400000, currency: "IDR", quote_date: "2026-05-18" },
+      { kind: "vendor", occurredAt: "2026-05-18T09:00:00Z",
+        payload: { interaction: "quote", vendor_name: "PT Galleria", amount: 2400000, currency: "IDR", quote_date: "2026-05-18" },
         costVisible: true },
       { kind: "decision", occurredAt: "2026-05-20T14:30:00Z",
         payload: { topic: "marmer lantai master bath", proposed_spec: "Statuario", approved_by: "client" } },
-      { kind: "pending", occurredAt: "2026-05-22T08:00:00Z",
-        payload: { what: "Pelebaran shower lt 2 — menunggu konfirmasi Wilson" } },
+      { kind: "note", occurredAt: "2026-05-22T08:00:00Z",
+        payload: { body: "(menunggu) Pelebaran shower lt 2 — menunggu konfirmasi Wilson" } },
     ],
   },
   {

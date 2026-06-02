@@ -2,26 +2,32 @@
 import type { CardEventKind } from "@datum/db";
 
 const KIND_LABELS: Record<CardEventKind, string> = {
+  // Active kinds
   decision:        "keputusan",
   drawing:         "gambar",
-  survey:          "survei",
-  vendor_quote:    "quote vendor",
-  vendor_pick:     "vendor",
+  vendor:          "vendor",
   material:        "material",
-  worker_assigned: "tukang",
-  progress:        "progres",
-  defect:          "defect",
+  work:            "kerja",
   photo:           "foto",
   document:        "dokumen",
   client_request:  "permintaan klien",
   note:            "catatan",
-  pending:         "menunggu",
+  // Retired kinds (still in DB enum; shown only if present on a card)
+  survey:          "survei (lama)",
+  vendor_quote:    "quote vendor (lama)",
+  vendor_pick:     "vendor dipilih (lama)",
+  worker_assigned: "tukang (lama)",
+  progress:        "progres (lama)",
+  defect:          "defect (lama)",
+  pending:         "menunggu (lama)",
 };
 
 const KIND_ORDER: CardEventKind[] = [
-  "decision","drawing","survey","vendor_quote","vendor_pick",
-  "material","worker_assigned","progress","defect","photo",
-  "document","client_request","note","pending",
+  "note","decision","drawing","vendor","material","work",
+  "client_request","photo","document",
+  // Retired kinds last so they appear only if a card still has them
+  "survey","vendor_quote","vendor_pick",
+  "worker_assigned","progress","defect","pending",
 ];
 
 export function TimelineFilter({
@@ -49,8 +55,8 @@ export function TimelineFilter({
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1 text-xs">
-      <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">filter:</span>
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">filter</span>
       {shown.map((k) => {
         const on = active.has(k);
         return (
@@ -60,23 +66,18 @@ export function TimelineFilter({
             onClick={() => toggle(k)}
             aria-label={`Filter ${KIND_LABELS[k]}${on ? " (aktif)" : ""}`}
             aria-pressed={on}
-            className={
-              "rounded border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide " +
-              (on
-                ? "border-[var(--sand-dark)] bg-[var(--sand-tint)] text-[var(--sand-dark)]"
-                : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--text-secondary)]")
-            }
+            className={`chip${on ? " chip-sand" : ""}`}
           >
             {KIND_LABELS[k]}
           </button>
         );
       })}
-      <div className="ml-2 flex gap-1">
+      <div className="ml-2 flex gap-2">
         <button
           type="button"
           onClick={onAll}
           aria-label="Tampilkan semua jenis aktivitas"
-          className="rounded px-2 py-0.5 text-xs text-[#7A6B56] hover:underline"
+          className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#7A6B56] hover:underline"
         >
           semua
         </button>
@@ -84,7 +85,7 @@ export function TimelineFilter({
           type="button"
           onClick={onNone}
           aria-label="Sembunyikan semua jenis aktivitas"
-          className="rounded px-2 py-0.5 text-xs text-[#7A6B56] hover:underline"
+          className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#7A6B56] hover:underline"
         >
           tidak ada
         </button>

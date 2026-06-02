@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { createCardEvent, attachToEvent, createCardEventDraft } from "@/lib/cards/mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
 import { HIGH_RISK_KINDS, type EventKind } from "@datum/types";
+import { CheckIcon, XIcon, PaperclipIcon } from "@/components/icons/Icon";
 
 export type Proposal = {
   projectId:  string;
@@ -22,18 +23,21 @@ export type Proposal = {
 const KIND_LABELS: Record<string, string> = {
   decision:       "keputusan",
   drawing:        "gambar",
-  survey:         "survei",
-  vendor_quote:   "quote vendor",
-  vendor_pick:    "vendor dipilih",
+  vendor:         "vendor",
   material:       "material",
-  worker_assigned:"tukang",
-  progress:       "progres",
-  defect:         "defect",
+  work:           "kerja",
   photo:          "foto",
   document:       "dokumen",
   client_request: "permintaan klien",
   note:           "catatan",
-  pending:        "menunggu",
+  // Retired — kept so in-flight historical proposals still render
+  survey:         "survei (lama)",
+  vendor_quote:   "quote vendor (lama)",
+  vendor_pick:    "vendor dipilih (lama)",
+  worker_assigned:"tukang (lama)",
+  progress:       "progres (lama)",
+  defect:         "defect (lama)",
+  pending:        "menunggu (lama)",
 };
 
 export function ProposalCard({ proposal }: { proposal: Proposal }) {
@@ -147,9 +151,9 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
         {KIND_LABELS[proposal.eventKind] ?? proposal.eventKind}
       </div>
       {proposal.fileMeta || proposal.pendingFile ? (
-        <div className="mb-2 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
-          📎 {proposal.fileMeta?.name ?? proposal.pendingFile?.name} —
-          akan diupload setelah ✓ Simpan
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
+          <PaperclipIcon size={11} />
+          <span>{proposal.fileMeta?.name ?? proposal.pendingFile?.name} — akan diupload setelah simpan</span>
         </div>
       ) : null}
       <pre className="mb-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-[var(--sand)] bg-[var(--surface)] p-2 text-[10px] text-foreground">
@@ -170,17 +174,17 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
             type="button"
             onClick={commit}
             aria-label="Simpan proposal ke kartu"
-            className="rounded bg-foreground px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
+            className="inline-flex items-center gap-1.5 rounded bg-foreground px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
           >
-            <span aria-hidden="true">&#10003;</span> Simpan
+            <CheckIcon size={12} /> Simpan
           </button>
           <button
             type="button"
             onClick={discard}
             aria-label="Batalkan proposal"
-            className="rounded px-3 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
+            className="inline-flex items-center gap-1.5 rounded px-3 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
           >
-            <span aria-hidden="true">&#10007;</span> Batal
+            <XIcon size={12} /> Batal
           </button>
         </div>
       ) : status === "saving" ? (

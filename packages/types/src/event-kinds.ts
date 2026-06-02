@@ -1,9 +1,7 @@
 import { z } from "zod";
 
 export const EVENT_KINDS = [
-  "decision","drawing","survey","vendor_quote","vendor_pick",
-  "material","worker_assigned","progress","defect","photo",
-  "document","client_request","note","pending",
+  "decision","drawing","vendor","material","work","client_request","note","photo","document",
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -23,27 +21,18 @@ const DrawingPayload = z.object({
   file_ref: z.string().optional(),
 });
 
-const SurveyPayload = z.object({
-  vendor_name: z.string().optional(),
+const VendorPayload = z.object({
+  interaction: z.enum(["quote","pick","survey","contract"]),
+  vendor_name: z.string().min(1),
+  vendor_id: z.string().uuid().optional(),
+  amount: z.number().nonnegative().optional(),
+  currency: z.literal("IDR").default("IDR").optional(),
+  quote_date: z.string().optional(),
+  expires_at: z.string().optional(),
   location: z.string().optional(),
   attendees: z.array(z.string()).optional(),
-  notes: z.string().optional(),
-});
-
-const VendorQuotePayload = z.object({
-  vendor_id: z.string().uuid().optional(),
-  vendor_name: z.string().min(1),
-  amount: z.number().nonnegative(),
-  currency: z.literal("IDR").default("IDR"),
-  quote_date: z.string().min(1),
-  expires_at: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const VendorPickPayload = z.object({
-  vendor_id: z.string().uuid().optional(),
-  vendor_name: z.string().min(1),
   rationale: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 const MaterialPayload = z.object({
@@ -54,34 +43,16 @@ const MaterialPayload = z.object({
   unit: z.string().optional(),
 });
 
-const WorkerAssignedPayload = z.object({
-  worker_name: z.string().min(1),
+const WorkPayload = z.object({
+  status: z.enum(["assigned","in_progress","blocked","done"]),
+  worker_name: z.string().optional(),
   role: z.string().optional(),
   scope: z.string().optional(),
   start_date: z.string().optional(),
-});
-
-const ProgressPayload = z.object({
-  status: z.string().min(1),
   percent_complete: z.number().min(0).max(100).optional(),
-  notes: z.string().optional(),
-});
-
-const DefectPayload = z.object({
-  description: z.string().min(1),
-  severity: z.enum(["low","medium","high"]).default("medium"),
+  description: z.string().optional(),
+  severity: z.enum(["low","medium","high"]).optional(),
   location: z.string().optional(),
-  fix_required_by: z.string().optional(),
-});
-
-const PhotoPayload = z.object({
-  caption: z.string().optional(),
-  taken_at: z.string().optional(),
-});
-
-const DocumentPayload = z.object({
-  title: z.string().min(1),
-  doc_type: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -95,26 +66,27 @@ const NotePayload = z.object({
   body: z.string().min(1),
 });
 
-const PendingPayload = z.object({
-  what: z.string().min(1),
-  blocked_on: z.string().optional(),
+const PhotoPayload = z.object({
+  caption: z.string().optional(),
+  taken_at: z.string().optional(),
+});
+
+const DocumentPayload = z.object({
+  title: z.string().min(1),
+  doc_type: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 export const EventPayloadSchemas = {
   decision:        DecisionPayload,
   drawing:         DrawingPayload,
-  survey:          SurveyPayload,
-  vendor_quote:    VendorQuotePayload,
-  vendor_pick:     VendorPickPayload,
+  vendor:          VendorPayload,
   material:        MaterialPayload,
-  worker_assigned: WorkerAssignedPayload,
-  progress:        ProgressPayload,
-  defect:          DefectPayload,
-  photo:           PhotoPayload,
-  document:        DocumentPayload,
+  work:            WorkPayload,
   client_request:  ClientRequestPayload,
   note:            NotePayload,
-  pending:         PendingPayload,
+  photo:           PhotoPayload,
+  document:        DocumentPayload,
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
 export type EventPayloadByKind = {
@@ -143,15 +115,14 @@ export function parseEventPayload<K extends EventKind>(
 
 // Kinds that always carry cost-sensitive data → card_events.cost_visible = true.
 export const COST_VISIBLE_KINDS: ReadonlySet<EventKind> = new Set([
-  "vendor_quote",
+  "vendor",  // any vendor interaction may carry an amount
 ]);
 
 // Kinds that require human approval when captured via AI chat
 // (cost-sensitive + client-facing + high-impact items)
 export const HIGH_RISK_KINDS: ReadonlySet<EventKind> = new Set([
-  "vendor_quote",
-  "vendor_pick",
+  "vendor",
   "decision",
-  "defect",
   "client_request",
+  "work",  // because work includes defects
 ]);

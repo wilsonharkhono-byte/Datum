@@ -5,26 +5,20 @@ import { uploadCardAttachment } from "@/lib/cards/upload";
 import type { EventKind } from "@datum/types";
 
 const KIND_LABELS: Record<EventKind, string> = {
-  decision:        "Keputusan",
-  drawing:         "Gambar",
-  survey:          "Survei",
-  vendor_quote:    "Quote vendor",
-  vendor_pick:     "Vendor dipilih",
-  material:        "Material",
-  worker_assigned: "Tukang ditugaskan",
-  progress:        "Progres",
-  defect:          "Defect",
-  photo:           "Foto",
-  document:        "Dokumen",
-  client_request:  "Permintaan klien",
-  note:            "Catatan",
-  pending:         "Menunggu / pending",
+  note:           "Catatan",
+  decision:       "Keputusan",
+  drawing:        "Gambar",
+  vendor:         "Vendor",
+  material:       "Material",
+  work:           "Kerja",
+  client_request: "Permintaan klien",
+  photo:          "Foto",
+  document:       "Dokumen",
 };
 
 const KIND_ORDER: EventKind[] = [
-  "note","decision","drawing","survey","vendor_quote","vendor_pick",
-  "material","worker_assigned","progress","defect","photo","document",
-  "client_request","pending",
+  "note","decision","drawing","vendor","material","work",
+  "client_request","photo","document",
 ];
 
 type FieldDef =
@@ -63,25 +57,20 @@ const FIELDS_BY_KIND: Record<EventKind, FieldDef[]> = {
     { name: "revision", label: "Revisi", type: "text", placeholder: "mis. R3" },
     { name: "file_ref", label: "Referensi file", type: "text" },
   ],
-  survey: [
-    { name: "vendor_name", label: "Vendor", type: "text",
-      placeholder: "mis. PT Galleria" },
-    { name: "location", label: "Lokasi", type: "text" },
-    { name: "attendees", label: "Peserta (pisah dengan koma)", type: "csv",
-      placeholder: "mis. Wilson, Carissa" },
-    { name: "notes", label: "Catatan", type: "textarea", rows: 2 },
-  ],
-  vendor_quote: [
+  vendor: [
+    { name: "interaction", label: "Jenis interaksi", type: "select", required: true, options: [
+      { value: "survey", label: "Survei lokasi" },
+      { value: "quote",  label: "Quote / penawaran" },
+      { value: "pick",   label: "Vendor dipilih" },
+      { value: "contract", label: "Kontrak" },
+    ] },
     { name: "vendor_name", label: "Vendor", type: "text", required: true },
-    { name: "amount", label: "Jumlah (IDR)", type: "number", required: true,
-      min: 0, step: "1" },
-    { name: "quote_date", label: "Tanggal quote", type: "date", required: true },
+    { name: "amount", label: "Jumlah (IDR, opsional)", type: "number", min: 0, step: "1" },
+    { name: "quote_date", label: "Tanggal quote / kunjungan", type: "date" },
     { name: "expires_at", label: "Berlaku sampai", type: "date" },
-    { name: "notes", label: "Catatan", type: "textarea", rows: 2 },
-  ],
-  vendor_pick: [
-    { name: "vendor_name", label: "Vendor dipilih", type: "text", required: true },
-    { name: "rationale", label: "Alasan", type: "textarea", rows: 2 },
+    { name: "location", label: "Lokasi (untuk survei)", type: "text" },
+    { name: "attendees", label: "Peserta (pisah dengan koma, untuk survei)", type: "csv" },
+    { name: "rationale", label: "Alasan / catatan", type: "textarea", rows: 2 },
   ],
   material: [
     { name: "item", label: "Item", type: "text", required: true,
@@ -97,29 +86,25 @@ const FIELDS_BY_KIND: Record<EventKind, FieldDef[]> = {
     { name: "quantity", label: "Jumlah", type: "number" },
     { name: "unit", label: "Satuan", type: "text", placeholder: "mis. m²" },
   ],
-  worker_assigned: [
-    { name: "worker_name", label: "Tukang / mandor", type: "text", required: true },
+  work: [
+    { name: "status", label: "Status", type: "select", required: true, options: [
+      { value: "assigned",    label: "Tukang ditugaskan" },
+      { value: "in_progress", label: "Sedang dikerjakan" },
+      { value: "blocked",     label: "Defect / terblokir" },
+      { value: "done",        label: "Selesai" },
+    ] },
+    { name: "worker_name", label: "Tukang / mandor", type: "text" },
     { name: "role", label: "Peran", type: "text", placeholder: "mis. mandor cat" },
     { name: "scope", label: "Lingkup kerja", type: "textarea", rows: 2 },
-    { name: "start_date", label: "Mulai", type: "date" },
-  ],
-  progress: [
-    { name: "status", label: "Status", type: "text", required: true,
-      placeholder: "mis. plesteran lt 2 selesai" },
-    { name: "percent_complete", label: "% selesai", type: "number",
-      min: 0, max: 100, step: "1" },
-    { name: "notes", label: "Catatan", type: "textarea", rows: 2 },
-  ],
-  defect: [
-    { name: "description", label: "Defect", type: "textarea", required: true, rows: 2 },
-    { name: "severity", label: "Tingkat", type: "select", required: true,
-      options: [
-        { value: "low", label: "Rendah" },
-        { value: "medium", label: "Sedang" },
-        { value: "high", label: "Tinggi" },
-      ] },
+    { name: "percent_complete", label: "% selesai (opsional)", type: "number", min: 0, max: 100, step: "1" },
+    { name: "description", label: "Deskripsi (terutama untuk defect)", type: "textarea", rows: 2 },
+    { name: "severity", label: "Severity (untuk defect)", type: "select", options: [
+      { value: "", label: "—" },
+      { value: "low", label: "Rendah" },
+      { value: "medium", label: "Sedang" },
+      { value: "high", label: "Tinggi" },
+    ] },
     { name: "location", label: "Lokasi", type: "text" },
-    { name: "fix_required_by", label: "Perbaikan sebelum", type: "date" },
   ],
   photo: [
     { name: "caption", label: "Keterangan", type: "text",
@@ -139,10 +124,6 @@ const FIELDS_BY_KIND: Record<EventKind, FieldDef[]> = {
       placeholder: "mis. Bu Setiono" },
     { name: "awaiting", label: "Menunggu", type: "text",
       placeholder: "mis. respon dari Wilson" },
-  ],
-  pending: [
-    { name: "what", label: "Apa yang menunggu", type: "text", required: true },
-    { name: "blocked_on", label: "Diblokir oleh", type: "text" },
   ],
 };
 

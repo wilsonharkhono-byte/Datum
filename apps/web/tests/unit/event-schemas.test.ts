@@ -6,11 +6,9 @@ import {
 } from "@datum/types";
 
 describe("event-kind schemas", () => {
-  it("exports all 14 event kinds", () => {
+  it("exports all 9 event kinds", () => {
     expect(EVENT_KINDS).toEqual([
-      "decision","drawing","survey","vendor_quote","vendor_pick",
-      "material","worker_assigned","progress","defect","photo",
-      "document","client_request","note","pending",
+      "decision","drawing","vendor","material","work","client_request","note","photo","document",
     ]);
   });
 
@@ -25,10 +23,32 @@ describe("event-kind schemas", () => {
     expect(parsed.approved_by).toBe("client");
   });
 
-  it("rejects an invalid vendor_quote payload (missing amount)", () => {
+  it("rejects an invalid vendor payload (missing vendor_name)", () => {
     expect(() =>
-      parseEventPayload("vendor_quote", { vendor_name: "PT Galleria" }),
+      parseEventPayload("vendor", { interaction: "quote" }),
     ).toThrow();
+  });
+
+  it("parses a valid vendor payload", () => {
+    const parsed = parseEventPayload("vendor", {
+      interaction: "quote",
+      vendor_name: "PT Galleria",
+      amount: 2400000,
+      currency: "IDR",
+      quote_date: "2026-05-18",
+    });
+    expect(parsed.vendor_name).toBe("PT Galleria");
+    expect(parsed.interaction).toBe("quote");
+  });
+
+  it("parses a valid work payload", () => {
+    const parsed = parseEventPayload("work", {
+      status: "blocked",
+      description: "Retak pada dinding utara",
+      severity: "high",
+    });
+    expect(parsed.status).toBe("blocked");
+    expect(parsed.severity).toBe("high");
   });
 
   it("parses a minimal note payload", () => {
@@ -37,7 +57,7 @@ describe("event-kind schemas", () => {
   });
 
   it("provides a type-safe discriminated union", () => {
-    // compile-time check: the union covers all 14 kinds
+    // compile-time check: the union covers all 9 kinds
     const x: EventPayloadByKind["decision"] = { topic: "x" };
     expect(x.topic).toBe("x");
   });

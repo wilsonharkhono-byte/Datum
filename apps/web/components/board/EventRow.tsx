@@ -22,18 +22,21 @@ function safeHostname(u: string): string {
 const KIND_LABEL: Record<string, string> = {
   decision: "keputusan",
   drawing: "gambar",
-  survey: "survei",
-  vendor_quote: "quote vendor",
-  vendor_pick: "vendor dipilih",
+  vendor: "vendor",
   material: "material",
-  worker_assigned: "tukang",
-  progress: "progres",
-  defect: "defect",
+  work: "kerja",
   photo: "foto",
   document: "dokumen",
   client_request: "permintaan klien",
   note: "catatan",
-  pending: "menunggu",
+  // Retired but might still appear in case of edge cases
+  survey: "survei (lama)",
+  vendor_quote: "quote vendor (lama)",
+  vendor_pick: "vendor dipilih (lama)",
+  worker_assigned: "tukang (lama)",
+  progress: "progres (lama)",
+  defect: "defect (lama)",
+  pending: "menunggu (lama)",
 };
 
 function summarize(ev: CardEvent): string {
@@ -41,17 +44,36 @@ function summarize(ev: CardEvent): string {
   switch (ev.event_kind) {
     case "decision":        return `${String(p.topic)} — ${String(p.proposed_spec ?? p.current_spec ?? "")}`;
     case "drawing":         return String(p.description ?? p.drawing_code ?? "");
-    case "survey":          return [p.vendor_name, p.location].filter(Boolean).map(String).join(" · ");
-    case "vendor_quote":    return `${String(p.vendor_name)} · Rp ${(p.amount as number).toLocaleString("id-ID")}`;
-    case "vendor_pick":     return String(p.vendor_name);
+    case "vendor": {
+      const verb = p.interaction === "quote" ? "Quote dari"
+                 : p.interaction === "pick" ? "Pilih"
+                 : p.interaction === "survey" ? "Survei oleh"
+                 : p.interaction === "contract" ? "Kontrak dengan"
+                 : "Interaksi";
+      const amount = typeof p.amount === "number" ? ` · Rp ${p.amount.toLocaleString("id-ID")}` : "";
+      return `${verb} ${p.vendor_name ?? ""}${amount}`;
+    }
     case "material":        return `${String(p.item)} — ${String(p.status)}`;
-    case "worker_assigned": return `${String(p.worker_name)}${p.scope ? ` — ${String(p.scope)}` : ""}`;
-    case "progress":        return `${String(p.status)}${p.percent_complete != null ? ` (${String(p.percent_complete)}%)` : ""}`;
-    case "defect":          return `${String(p.severity)} · ${String(p.description)}`;
+    case "work": {
+      const status = p.status as string ?? "?";
+      const who = typeof p.worker_name === "string" && p.worker_name.length > 0 ? `${p.worker_name} · ` : "";
+      const desc = typeof p.description === "string" ? p.description
+                 : typeof p.scope === "string" ? p.scope
+                 : "";
+      const pct = typeof p.percent_complete === "number" ? ` (${p.percent_complete}%)` : "";
+      return `${who}${status}${pct}${desc ? " — " + desc : ""}`;
+    }
     case "photo":           return String(p.caption ?? "(foto)");
     case "document":        return String(p.title);
     case "client_request":  return String(p.request_text);
     case "note":            return String(p.body);
+    // Retired kinds — kept for historical event display
+    case "survey":          return [p.vendor_name, p.location].filter(Boolean).map(String).join(" · ");
+    case "vendor_quote":    return `${String(p.vendor_name)} · Rp ${(p.amount as number).toLocaleString("id-ID")}`;
+    case "vendor_pick":     return String(p.vendor_name);
+    case "worker_assigned": return `${String(p.worker_name)}${p.scope ? ` — ${String(p.scope)}` : ""}`;
+    case "progress":        return `${String(p.status)}${p.percent_complete != null ? ` (${String(p.percent_complete)}%)` : ""}`;
+    case "defect":          return `${String(p.severity)} · ${String(p.description)}`;
     case "pending":         return String(p.what);
     default:                return JSON.stringify(p);
   }

@@ -21,22 +21,17 @@ TUGAS: Pengguna memberi sebuah input bebas (catatan lapangan, keputusan klien, i
 
 ATURAN:
 - Pilih kartu (card_id) HANYA dari daftar KARTU TERSEDIA di bawah. Jangan menebak UUID.
-- Pilih event_kind dari daftar berikut: decision, drawing, survey, vendor_quote, vendor_pick, material, worker_assigned, progress, defect, photo, document, client_request, note, pending.
+- Pilih event_kind dari daftar berikut: decision, drawing, vendor, material, work, client_request, note, photo, document.
 - Susun payload sesuai dengan kind yang dipilih. Field penting per kind (lihat catatan implementasi DATUM):
   - decision: { topic, current_spec?, proposed_spec?, approved_by? (client|principal|pic), approval_evidence? }
   - drawing: { description, drawing_code?, revision?, file_ref? }
-  - survey: { vendor_name?, location?, attendees?[], notes? }
-  - vendor_quote: { vendor_name, amount (number IDR), currency: "IDR", quote_date (YYYY-MM-DD), expires_at?, notes? }
-  - vendor_pick: { vendor_name, vendor_id?, rationale? }
+  - vendor: { interaction (quote|pick|survey|contract), vendor_name, amount? (number IDR), quote_date? (YYYY-MM-DD), expires_at?, location?, attendees?[], rationale?, notes? }
   - material: { item, spec?, status: "specified"|"sample_approved"|"ordered"|"delivered", quantity?, unit? }
-  - worker_assigned: { worker_name, role?, scope?, start_date? }
-  - progress: { status, percent_complete? (0-100), notes? }
-  - defect: { description, severity: "low"|"medium"|"high", location?, fix_required_by? }
-  - photo: { caption?, taken_at? }
-  - document: { title, doc_type?, notes? }
+  - work: { status: "assigned"|"in_progress"|"blocked"|"done", worker_name?, role?, scope?, percent_complete? (0-100), description?, severity? ("low"|"medium"|"high"), location? }
   - client_request: { request_text, requested_by?, awaiting? }
   - note: { body }
-  - pending: { what, blocked_on? }
+  - photo: { caption?, taken_at? }
+  - document: { title, doc_type?, notes? }
 - Confidence 0–1: berapa yakin Anda dengan pilihan ini. Turunkan jika input ambigu.
 - Rationale: 1 kalimat Bahasa Indonesia pendek menjelaskan kenapa kartu+kind itu cocok.
 - Jika tidak ada kartu yang cocok sama sekali, gunakan event_kind "note" dengan body=input asli dan pilih kartu paling mungkin terkait.
@@ -44,7 +39,7 @@ ATURAN:
 FORMAT OUTPUT — WAJIB JSON murni, TANPA markdown fence, TANPA penjelasan di luar JSON:
 {
   "card_id": "<uuid dari KARTU TERSEDIA>",
-  "event_kind": "<salah satu dari 14 kind>",
+  "event_kind": "<salah satu dari 9 kind>",
   "payload": { ... },
   "rationale": "<kalimat Bahasa Indonesia>",
   "confidence": 0.0..1.0
