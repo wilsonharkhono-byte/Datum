@@ -77,6 +77,28 @@ export function CardHeader({
             <span>terakhir: {new Date(card.last_event_at).toLocaleDateString("id-ID")}</span>
           ) : null}
         </div>
+        {(() => {
+          const props = (card.properties as { trello_card_id?: string; trello_url?: string } | null);
+          if (!props?.trello_card_id) return null;
+          return (
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="inline-flex items-center gap-1 rounded bg-[var(--surface-alt)] px-2 py-0.5 font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                <span aria-hidden="true">📋</span> Diimpor dari Trello
+              </span>
+              {props.trello_url ? (
+                <a
+                  href={props.trello_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Buka kartu asli di Trello"
+                  className="text-[var(--sand-dark)] hover:underline"
+                >
+                  Lihat di Trello ↗
+                </a>
+              ) : null}
+            </div>
+          );
+        })()}
         {card.current_summary ? (
           <p className="mt-2 text-sm text-[var(--text-secondary)]">{card.current_summary}</p>
         ) : null}

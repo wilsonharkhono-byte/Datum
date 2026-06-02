@@ -16,6 +16,12 @@ export function MiniCard({ card, projectCode }: { card: Card; projectCode: strin
           {new Date(card.last_event_at).toLocaleDateString("id-ID", { year: "numeric", month: "short", day: "numeric" })}
         </div>
       ) : null}
+      {(card.properties as { trello_card_id?: string } | null)?.trello_card_id ? (
+        <div className="mt-1 inline-flex items-center gap-1 rounded bg-[var(--surface-alt)] px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-[var(--text-muted)]">
+          <span aria-hidden="true">📋</span>
+          <span>Trello</span>
+        </div>
+      ) : null}
     </Link>
   );
 }
