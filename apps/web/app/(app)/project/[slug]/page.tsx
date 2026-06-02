@@ -29,12 +29,20 @@ export default async function ProjectBoardPage({
       <header className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
         <div className="flex items-center justify-between">
           <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Proyek</Link>
-          <Link
-            href={`/project/${board.project.project_code}/schedule`}
-            className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
-          >
-            Jadwal & Readiness →
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/project/${board.project.project_code}/members`}
+              className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+            >
+              Anggota →
+            </Link>
+            <Link
+              href={`/project/${board.project.project_code}/schedule`}
+              className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+            >
+              Jadwal & Readiness →
+            </Link>
+          </div>
         </div>
         <h1 className="text-lg font-semibold text-foreground">
           {board.project.project_code} · {board.project.project_name}
