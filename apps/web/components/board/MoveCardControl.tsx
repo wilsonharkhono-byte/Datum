@@ -66,7 +66,7 @@ export function MoveCardControl({
         value={targetId}
         onChange={(e) => setTargetId(e.target.value)}
         disabled={pending}
-        className="rounded border border-[var(--border)] px-2 py-0.5 text-xs"
+        className="select-brand-sm"
       >
         {topics.map((t) => (
           <option key={t.id} value={t.id}>{t.name}</option>

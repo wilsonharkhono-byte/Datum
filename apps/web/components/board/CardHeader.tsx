@@ -103,7 +103,7 @@ export function CardHeader({
           value={status}
           onChange={(e) => setStatus(e.target.value as "active" | "dormant" | "closed")}
           disabled={pending}
-          className="rounded border border-[var(--border)] px-2 py-0.5 text-xs"
+          className="select-brand-sm"
         >
           <option value="active">Aktif</option>
           <option value="dormant">Tertunda</option>

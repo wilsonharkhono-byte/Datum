@@ -263,7 +263,7 @@ export function AddEventForm({
             setFormKey((k) => k + 1);
           }}
           disabled={pending}
-          className="rounded border border-[var(--border)] px-2 py-1 text-xs"
+          className="select-brand"
         >
           {KIND_ORDER.map((k) => (
             <option key={k} value={k}>{KIND_LABELS[k]}</option>
@@ -386,7 +386,7 @@ function renderInput(f: FieldDef, id: string, cls: string, disabled: boolean): R
     case "select":
       return (
         <select id={id} name={`payload_${f.name}`} defaultValue={f.options[0]?.value ?? ""}
-          disabled={disabled} className={cls}>
+          disabled={disabled} className="select-brand w-full">
           {f.options.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
