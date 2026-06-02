@@ -9,7 +9,7 @@ export default async function BriefPage() {
 
   return (
     <div className="mx-auto max-w-5xl p-6">
-      <Link href="/" className="text-xs text-stone-500 hover:underline">← Beranda</Link>
+      <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
       <header className="mt-2 mb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">Morning brief</p>
         <h1 className="text-3xl font-semibold text-[#141210]">Apa yang butuh perhatian hari ini</h1>
@@ -62,11 +62,11 @@ export default async function BriefPage() {
               <li key={p.projectCode}>
                 <Link
                   href={`/project/${p.projectCode}/schedule`}
-                  className="block rounded border border-stone-200 bg-white px-3 py-2 text-xs hover:border-amber-700"
+                  className="block rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs hover:border-[var(--sand-dark)]"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-[#141210]">{p.projectCode}</span>
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                    <span className="rounded bg-[var(--sand-tint)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--sand-dark)]">
                       {p.staleCount} stale
                     </span>
                   </div>

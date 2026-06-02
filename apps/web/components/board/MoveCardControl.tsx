@@ -63,7 +63,7 @@ export function MoveCardControl({
         value={targetId}
         onChange={(e) => setTargetId(e.target.value)}
         disabled={pending}
-        className="rounded border border-stone-300 px-2 py-0.5 text-xs"
+        className="rounded border border-[var(--border)] px-2 py-0.5 text-xs"
       >
         {topics.map((t) => (
           <option key={t.id} value={t.id}>{t.name}</option>
@@ -73,7 +73,7 @@ export function MoveCardControl({
         type="button"
         onClick={submit}
         disabled={pending || targetId === currentTopicId}
-        className="rounded bg-[#141210] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-stone-400"
+        className="rounded bg-[#141210] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
       >
         {pending ? "…" : "pindah"}
       </button>
@@ -81,7 +81,7 @@ export function MoveCardControl({
         type="button"
         onClick={() => { setOpen(false); setTargetId(currentTopicId); setError(null); }}
         disabled={pending}
-        className="rounded px-2 py-1 text-[10px] font-medium text-[#524E49] hover:bg-stone-100"
+        className="rounded px-2 py-1 text-[10px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
       >
         batal
       </button>

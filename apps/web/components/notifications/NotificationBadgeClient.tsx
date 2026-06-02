@@ -49,7 +49,7 @@ export function NotificationBadgeClient({
     >
       🔔
       {count > 0 ? (
-        <span className="ml-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-600 px-1 text-[10px] font-bold text-white">
+        <span className="ml-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--flag-warning)] px-1 text-[10px] font-bold text-white">
           {count > 99 ? "99+" : count}
         </span>
       ) : null}

@@ -39,9 +39,9 @@ export function Board({ board }: { board: BoardData }) {
         matched={matchedTotal}
         total={totalCards}
       />
-      <div className="flex flex-1 gap-2 overflow-x-auto overflow-y-hidden bg-stone-100 p-3">
+      <div className="flex flex-1 gap-2 overflow-x-auto overflow-y-hidden bg-[var(--surface-alt)] p-3">
         {filteredColumns.length === 0 ? (
-          <div className="m-auto text-sm italic text-stone-500">
+          <div className="m-auto text-sm italic text-[var(--text-muted)]">
             Tidak ada kartu cocok. Coba ubah filter atau kata kunci.
           </div>
         ) : (

@@ -32,18 +32,18 @@ export function BoardFilter({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 bg-white px-3 py-2 text-xs">
+    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs">
       <input
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         placeholder="Cari judul atau ringkasan kartu…"
-        className="w-56 rounded border border-stone-300 px-2 py-1 text-xs focus:border-amber-700 focus:outline-none"
+        className="w-56 rounded border border-[var(--border)] px-2 py-1 text-xs focus:border-[var(--sand-dark)] focus:outline-none"
       />
       {query ? (
         <button
           type="button"
           onClick={() => onQueryChange("")}
-          className="text-[10px] text-stone-500 hover:underline"
+          className="text-[10px] text-[var(--text-muted)] hover:underline"
         >
           × bersihkan
         </button>
@@ -61,7 +61,7 @@ export function BoardFilter({
                 "rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide " +
                 (on
                   ? "border-[#141210] bg-[#141210] text-white"
-                  : "border-stone-300 bg-white text-stone-500 hover:border-stone-500")
+                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--text-secondary)]")
               }
             >
               {STATUS_LABELS[s]}

@@ -34,7 +34,7 @@ export function RecomputeButton({
         type="button"
         onClick={recompute}
         disabled={pending}
-        className="rounded bg-[#141210] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] hover:bg-[#3a3527] disabled:bg-stone-400"
+        className="rounded bg-[#141210] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] hover:bg-[#3a3527] disabled:bg-[var(--text-muted)]"
       >
         {pending ? "Menghitung…" : "Hitung ulang readiness"}
       </button>

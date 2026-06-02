@@ -51,7 +51,7 @@ export function Timeline({
   );
 
   if (events.length === 0) {
-    return <p className="mt-6 italic text-stone-500">Belum ada aktivitas tercatat.</p>;
+    return <p className="mt-6 italic text-[var(--text-muted)]">Belum ada aktivitas tercatat.</p>;
   }
 
   return (
@@ -64,7 +64,7 @@ export function Timeline({
         onNone={() => setActive(new Set())}
       />
       {visible.length === 0 ? (
-        <p className="mt-4 italic text-stone-500">Tidak ada aktivitas yang cocok dengan filter.</p>
+        <p className="mt-4 italic text-[var(--text-muted)]">Tidak ada aktivitas yang cocok dengan filter.</p>
       ) : (
         <ol className="mt-4 space-y-2">
           {visible.map((ev) => (

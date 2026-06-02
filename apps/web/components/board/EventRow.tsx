@@ -47,15 +47,15 @@ export function EventRow({
   attachments: CardAttachment[];
 }) {
   return (
-    <li className="rounded border border-stone-200 bg-white px-3 py-2 text-sm">
+    <li className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
       <div className="flex gap-3">
-        <span className="w-24 flex-shrink-0 text-[11px] uppercase tracking-wide text-amber-800">
+        <span className="w-24 flex-shrink-0 text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">
           {KIND_LABEL[event.event_kind] ?? event.event_kind}
         </span>
-        <span className="w-24 flex-shrink-0 text-[11px] text-stone-500">
+        <span className="w-24 flex-shrink-0 text-[11px] text-[var(--text-muted)]">
           {new Date(event.occurred_at).toLocaleDateString("id-ID", { year: "2-digit", month: "short", day: "numeric" })}
         </span>
-        <span className="flex-1 text-stone-800">{summarize(event)}</span>
+        <span className="flex-1 text-foreground">{summarize(event)}</span>
       </div>
       <EventAttachments attachments={attachments} />
     </li>

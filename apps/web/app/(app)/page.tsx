@@ -50,7 +50,7 @@ export default async function HomePage() {
           {projects.length} proyek aktif. Klik salah satu untuk melihat semua kartu per topik, timeline keputusan, dan bertanya pada asisten.
         </p>
         {pendingDraftCount && pendingDraftCount > 0 ? (
-          <Link href="/review" className="mt-2 inline-block rounded bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200">
+          <Link href="/review" className="mt-2 inline-block rounded bg-[var(--sand-tint)] px-3 py-1 text-xs font-semibold text-[var(--sand-dark)] hover:bg-[var(--sand)]/20">
             🔔 {pendingDraftCount} draft menunggu review →
           </Link>
         ) : null}

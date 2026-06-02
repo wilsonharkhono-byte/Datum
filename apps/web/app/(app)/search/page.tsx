@@ -10,9 +10,9 @@ const KIND_LABEL: Record<SearchHit["kind"], string> = {
 };
 
 const KIND_COLOR: Record<SearchHit["kind"], string> = {
-  card: "bg-green-100 text-green-900",
-  event: "bg-amber-100 text-amber-900",
-  comment: "bg-stone-200 text-stone-700",
+  card: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]",
+  event: "bg-[var(--sand-tint)] text-[var(--sand-dark)]",
+  comment: "bg-[var(--surface-alt)] text-[var(--text-secondary)]",
 };
 
 export default async function SearchPage({
@@ -27,7 +27,7 @@ export default async function SearchPage({
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <Link href="/" className="text-xs text-stone-500 hover:underline">← Beranda</Link>
+      <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
       <h1 className="mt-2 text-2xl font-semibold text-[#141210]">Cari</h1>
       <p className="mt-1 text-sm text-[#524E49]">
         Pencarian teks di seluruh proyek — kartu, aktivitas, komentar.

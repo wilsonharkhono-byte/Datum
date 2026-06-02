@@ -80,7 +80,7 @@ export function CardMembers({
               {initials(m.staff?.full_name)}
             </span>
             <span>{m.staff?.full_name ?? "(unknown)"}</span>
-            <span className="text-[8px] uppercase text-stone-400">{m.role}</span>
+            <span className="text-[8px] uppercase text-[var(--text-muted)]">{m.role}</span>
           </button>
         ))}
         <button
@@ -103,7 +103,7 @@ export function CardMembers({
               type="button"
               onClick={() => add(s.id)}
               disabled={pending}
-              className="rounded-full border border-[#B5AFA8] bg-[#FDFAF6] px-2 py-0.5 text-[10px] font-medium text-[#141210] hover:border-amber-700"
+              className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] font-medium text-[#141210] hover:border-[var(--sand-dark)]"
             >
               {s.full_name ?? "(unknown)"}
             </button>

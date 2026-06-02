@@ -1,28 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  --background: #d2d0c4;
-  --foreground: #141210;
-  --surface: #fdfaf6;
-  --surface-alt: #f2efe9;
-  --oat: #c6c1b6;
+  /* Surfaces */
+  --background: #d2d0c4;        /* oat — page bg */
+  --oat-deep: #c6c1b6;          /* darker oat — section dividers */
+  --surface: #fdfaf6;           /* warm near-white — cards */
+  --surface-alt: #f2efe9;       /* warmer off-white — inactive */
+
+  /* Text */
+  --foreground: #141210;        /* warm near-black */
+  --text-secondary: #524e49;    /* AA on oat + surface */
+  --text-muted: #847e78;        /* large sizes only */
+  --text-inverse: #fdfaf6;
+  --text-inverse-secondary: rgba(253, 250, 246, 0.65);
+
+  /* Brand accent (sand) */
   --sand: #b29f86;
   --sand-dark: #7a6b56;
+  --sand-tint: rgba(178, 159, 134, 0.12);
+
+  /* Borders */
   --border: #b5afa8;
-  --text-muted: #847e78;
+  --border-sub: rgba(148, 148, 148, 0.18);
+
+  /* Status — the flag system */
+  --flag-ok: #3d8b40;
+  --flag-info: #1565c0;
+  --flag-warning: #e65100;
+  --flag-high: #bf360c;
+  --flag-critical: #c62828;
+  --flag-ok-bg: rgba(61, 139, 64, 0.08);
+  --flag-info-bg: rgba(21, 101, 192, 0.08);
+  --flag-warning-bg: rgba(230, 81, 0, 0.10);
+  --flag-high-bg: rgba(191, 54, 12, 0.10);
+  --flag-critical-bg: rgba(198, 40, 40, 0.08);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-oat-deep: var(--oat-deep);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-sand: var(--sand);
+  --color-sand-dark: var(--sand-dark);
+  --color-border-brand: var(--border);
+  --color-flag-ok: var(--flag-ok);
+  --color-flag-info: var(--flag-info);
+  --color-flag-warning: var(--flag-warning);
+  --color-flag-high: var(--flag-high);
+  --color-flag-critical: var(--flag-critical);
+  --font-sans: var(--font-space-grotesk);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-space-grotesk), "Space Grotesk", system-ui, sans-serif;
 }
 
 ::selection {

@@ -18,7 +18,7 @@ export default async function ActivityPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <Link href="/" className="text-xs text-stone-500 hover:underline">← Beranda</Link>
+      <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
       <h1 className="mt-2 text-2xl font-semibold text-[#141210]">Aktivitas Terbaru</h1>
       <p className="mt-1 text-sm text-[#524E49]">
         50 aktivitas terbaru di semua proyek — kartu baru, aktivitas, dan komentar.

@@ -33,7 +33,7 @@ export function BriefSection({
       ) : (
         <ol className="space-y-1.5">
           {items.map((it) => (
-            <li key={it.id} className="rounded border border-stone-200 bg-white px-3 py-2 text-xs">
+            <li key={it.id} className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs">
               <div className="mb-0.5 flex items-center justify-between text-[10px]">
                 <span className="font-semibold uppercase tracking-wide text-[#7A6B56]">{it.projectCode}</span>
                 <span className="text-[#847E78]">{it.meta}</span>

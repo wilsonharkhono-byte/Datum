@@ -257,7 +257,7 @@ export function AddEventForm({
             setFormKey((k) => k + 1);
           }}
           disabled={pending}
-          className="rounded border border-stone-300 px-2 py-1 text-xs"
+          className="rounded border border-[var(--border)] px-2 py-1 text-xs"
         >
           {KIND_ORDER.map((k) => (
             <option key={k} value={k}>{KIND_LABELS[k]}</option>
@@ -269,7 +269,7 @@ export function AddEventForm({
         {fields.map((f) => {
           const errMsg = fieldErrors[f.name];
           const baseInput =
-            "w-full rounded border border-stone-300 px-2 py-1.5 text-sm focus:border-amber-700 focus:outline-none";
+            "w-full rounded border border-[var(--border)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none";
           return (
             <div key={f.name}>
               <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
@@ -284,7 +284,7 @@ export function AddEventForm({
         })}
       </div>
 
-      <div className="mt-3 border-t border-stone-200 pt-3">
+      <div className="mt-3 border-t border-[var(--border)] pt-3">
         <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
           Lampiran (opsional) — foto / PDF, maks 20MB per file
         </label>
@@ -317,7 +317,7 @@ export function AddEventForm({
           value={occurredAt}
           onChange={(e) => setOccurredAt(e.target.value)}
           disabled={pending}
-          className="rounded border border-stone-300 px-2 py-0.5 text-xs"
+          className="rounded border border-[var(--border)] px-2 py-0.5 text-xs"
         />
         <span className="text-[10px] text-[#847E78]">kosongkan untuk hari ini</span>
       </div>
@@ -328,7 +328,7 @@ export function AddEventForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-stone-400"
+          className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
         >
           {pending && uploadState === "uploading" ? "Mengupload…" : pending ? "Menyimpan…" : "Simpan"}
         </button>
@@ -345,7 +345,7 @@ export function AddEventForm({
             setFormKey((k) => k + 1);
           }}
           disabled={pending}
-          className="rounded px-3 py-1.5 text-[11px] font-medium text-[#524E49] hover:bg-stone-100"
+          className="rounded px-3 py-1.5 text-[11px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
         >
           Batal
         </button>

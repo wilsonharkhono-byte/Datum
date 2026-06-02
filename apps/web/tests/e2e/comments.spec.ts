@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test("comment add → edit → soft-delete cycle on a card", async ({ page }) => {
   await page.goto("/login");
   await page.fill('input[name="email"]', "wilson@datum.local");
-  await page.fill('input[name="password"]', "datum-pilot-2026");
+  await page.fill('input[name="password"]', "password123");
   await page.click('button[type="submit"]');
   await page.waitForURL("**/");
 

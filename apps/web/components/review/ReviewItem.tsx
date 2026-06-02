@@ -59,7 +59,7 @@ export function ReviewItem({ draft }: { draft: Draft }) {
         <span className="font-semibold uppercase tracking-wide">
           {draft.projects?.project_code ?? "(unknown)"} · {draft.proposed_payload.kind}
         </span>
-        <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${draft.risk_level === "high" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
+        <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${draft.risk_level === "high" ? "bg-[var(--flag-high-bg)] text-[var(--flag-high)]" : "bg-[var(--sand-tint)] text-[var(--sand-dark)]"}`}>
           {draft.risk_level} risk
         </span>
       </div>
@@ -68,7 +68,7 @@ export function ReviewItem({ draft }: { draft: Draft }) {
         {new Date(draft.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
       </div>
       {draft.original_input_text ? (
-        <div className="mb-2 rounded border border-stone-200 bg-white p-2 text-xs italic text-stone-600">
+        <div className="mb-2 rounded border border-[var(--border)] bg-[var(--surface)] p-2 text-xs italic text-[var(--text-secondary)]">
           Input asli: &ldquo;{draft.original_input_text}&rdquo;
         </div>
       ) : null}
@@ -77,7 +77,7 @@ export function ReviewItem({ draft }: { draft: Draft }) {
           AI: &ldquo;{draft.proposed_payload.rationale}&rdquo;
         </div>
       ) : null}
-      <pre className="mb-3 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-stone-200 bg-white p-2 text-[11px] text-stone-800">
+      <pre className="mb-3 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-[var(--border)] bg-[var(--surface)] p-2 text-[11px] text-foreground">
         {JSON.stringify(draft.proposed_payload.payload, null, 2)}
       </pre>
       {error ? <div className="mb-2 text-[11px] text-red-700">{error}</div> : null}
@@ -91,27 +91,27 @@ export function ReviewItem({ draft }: { draft: Draft }) {
             <div className="flex gap-1">
               <input value={reason} onChange={(e) => setReason(e.target.value)}
                 placeholder="alasan (opsional)"
-                className="rounded border border-stone-300 px-2 py-1 text-xs" />
+                className="rounded border border-[var(--border)] px-2 py-1 text-xs" />
               <button type="button" onClick={reject}
                 className="rounded bg-red-700 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white">
                 Tolak
               </button>
               <button type="button" onClick={() => setShowReject(false)}
-                className="text-[10px] text-stone-500 hover:underline">batal</button>
+                className="text-[10px] text-[var(--text-muted)] hover:underline">batal</button>
             </div>
           ) : (
             <button type="button" onClick={() => setShowReject(true)}
-              className="rounded border border-stone-300 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone-700 hover:bg-stone-100">
+              className="rounded border border-[var(--border)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]">
               ✗ Tolak
             </button>
           )}
         </div>
       ) : status === "saving" ? (
-        <div className="text-[11px] text-stone-600">Memproses…</div>
+        <div className="text-[11px] text-[var(--text-secondary)]">Memproses…</div>
       ) : status === "approved" ? (
         <div className="text-[11px] font-semibold text-green-700">✓ Disetujui dan dipromosikan ke kartu.</div>
       ) : (
-        <div className="text-[11px] font-semibold text-stone-500">Ditolak.</div>
+        <div className="text-[11px] font-semibold text-[var(--text-muted)]">Ditolak.</div>
       )}
     </li>
   );

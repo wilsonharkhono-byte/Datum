@@ -57,9 +57,9 @@ export function CardHeader({
 
   if (!editing) {
     return (
-      <header className="mt-2 border-b border-stone-200 pb-3">
+      <header className="mt-2 border-b border-[var(--border)] pb-3">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-semibold text-stone-900">{card.title}</h1>
+          <h1 className="text-xl font-semibold text-foreground">{card.title}</h1>
           <button
             type="button"
             onClick={() => setEditing(true)}
@@ -68,8 +68,8 @@ export function CardHeader({
             edit
           </button>
         </div>
-        <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-stone-600">
-          <span className="rounded bg-stone-200 px-2 py-0.5 uppercase tracking-wide">
+        <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-[var(--text-secondary)]">
+          <span className="rounded bg-[var(--surface-alt)] px-2 py-0.5 uppercase tracking-wide">
             {STATUS_LABEL[card.status as "active" | "dormant" | "closed"] ?? card.status}
           </span>
           {card.last_event_at ? (
@@ -77,14 +77,14 @@ export function CardHeader({
           ) : null}
         </div>
         {card.current_summary ? (
-          <p className="mt-2 text-sm text-stone-700">{card.current_summary}</p>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">{card.current_summary}</p>
         ) : null}
       </header>
     );
   }
 
   return (
-    <form onSubmit={save} className="mt-2 border-b border-stone-200 pb-3">
+    <form onSubmit={save} className="mt-2 border-b border-[var(--border)] pb-3">
       <div className="flex items-start justify-between gap-3">
         <input
           autoFocus
@@ -92,7 +92,7 @@ export function CardHeader({
           onChange={(e) => setTitle(e.target.value)}
           disabled={pending}
           maxLength={120}
-          className="flex-1 rounded border border-[#B5AFA8] bg-[#FDFAF6] px-2 py-1 text-xl font-semibold text-[#141210] focus:border-amber-700 focus:outline-none"
+          className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xl font-semibold text-foreground focus:border-[var(--sand-dark)] focus:outline-none"
         />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -101,7 +101,7 @@ export function CardHeader({
           value={status}
           onChange={(e) => setStatus(e.target.value as "active" | "dormant" | "closed")}
           disabled={pending}
-          className="rounded border border-stone-300 px-2 py-0.5 text-xs"
+          className="rounded border border-[var(--border)] px-2 py-0.5 text-xs"
         >
           <option value="active">Aktif</option>
           <option value="dormant">Tertunda</option>
@@ -115,14 +115,14 @@ export function CardHeader({
         rows={2}
         maxLength={2000}
         placeholder="Ringkasan singkat — mis. 'Marmer Statuario disetujui klien'"
-        className="mt-2 w-full rounded border border-stone-300 px-2 py-1.5 text-sm focus:border-amber-700 focus:outline-none"
+        className="mt-2 w-full rounded border border-[var(--border)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none"
       />
       {error ? <div className="mt-1 text-[11px] text-red-700">{error}</div> : null}
       <div className="mt-2 flex gap-2">
         <button
           type="submit"
           disabled={pending || !title.trim()}
-          className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-stone-400"
+          className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
         >
           {pending ? "Menyimpan…" : "Simpan"}
         </button>
@@ -130,7 +130,7 @@ export function CardHeader({
           type="button"
           onClick={cancel}
           disabled={pending}
-          className="rounded px-3 py-1.5 text-[11px] font-medium text-[#524E49] hover:bg-stone-100"
+          className="rounded px-3 py-1.5 text-[11px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
         >
           Batal
         </button>

@@ -48,7 +48,7 @@ export default async function CardDetailPage({
   return (
     <div className="mx-auto max-w-3xl p-4">
       <div className="flex items-center justify-between">
-        <Link href={`/project/${slug}`} className="text-xs text-stone-500 hover:underline">
+        <Link href={`/project/${slug}`} className="text-xs text-[var(--text-muted)] hover:underline">
           ← {project.project_code}
         </Link>
         <MoveCardControl

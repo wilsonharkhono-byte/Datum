@@ -55,16 +55,16 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   }
 
   return (
-    <div className="flex h-[25vh] flex-col border-t border-stone-300 bg-stone-50">
-      <div className="flex items-center justify-between border-b border-stone-200 px-4 py-1.5 text-xs">
+    <div className="flex h-[25vh] flex-col border-t border-[var(--border)] bg-[var(--surface)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-1.5 text-xs">
         <div className="flex items-center gap-2">
-          <span className="font-semibold uppercase tracking-wide text-amber-800">&#9652; Asisten</span>
-          <div className="flex overflow-hidden rounded border border-stone-300 bg-white">
+          <span className="font-semibold uppercase tracking-wide text-[var(--sand-dark)]">&#9652; Asisten</span>
+          <div className="flex overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
             <button
               type="button"
               onClick={() => setMode("tanya")}
               className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                mode === "tanya" ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"
+                mode === "tanya" ? "bg-foreground text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
               }`}
             >
               Tanya
@@ -73,14 +73,14 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
               type="button"
               onClick={() => setMode("catat")}
               className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                mode === "catat" ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"
+                mode === "catat" ? "bg-foreground text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
               }`}
             >
               Catat
             </button>
           </div>
         </div>
-        <span className="text-stone-500">
+        <span className="text-[var(--text-muted)]">
           {mode === "tanya"
             ? "Bahasa Indonesia · jawaban dikutip dari kartu"
             : "AI memilih kartu + jenis aktivitas; Anda konfirmasi"}

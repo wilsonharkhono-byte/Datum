@@ -61,8 +61,8 @@ export function TimelineFilter({
             className={
               "rounded border px-2 py-0.5 font-semibold uppercase tracking-wide " +
               (on
-                ? "border-amber-700 bg-amber-100 text-amber-900"
-                : "border-stone-300 bg-white text-stone-500 hover:border-stone-500")
+                ? "border-[var(--sand-dark)] bg-[var(--sand-tint)] text-[var(--sand-dark)]"
+                : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--text-secondary)]")
             }
           >
             {KIND_LABELS[k]}

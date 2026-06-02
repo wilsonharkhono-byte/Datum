@@ -20,7 +20,7 @@ export function SearchBox({ initialQ = "" }: { initialQ?: string }) {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Cari kartu, aktivitas, komentar…"
-        className="flex-1 rounded border border-[#B5AFA8] bg-white px-3 py-1.5 text-sm focus:border-amber-700 focus:outline-none"
+        className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none"
         minLength={2}
       />
       <button

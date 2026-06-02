@@ -8,9 +8,9 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 const KIND_COLOR: Record<string, string> = {
-  event: "bg-amber-100 text-amber-900",
-  comment: "bg-stone-200 text-stone-700",
-  card: "bg-green-100 text-green-900",
+  event: "bg-[var(--sand-tint)] text-[var(--sand-dark)]",
+  comment: "bg-[var(--surface-alt)] text-[var(--text-secondary)]",
+  card: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]",
 };
 
 export function ActivityItem({ item }: { item: Item }) {

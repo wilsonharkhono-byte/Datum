@@ -59,10 +59,10 @@ export function NotificationList({ items }: { items: Notification[] }) {
               key={n.id}
               className={
                 "flex items-start gap-3 rounded border p-3 text-sm " +
-                (unread ? "border-amber-300 bg-amber-50" : "border-[#B5AFA8] bg-white")
+                (unread ? "border-[var(--sand)] bg-[var(--sand-tint)]" : "border-[var(--border)] bg-[var(--surface)]")
               }
             >
-              <span className="rounded bg-stone-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-700">
+              <span className="rounded bg-[var(--surface-alt)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                 {KIND_LABEL[n.kind] ?? n.kind}
               </span>
               <div className="flex-1">

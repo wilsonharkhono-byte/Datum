@@ -13,7 +13,7 @@ function renderBody(body: string): React.ReactNode[] {
   while ((match = re.exec(body)) !== null) {
     if (match.index > last) parts.push(body.slice(last, match.index));
     parts.push(
-      <span key={`m${key++}`} className="rounded bg-amber-100 px-1 text-amber-900">
+      <span key={`m${key++}`} className="rounded bg-[var(--sand-tint)] px-1 text-[var(--sand-dark)]">
         @{match[1]}
       </span>
     );
@@ -94,17 +94,17 @@ export function CommentItem({
             disabled={pending}
             rows={3}
             maxLength={4000}
-            className="w-full rounded border border-stone-300 px-2 py-1.5 text-sm focus:border-amber-700 focus:outline-none"
+            className="w-full rounded border border-[var(--border)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none"
           />
           {error ? <div className="mt-1 text-[10px] text-red-700">{error}</div> : null}
           <div className="mt-1.5 flex gap-2">
             <button type="submit" disabled={pending || !body.trim()}
-              className="rounded bg-[#141210] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-stone-400">
+              className="rounded bg-[#141210] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]">
               {pending ? "Menyimpan…" : "Simpan"}
             </button>
             <button type="button" onClick={() => { setEditing(false); setBody(comment.body); }}
               disabled={pending}
-              className="rounded px-3 py-1 text-[10px] font-medium text-[#524E49] hover:bg-stone-100">
+              className="rounded px-3 py-1 text-[10px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]">
               Batal
             </button>
           </div>

@@ -31,7 +31,7 @@ export function EventAttachments({ attachments }: { attachments: CardAttachment[
         ? attachments.map((a) => (
             <span
               key={a.id}
-              className="rounded border border-stone-300 bg-white px-2 py-0.5 text-[10px] text-stone-500"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]"
             >
               {a.storage_path.split("/").pop() ?? "lampiran"} (memuat…)
             </span>
@@ -43,7 +43,7 @@ export function EventAttachments({ attachments }: { attachments: CardAttachment[
               return (
                 <span
                   key={a.id}
-                  className="rounded border border-stone-300 bg-white px-2 py-0.5 text-[10px] text-stone-500"
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]"
                 >
                   {fileName} (memuat…)
                 </span>
@@ -55,7 +55,7 @@ export function EventAttachments({ attachments }: { attachments: CardAttachment[
                 href={a.signedUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="block overflow-hidden rounded border border-[#B5AFA8] hover:border-amber-700"
+                className="block overflow-hidden rounded border border-[var(--border)] hover:border-[var(--sand-dark)]"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={a.signedUrl} alt={fileName} className="h-16 w-16 object-cover" />
@@ -66,7 +66,7 @@ export function EventAttachments({ attachments }: { attachments: CardAttachment[
                 href={a.signedUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded border border-[#B5AFA8] bg-white px-2 py-1 text-[10px] font-medium text-[#7A6B56] hover:border-amber-700 hover:text-amber-700"
+                className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:text-[var(--sand-dark)]"
               >
                 📎 {fileName}
               </a>

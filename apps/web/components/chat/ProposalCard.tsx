@@ -132,65 +132,65 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
 
   const conf = Math.round(proposal.confidence * 100);
   const confColor =
-    conf >= 80 ? "text-green-700" : conf >= 50 ? "text-amber-700" : "text-red-700";
+    conf >= 80 ? "text-[var(--flag-ok)]" : conf >= 50 ? "text-[var(--sand-dark)]" : "text-[var(--flag-critical)]";
 
   return (
-    <div className="max-w-[85%] rounded-md border border-amber-300 bg-amber-50 p-3 text-xs">
+    <div className="max-w-[85%] rounded-md border border-[var(--sand)] bg-[var(--sand-tint)] p-3 text-xs">
       <div className="mb-1 flex items-center justify-between">
-        <div className="font-semibold text-stone-900">
+        <div className="font-semibold text-foreground">
           → {proposal.cardTitle}
-          <span className="ml-1 font-normal text-stone-500">· {proposal.topicName}</span>
+          <span className="ml-1 font-normal text-[var(--text-muted)]">· {proposal.topicName}</span>
         </div>
         <span className={`text-[10px] font-semibold uppercase ${confColor}`}>{conf}% yakin</span>
       </div>
-      <div className="mb-2 text-[10px] uppercase tracking-wide text-amber-800">
+      <div className="mb-2 text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">
         {KIND_LABELS[proposal.eventKind] ?? proposal.eventKind}
       </div>
       {proposal.fileMeta || proposal.pendingFile ? (
-        <div className="mb-2 rounded border border-amber-200 bg-white px-2 py-1 text-[10px] text-stone-700">
+        <div className="mb-2 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
           📎 {proposal.fileMeta?.name ?? proposal.pendingFile?.name} —
           akan diupload setelah ✓ Simpan
         </div>
       ) : null}
-      <pre className="mb-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-amber-200 bg-white p-2 text-[10px] text-stone-800">
+      <pre className="mb-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-[var(--sand)] bg-[var(--surface)] p-2 text-[10px] text-foreground">
         {JSON.stringify(proposal.payload, null, 2)}
       </pre>
       {proposal.rationale ? (
-        <p className="mb-2 text-[10px] italic text-stone-600">"{proposal.rationale}"</p>
+        <p className="mb-2 text-[10px] italic text-[var(--text-secondary)]">"{proposal.rationale}"</p>
       ) : null}
       {isHighRisk ? (
-        <div className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-900">
+        <div className="mb-2 rounded border border-[var(--sand)] bg-[var(--sand-tint)] px-2 py-1 text-[10px] text-[var(--sand-dark)]">
           🔒 Kategori berisiko tinggi — akan dikirim ke /review untuk approval principal
         </div>
       ) : null}
-      {error ? <div className="mb-2 text-[10px] text-red-700">{error}</div> : null}
+      {error ? <div className="mb-2 text-[10px] text-[var(--flag-critical)]">{error}</div> : null}
       {status === "pending" || status === "error" ? (
         <div className="flex gap-1.5">
           <button
             type="button"
             onClick={commit}
-            className="rounded bg-stone-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
+            className="rounded bg-foreground px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
           >
             &#10003; Simpan
           </button>
           <button
             type="button"
             onClick={discard}
-            className="rounded px-3 py-1 text-[10px] font-medium text-stone-600 hover:bg-stone-100"
+            className="rounded px-3 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
           >
             &#10007; Batal
           </button>
         </div>
       ) : status === "saving" ? (
-        <div className="text-[10px] text-stone-600">Menyimpan…</div>
+        <div className="text-[10px] text-[var(--text-secondary)]">Menyimpan…</div>
       ) : status === "saved" ? (
-        <div className="text-[10px] text-green-700">
+        <div className="text-[10px] text-[var(--flag-ok)]">
           {isHighRisk
             ? "✓ Tersimpan sebagai draft. Menunggu approval di /review."
             : "✓ Tersimpan di kartu."}
         </div>
       ) : (
-        <div className="text-[10px] text-stone-500">Dibatalkan.</div>
+        <div className="text-[10px] text-[var(--text-muted)]">Dibatalkan.</div>
       )}
     </div>
   );

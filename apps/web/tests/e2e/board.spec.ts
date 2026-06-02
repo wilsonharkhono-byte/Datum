@@ -4,7 +4,7 @@ test.describe("Project board (read-only)", () => {
   test("logs in, opens BDG-H1 board, drills into Master bathroom card", async ({ page }) => {
     await page.goto("/login");
     await page.fill('input[name="email"]', "wilson@datum.local");
-    await page.fill('input[name="password"]', "datum-pilot-2026");
+    await page.fill('input[name="password"]', "password123");
     await page.click('button[type="submit"]');
     await page.waitForURL("**/");
 
