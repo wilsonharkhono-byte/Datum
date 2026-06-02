@@ -140,8 +140,8 @@ Then either:
 
 | Email | Password | Role | Cost visibility |
 |---|---|---|---|
-| `wilson@datum.local` | `datum-pilot-2026` | Principal | yes |
-| `carissa@datum.local` | `datum-pilot-2026` | Designer | — |
+| `wilson@datum.local` | `password123` | Principal | yes |
+| `carissa@datum.local` | `password123` | Designer | — |
 
 ---
 

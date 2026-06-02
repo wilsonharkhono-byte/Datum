@@ -5,7 +5,7 @@ test("Wilson can log in and sees the seeded project list", async ({ page }) => {
   await expect(page.getByText("Masuk ke DATUM")).toBeVisible();
 
   await page.getByLabel("Email").fill("wilson@datum.local");
-  await page.getByLabel("Kata sandi").fill("datum-pilot-2026");
+  await page.getByLabel("Kata sandi").fill("password123");
   await page.getByRole("button", { name: "Masuk" }).click();
 
   await expect(page).toHaveURL("/");

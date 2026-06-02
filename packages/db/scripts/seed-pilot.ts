@@ -52,12 +52,12 @@ async function main() {
 
   const wilsonId = await upsertAuthUser(
     "wilson@datum.local",
-    "datum-pilot-2026",
+    "password123",
     "Wilson Harkhono",
   );
   const carissaId = await upsertAuthUser(
     "carissa@datum.local",
-    "datum-pilot-2026",
+    "password123",
     "Carissa Tjondro",
   );
   console.log(
@@ -306,8 +306,8 @@ async function main() {
   console.log("Pilot seed complete.");
   console.log("");
   console.log("Test credentials:");
-  console.log("  wilson@datum.local / datum-pilot-2026   (Principal, cost-visible)");
-  console.log("  carissa@datum.local / datum-pilot-2026  (Designer)");
+  console.log("  wilson@datum.local / password123   (Principal, cost-visible)");
+  console.log("  carissa@datum.local / password123  (Designer)");
 
   // Slice 1.1: sample cards
   const { execSync } = await import("node:child_process");
