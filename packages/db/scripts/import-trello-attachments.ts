@@ -45,14 +45,32 @@ const admin = createClient<Database>(url, srk, {
 });
 
 const BUCKET = "card-attachments";
-const ALLOWED_MIMES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "application/pdf",
-]);
+
+const EXT_TO_MIME: Record<string, string> = {
+  // Images
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+  webp: "image/webp", heic: "image/heic", heif: "image/heif",
+  gif: "image/gif", svg: "image/svg+xml", tiff: "image/tiff", tif: "image/tiff",
+  // Docs
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  txt: "text/plain", csv: "text/csv",
+  // CAD
+  dwg: "image/vnd.dwg", dxf: "image/vnd.dxf",
+  skp: "application/vnd.sketchup.skp",
+  ai: "application/illustrator", eps: "application/postscript",
+  // Video
+  mp4: "video/mp4", mov: "video/quicktime", avi: "video/x-msvideo", webm: "video/webm",
+  // Audio
+  mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav", ogg: "audio/ogg",
+  // Archives
+  zip: "application/zip", rar: "application/vnd.rar", "7z": "application/x-7z-compressed",
+};
 
 type CandidateRow = {
   event_id: string;
@@ -118,21 +136,19 @@ function extractFilenameFromUrl(rawUrl: string): string {
 }
 
 function safeName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200);
 }
 
 function inferMime(filename: string, headerMime: string | null): string {
+  // Extension-first — header is unreliable from Trello (often sends
+  // application/octet-stream even for PDFs and known formats)
+  const ext = filename.toLowerCase().match(/\.([a-z0-9]{1,8})$/);
+  if (ext && EXT_TO_MIME[ext[1]!]) return EXT_TO_MIME[ext[1]!]!;
+  // Trust the header if it's not the lazy default
   if (headerMime) {
     const base = headerMime.split(";")[0]?.trim() ?? "";
-    if (ALLOWED_MIMES.has(base)) return base;
+    if (base && base !== "application/octet-stream") return base;
   }
-  const lower = filename.toLowerCase();
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".webp")) return "image/webp";
-  if (lower.endsWith(".heic")) return "image/heic";
-  if (lower.endsWith(".heif")) return "image/heif";
-  if (lower.endsWith(".pdf")) return "application/pdf";
   return "application/octet-stream";
 }
 
@@ -157,17 +173,16 @@ async function fetchAndStore(c: CandidateRow): Promise<
   if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` };
 
   const contentLength = Number(res.headers.get("content-length") ?? 0);
-  if (contentLength > 20_000_000) {
+  if (contentLength > 104_857_600) {
     return { ok: false, reason: `too large (${contentLength} bytes)` };
   }
 
   const mime = inferMime(filename, res.headers.get("content-type"));
-  if (!ALLOWED_MIMES.has(mime)) {
-    return { ok: false, reason: `mime not allowed: ${mime}` };
-  }
+  // No script-side ALLOWED_MIMES gate — the bucket enforces mime policy.
+  // Anything the bucket rejects will surface as a storage upload error below.
 
   const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > 20_000_000) {
+  if (buf.length > 104_857_600) {
     return { ok: false, reason: `too large after read (${buf.length} bytes)` };
   }
 
