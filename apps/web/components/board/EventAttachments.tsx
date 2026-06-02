@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import type { CardAttachment } from "@datum/db";
 import { signAttachment } from "@/lib/cards/mutations";
 
@@ -57,8 +58,16 @@ export function EventAttachments({ attachments }: { attachments: CardAttachment[
                 rel="noreferrer"
                 className="block overflow-hidden rounded border border-[var(--border)] hover:border-[var(--sand-dark)]"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.signedUrl} alt={fileName} className="h-16 w-16 object-cover" />
+                <Image
+                  src={a.signedUrl}
+                  alt={fileName}
+                  width={64}
+                  height={64}
+                  sizes="64px"
+                  className="h-16 w-16 object-cover"
+                  loading="lazy"
+                  unoptimized={true}
+                />
               </a>
             ) : (
               <a
