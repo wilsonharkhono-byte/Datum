@@ -1,6 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 
+function extractUrls(payload: Record<string, unknown>): string[] {
+  const urls: string[] = [];
+  const urlRe = /(https?:\/\/[^\s"'<>)]+)/g;
+  for (const v of Object.values(payload)) {
+    if (typeof v !== "string") continue;
+    for (const m of v.matchAll(urlRe)) urls.push(m[1]!);
+  }
+  return [...new Set(urls)]; // dedup
+}
+
 type Snippet = {
   card: { id: string; title: string; slug: string; current_summary: string | null };
   topicName: string;
@@ -22,15 +32,33 @@ export function InlineCardSnippet({ cardId, eventIds }: { cardId: string; eventI
         {snippet.card.title} <span className="font-normal text-[var(--text-muted)]">· {snippet.topicName}</span>
       </div>
       <ul className="space-y-0.5">
-        {snippet.events.map((e) => (
-          <li key={e.id} className="flex gap-2">
-            <span className="w-20 text-[10px] uppercase text-[var(--sand-dark)]">{e.event_kind}</span>
-            <span className="w-16 text-[10px] text-[var(--text-muted)]">
-              {new Date(e.occurred_at).toLocaleDateString("id-ID", { month: "short", day: "numeric" })}
-            </span>
-            <span className="flex-1 text-foreground">{JSON.stringify(e.payload).slice(0, 80)}</span>
-          </li>
-        ))}
+        {snippet.events.map((e) => {
+          const p = e.payload as Record<string, unknown>;
+          const urls = extractUrls(p);
+          const firstText = (["body", "description", "request_text", "topic", "what", "title", "notes"] as const)
+            .map((k) => typeof p[k] === "string" ? p[k] as string : null)
+            .filter((s): s is string => s != null && s.length > 0)[0] ?? JSON.stringify(p);
+          return (
+            <li key={e.id} className="flex gap-2">
+              <span className="w-20 text-[10px] uppercase text-[var(--sand-dark)]">{e.event_kind}</span>
+              <span className="w-16 text-[10px] text-[var(--text-muted)]">
+                {new Date(e.occurred_at).toLocaleDateString("id-ID", { month: "short", day: "numeric" })}
+              </span>
+              <span className="flex-1 text-[var(--foreground)]">{firstText.slice(0, 80)}</span>
+              {urls.length > 0 ? (
+                <a
+                  href={urls[0]}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded bg-[var(--surface-alt)] px-1.5 text-[10px] text-[var(--sand-dark)] hover:underline"
+                  aria-label={`Buka ${urls[0]}`}
+                >
+                  🔗
+                </a>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
