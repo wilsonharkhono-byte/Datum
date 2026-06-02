@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_body", detail: String(e) }, { status: 400 });
   }
 
-  const cards = await retrieveProjectContext(supabase, parsed.projectId);
+  const cards = await retrieveProjectContext(supabase, parsed.projectId, parsed.question);
   const contextBlock = buildContextBlock(cards);
   const { answer, usage } = await askAssistant({ question: parsed.question, contextBlock });
   const citations = extractCitations(answer);
