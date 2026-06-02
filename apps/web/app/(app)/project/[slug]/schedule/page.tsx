@@ -4,6 +4,8 @@ import { fetchMatrix } from "@/lib/matrix/fetch-matrix";
 import { AreaGateMatrix } from "@/components/matrix/area-gate-matrix";
 import { RecomputeButton } from "@/components/schedule/RecomputeButton";
 import { RULE_VERSION } from "@/lib/gates/readiness-rules";
+import { Gantt } from "@/components/schedule/Gantt";
+import { getProjectScheduleCells } from "@/lib/gates/schedule";
 
 export default async function ProjectSchedulePage({
   params,
@@ -28,6 +30,7 @@ export default async function ProjectSchedulePage({
   }
 
   const matrix = await fetchMatrix(project.id);
+  const scheduleCells = await getProjectScheduleCells(project.id);
 
   // Count stale cells
   const { count: staleCount } = await supabase
@@ -76,6 +79,17 @@ export default async function ProjectSchedulePage({
           )}
         </p>
       </header>
+
+      <section className="mb-6">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
+          Gantt rencana
+        </h2>
+        <Gantt
+          areas={matrix?.areas ?? []}
+          gates={(matrix?.gates ?? []).map((c) => ({ code: c, name: c }))}
+          cells={scheduleCells}
+        />
+      </section>
 
       {matrix ? (
         <AreaGateMatrix data={matrix} />

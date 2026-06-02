@@ -2359,6 +2359,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      compute_project_schedule: {
+        Args: { p_project_id: string }
+        Returns: undefined
+      }
       current_can_read_project: {
         Args: { p_project_id: string }
         Returns: boolean

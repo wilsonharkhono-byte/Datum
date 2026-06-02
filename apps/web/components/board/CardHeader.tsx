@@ -2,6 +2,8 @@
 import { useState, useTransition } from "react";
 import type { Card } from "@datum/db";
 import { updateCard } from "@/lib/cards/mutations";
+import { TrelloIcon } from "@/components/icons/Icon";
+import { NextDeadlineBadge } from "@/components/schedule/NextDeadlineBadge";
 
 const STATUS_LABEL: Record<"active" | "dormant" | "closed", string> = {
   active:  "Aktif",
@@ -76,14 +78,15 @@ export function CardHeader({
           {card.last_event_at ? (
             <span>terakhir: {new Date(card.last_event_at).toLocaleDateString("id-ID")}</span>
           ) : null}
+          <NextDeadlineBadge cardId={card.id} />
         </div>
         {(() => {
           const props = (card.properties as { trello_card_id?: string; trello_url?: string } | null);
           if (!props?.trello_card_id) return null;
           return (
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="inline-flex items-center gap-1 rounded bg-[var(--surface-alt)] px-2 py-0.5 font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                <span aria-hidden="true">📋</span> Diimpor dari Trello
+              <span className="inline-flex items-center gap-1.5 rounded bg-[var(--surface-alt)] px-2 py-0.5 font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                <TrelloIcon size={11} /> Diimpor dari Trello
               </span>
               {props.trello_url ? (
                 <a
