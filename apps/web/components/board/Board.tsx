@@ -1,10 +1,16 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Board as BoardData, BoardColumn } from "@/lib/cards/queries";
 import { Column } from "./Column";
 import { BoardFilter, type StatusFilter } from "./BoardFilter";
+import { subscribeToProjectChanges } from "@/lib/cards/realtime";
 
 export function Board({ board }: { board: BoardData }) {
+  const router = useRouter();
+  useEffect(() => {
+    return subscribeToProjectChanges(board.project.id, () => router.refresh());
+  }, [board.project.id, router]);
   const [query, setQuery] = useState("");
   const [statuses, setStatuses] = useState<StatusFilter>(new Set(["active"]));
 

@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCardComments } from "@/lib/cards/queries";
 import { CommentItem } from "./CommentItem";
 import { CommentInput } from "./CommentInput";
+import { CommentsRefresher } from "./CommentsRefresher";
 
 export async function CommentsSection({
   cardId,
@@ -21,6 +22,7 @@ export async function CommentsSection({
 
   return (
     <section className="mt-8">
+      <CommentsRefresher cardId={cardId} />
       <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#7A6B56]">
         Diskusi ({comments.length})
       </h2>

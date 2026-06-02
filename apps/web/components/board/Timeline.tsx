@@ -1,5 +1,7 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { CardEvent, CardAttachment, CardEventKind } from "@datum/db";
 import { EventRow } from "./EventRow";
 import { TimelineFilter } from "./TimelineFilter";
@@ -11,6 +13,23 @@ export function Timeline({
   events: CardEvent[];
   attachmentsByEvent: Map<string, CardAttachment[]>;
 }) {
+  const router = useRouter();
+
+  const cardId = events[0]?.card_id; // all events belong to the same card
+  useEffect(() => {
+    if (!cardId) return;
+    const supabase = createSupabaseBrowserClient();
+    const ch = supabase
+      .channel(`card-events:${cardId}`)
+      .on(
+        "postgres_changes" as never,
+        { event: "*", schema: "public", table: "card_events", filter: `card_id=eq.${cardId}` },
+        () => router.refresh(),
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [cardId, router]);
+
   // Available kinds = those actually present on this card
   const available = useMemo(() => {
     const s = new Set<CardEventKind>();
