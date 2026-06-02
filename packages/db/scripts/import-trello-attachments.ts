@@ -96,10 +96,12 @@ async function listCandidates(): Promise<CandidateRow[]> {
   return candidates.filter((c) => !haveAttachment.has(c.event_id));
 }
 
-function authTrelloUrl(rawUrl: string): string {
-  // Append key + token to the URL. If a query string already exists, use &; otherwise ?
-  const sep = rawUrl.includes("?") ? "&" : "?";
-  return `${rawUrl}${sep}key=${trelloKey}&token=${trelloToken}`;
+function trelloAuthHeader(): string {
+  // Attachment download endpoints REQUIRE the OAuth Authorization header.
+  // Query-param auth (?key=&token=) works for most REST endpoints but NOT
+  // for /attachments/.../download/... — that returns 401 silently.
+  // See https://support.atlassian.com/trello/docs/downloading-attachments-using-the-trello-rest-api/
+  return `OAuth oauth_consumer_key="${trelloKey}", oauth_token="${trelloToken}"`;
 }
 
 function extractFilenameFromUrl(rawUrl: string): string {
@@ -139,11 +141,13 @@ async function fetchAndStore(c: CandidateRow): Promise<
   | { ok: false; reason: string }
 > {
   const filename = extractFilenameFromUrl(c.url);
-  const authedUrl = authTrelloUrl(c.url);
 
   let res: Response;
   try {
-    res = await fetch(authedUrl, { redirect: "follow" });
+    res = await fetch(c.url, {
+      redirect: "follow",
+      headers: { Authorization: trelloAuthHeader() },
+    });
   } catch (e) {
     return {
       ok: false,
