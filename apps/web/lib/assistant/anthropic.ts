@@ -1,6 +1,18 @@
 // apps/web/lib/assistant/anthropic.ts
 import Anthropic from "@anthropic-ai/sdk";
 
+export class AnthropicNotConfiguredError extends Error {
+  constructor() {
+    super("ANTHROPIC_API_KEY not set");
+    this.name = "AnthropicNotConfiguredError";
+  }
+}
+
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+export function getModel(): string {
+  return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
+}
+
 const SYSTEM = `Anda adalah asisten internal DATUM untuk WHAstudio.
 
 ATURAN:
@@ -14,7 +26,7 @@ ATURAN:
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
   if (!client) {
-    if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
+    if (!process.env.ANTHROPIC_API_KEY) throw new AnthropicNotConfiguredError();
     client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
   return client;
@@ -25,7 +37,7 @@ export async function askAssistant(args: {
   contextBlock: string;
 }): Promise<{ answer: string; usage: { input_tokens: number; output_tokens: number } }> {
   const res = await getClient().messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: getModel(),
     max_tokens: 1024,
     system: SYSTEM,
     messages: [

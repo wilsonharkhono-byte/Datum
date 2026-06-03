@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { MessageList, type Message } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { SparkIcon, XIcon } from "@/components/icons/Icon";
 
 type Mode = "tanya" | "catat";
 
@@ -17,13 +18,19 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     setPending(true);
     try {
       if (mode === "tanya") {
-        // File ignored in Tanya mode (could be a future enhancement)
         const res = await fetch("/api/assistant/message", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ projectId, question: input, sessionId }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          let body: { message?: string; error?: string } | null = null;
+          try { body = await res.json(); } catch { /* ignore */ }
+          const friendlyMessage = body?.message
+            || (res.status === 503 ? "Asisten belum dikonfigurasi."
+                : `Gagal: HTTP ${res.status}`);
+          throw new Error(friendlyMessage);
+        }
         const data = await res.json();
         setSessionId(data.sessionId);
         setMessages((m) => [...m, { role: "assistant", content: data.answer, citations: data.citations }]);
@@ -37,7 +44,14 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             file: file ? { name: file.name, mime: file.type || "application/octet-stream", size: file.size } : undefined,
           }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          let body: { message?: string; error?: string } | null = null;
+          try { body = await res.json(); } catch { /* ignore */ }
+          const friendlyMessage = body?.message
+            || (res.status === 503 ? "Asisten belum dikonfigurasi."
+                : `Gagal: HTTP ${res.status}`);
+          throw new Error(friendlyMessage);
+        }
         const data = await res.json();
         if (!data.ok) {
           setMessages((m) => [...m, { role: "assistant", content: `Tidak bisa mencatat: ${data.error}` }]);
@@ -55,97 +69,109 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     }
   }
 
-  /** Shared dock content: mode toggle row + MessageList + MessageInput */
-  function DockContent() {
+  function DockContent({ onClose }: { onClose?: () => void }) {
     return (
       <>
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-1.5 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold uppercase tracking-wide text-[var(--sand-dark)]">&#9652; Asisten</span>
-            <div className="flex overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
+        {/* Layer 1 — signature dark header bar.
+            Carries the assistant label, segmented mode control, and helper text.
+            On mobile (when onClose is provided), shows a close button instead. */}
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[var(--text-inverse)]">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)]">
+              <SparkIcon size={12} /> Asisten
+            </span>
+            <div className="seg" role="tablist" aria-label="Mode asisten">
               <button
                 type="button"
+                role="tab"
                 onClick={() => setMode("tanya")}
                 aria-label="Mode tanya"
-                aria-pressed={mode === "tanya"}
-                className={`px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide ${
-                  mode === "tanya" ? "bg-foreground text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
-                }`}
+                aria-selected={mode === "tanya"}
+                className={`seg-btn${mode === "tanya" ? " seg-active" : ""}`}
               >
                 Tanya
               </button>
               <button
                 type="button"
+                role="tab"
                 onClick={() => setMode("catat")}
                 aria-label="Mode catat"
-                aria-pressed={mode === "catat"}
-                className={`px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide ${
-                  mode === "catat" ? "bg-foreground text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
-                }`}
+                aria-selected={mode === "catat"}
+                className={`seg-btn${mode === "catat" ? " seg-active" : ""}`}
               >
                 Catat
               </button>
             </div>
           </div>
-          <span className="text-[var(--text-muted)]">
-            {mode === "tanya"
-              ? "Bahasa Indonesia · jawaban dikutip dari kartu"
-              : "AI memilih kartu + jenis aktivitas; Anda konfirmasi"}
-          </span>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Tutup asisten"
+              className="inline-flex items-center gap-1 rounded border border-[var(--text-inverse-secondary)]/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
+            >
+              <XIcon size={11} /> Tutup
+            </button>
+          ) : (
+            <span className="hidden text-[10px] uppercase tracking-[0.06em] text-[var(--text-inverse-secondary)] md:inline">
+              {mode === "tanya"
+                ? "Bahasa Indonesia · jawaban dikutip dari kartu"
+                : "AI memilih kartu + jenis aktivitas; Anda konfirmasi"}
+            </span>
+          )}
         </div>
+
+        {/* Layer 2 — warm-white message canvas */}
         <MessageList messages={messages} pending={pending} />
-        <MessageInput
-          onSend={send}
-          disabled={pending}
-          acceptFiles={mode === "catat"}
-          placeholder={
-            mode === "tanya"
-              ? "Tanya atau cari di kartu…"
-              : "Catat sesuatu atau drop file…"
-          }
-        />
+
+        {/* Layer 3 — sand-tinted input footer band, anchored to the bottom */}
+        <div className="border-t border-[var(--border)] bg-[var(--surface-alt)]">
+          <MessageInput
+            onSend={send}
+            disabled={pending}
+            acceptFiles={mode === "catat"}
+            placeholder={
+              mode === "tanya"
+                ? "Tanya atau cari di kartu…"
+                : "Catat sesuatu atau drop file…"
+            }
+          />
+        </div>
       </>
     );
   }
 
   return (
     <>
-      {/* Mobile pill — shown below md when sheet is closed */}
+      {/* Mobile pill — shown below md when sheet is closed.
+          Same dark header treatment as the desktop dock so the assistant always
+          announces itself with the signature dark bar. */}
       {!mobileOpen ? (
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="flex h-12 w-full items-center justify-between border-t border-[var(--border)] bg-[var(--surface)] px-4 text-xs md:hidden"
+          className="flex h-12 w-full items-center justify-between border-t border-[var(--foreground)] bg-[var(--foreground)] px-4 text-xs text-[var(--text-inverse)] md:hidden"
           aria-label="Buka asisten"
         >
-          <span className="flex items-center gap-2">
-            <span aria-hidden="true">&#9652;</span>
-            <span className="font-semibold uppercase tracking-wide text-[var(--sand-dark)]">Asisten</span>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)]">
+            <SparkIcon size={12} /> Asisten
           </span>
-          <span className="text-[var(--text-secondary)]">tap untuk buka</span>
+          <span className="text-[10px] uppercase tracking-[0.06em] text-[var(--text-inverse-secondary)]">
+            tap untuk buka →
+          </span>
         </button>
       ) : null}
 
-      {/* Mobile full-screen sheet — shown below md when open */}
+      {/* Mobile full-screen sheet */}
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 flex flex-col bg-[var(--surface)] md:hidden">
-          <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-            <span className="font-semibold uppercase tracking-wide text-[var(--sand-dark)]">&#9652; Asisten</span>
-            <button
-              type="button"
-              onClick={() => setMobileOpen(false)}
-              className="rounded border border-[var(--border)] px-3 py-1.5 text-xs"
-              aria-label="Tutup asisten"
-            >
-              tutup
-            </button>
-          </div>
-          <DockContent />
+          <DockContent onClose={() => setMobileOpen(false)} />
         </div>
       ) : null}
 
-      {/* Desktop inline dock — md+ */}
-      <div className="hidden h-[25vh] flex-col border-t border-[var(--border)] bg-[var(--surface)] md:flex">
+      {/* Desktop inline dock — md+. The shadow under the dock anchors it to the
+          screen edge and reinforces the assistant as a persistent surface. */}
+      <div className="hidden h-[26vh] flex-col border-t border-[var(--border)] bg-[var(--surface)] shadow-[0_-6px_18px_-10px_rgba(20,18,16,0.18)] md:flex">
         <DockContent />
       </div>
     </>

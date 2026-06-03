@@ -3,6 +3,7 @@ import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { retrieveProjectContext } from "@/lib/assistant/retrieval";
+import { AnthropicNotConfiguredError, getModel } from "@/lib/assistant/anthropic";
 import { EVENT_KINDS, EventPayloadSchemas, type EventKind } from "@datum/types";
 
 const Body = z.object({
@@ -48,7 +49,7 @@ FORMAT OUTPUT — WAJIB JSON murni, TANPA markdown fence, TANPA penjelasan di lu
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
   if (!client) {
-    if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
+    if (!process.env.ANTHROPIC_API_KEY) throw new AnthropicNotConfiguredError();
     client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
   return client;
@@ -82,15 +83,27 @@ export async function POST(req: Request) {
     ? `\n\nLAMPIRAN FILE TERLAMPIR:\n- Nama: ${body.file.name}\n- Mime: ${body.file.mime}\n- Ukuran: ${Math.round(body.file.size / 1024)} KB\nPilih event_kind "photo" untuk gambar (image/*) atau "document" untuk PDF, kecuali konteks input jelas-jelas berbeda.`
     : "";
 
-  const res = await getClient().messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    system: CAPTURE_SYSTEM,
-    messages: [{
-      role: "user",
-      content: `KARTU TERSEDIA:\n${cardList}\n\nINPUT PENGGUNA:\n${body.text}${fileHint}`,
-    }],
-  });
+  let res: Anthropic.Message;
+  try {
+    res = await getClient().messages.create({
+      model: getModel(),
+      max_tokens: 1024,
+      system: CAPTURE_SYSTEM,
+      messages: [{
+        role: "user",
+        content: `KARTU TERSEDIA:\n${cardList}\n\nINPUT PENGGUNA:\n${body.text}${fileHint}`,
+      }],
+    });
+  } catch (e) {
+    if (e instanceof AnthropicNotConfiguredError) {
+      return NextResponse.json(
+        { error: "assistant_not_configured",
+          message: "Asisten belum dikonfigurasi. Set ANTHROPIC_API_KEY di .env.local untuk mengaktifkan." },
+        { status: 503 },
+      );
+    }
+    throw e;
+  }
 
   const raw = res.content
     .filter((c): c is { type: "text"; text: string } => c.type === "text")
