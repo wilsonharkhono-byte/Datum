@@ -37,6 +37,20 @@ const FIELD_LABELS: Record<string, string> = {
   what:            "Apa",
   url:             "Tautan",
   link:            "Tautan",
+  status:          "Status",
+  awaiting:        "Menunggu",
+  blocked_on:      "Terblokir oleh",
+  issue:           "Jenis isu",
+  fix_required_by: "Perbaiki sebelum",
+  expires_at:      "Berlaku sampai",
+  interaction:     "Interaksi",
+  item:            "Material",
+  spec:            "Spesifikasi",
+  scope:           "Lingkup",
+  percent_complete:"Progres (%)",
+  proposed_spec:   "Spesifikasi diusulkan",
+  current_spec:    "Spesifikasi sekarang",
+  approved_by:     "Disetujui oleh",
 };
 
 const HIDDEN_FIELDS = new Set([
@@ -44,6 +58,36 @@ const HIDDEN_FIELDS = new Set([
   "internal_id",
   "_meta",
 ]);
+
+/** Bahasa labels for well-known enum payload values (statuses, actors). */
+const VALUE_LABELS: Record<string, string> = {
+  needs_decision:  "Butuh keputusan",
+  decided:         "Sudah diputuskan",
+  superseded:      "Digantikan",
+  open:            "Terbuka",
+  answered:        "Terjawab",
+  assigned:        "Ditugaskan",
+  in_progress:     "Dikerjakan",
+  blocked:         "Terblokir",
+  done:            "Selesai",
+  specified:       "Spesifikasi dibuat",
+  sample_approved: "Sampel disetujui",
+  ordered:         "Dipesan",
+  delivered:       "Terkirim",
+  quote:           "Penawaran",
+  pick:            "Dipilih",
+  contract:        "Kontrak",
+  defect:          "Defect",
+  client:          "Klien",
+  principal:       "Prinsipal",
+  pic:             "PIC",
+  contractor:      "Kontraktor",
+  architect:       "Arsitek",
+};
+
+export function valueLabel(v: string): string {
+  return VALUE_LABELS[v] ?? v;
+}
 
 export type RenderedField = {
   key: string;
@@ -64,6 +108,8 @@ export function renderPayload(payload: Record<string, unknown> | null | undefine
       ? raw.map((v) => String(v)).join(", ")
       : typeof raw === "object"
       ? JSON.stringify(raw)
+      : typeof raw === "string"
+      ? valueLabel(raw)
       : String(raw);
     const label = FIELD_LABELS[key] ?? prettify(key);
     out.push({

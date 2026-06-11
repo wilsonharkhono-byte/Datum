@@ -1,5 +1,7 @@
 import type { CardEvent, CardAttachment } from "@datum/db";
-import { HIGH_RISK_KINDS, type EventKind } from "@datum/types";
+import { HIGH_RISK_KINDS, isDecisionOpen, isClientRequestOpen, type EventKind } from "@datum/types";
+import { resolveCardEvent } from "@/lib/cards/mutations";
+import { valueLabel } from "@/lib/cards/payload-render";
 import { EventAttachments } from "./EventAttachments";
 
 function extractUrls(payload: Record<string, unknown>): string[] {
@@ -54,9 +56,9 @@ function summarize(ev: CardEvent): string {
       const amount = typeof p.amount === "number" ? ` · Rp ${p.amount.toLocaleString("id-ID")}` : "";
       return `${verb} ${p.vendor_name ?? ""}${amount}`;
     }
-    case "material":        return `${String(p.item)} — ${String(p.status)}`;
+    case "material":        return `${String(p.item)} — ${valueLabel(String(p.status))}`;
     case "work": {
-      const status = p.status as string ?? "?";
+      const status = valueLabel((p.status as string) ?? "?");
       const who = typeof p.worker_name === "string" && p.worker_name.length > 0 ? `${p.worker_name} · ` : "";
       const desc = typeof p.description === "string" ? p.description
                  : typeof p.scope === "string" ? p.scope
@@ -83,9 +85,13 @@ function summarize(ev: CardEvent): string {
 export function EventRow({
   event,
   attachments,
+  projectCode,
+  cardSlug,
 }: {
   event: CardEvent;
   attachments: CardAttachment[];
+  projectCode: string;
+  cardSlug: string;
 }) {
   const urls = extractUrls(event.payload as Record<string, unknown>);
   const isHighRisk = HIGH_RISK_KINDS.has(event.event_kind as EventKind);
@@ -107,6 +113,7 @@ export function EventRow({
             Berisiko tinggi
           </span>
         ) : null}
+        <ResolveAction event={event} projectCode={projectCode} cardSlug={cardSlug} />
       </div>
       {urls.length > 0 ? (
         <div className="ml-[12.5rem] mt-1 flex flex-wrap gap-1.5">
@@ -126,5 +133,54 @@ export function EventRow({
       ) : null}
       <EventAttachments attachments={attachments} />
     </li>
+  );
+}
+
+/** One-click resolution for open-loop events. Renders nothing for events
+ *  that are already resolved or have no lifecycle. */
+function ResolveAction({
+  event,
+  projectCode,
+  cardSlug,
+}: {
+  event: CardEvent;
+  projectCode: string;
+  cardSlug: string;
+}) {
+  const p = event.payload as Record<string, unknown>;
+  let newStatus: "decided" | "answered" | null = null;
+  let label = "";
+  if (
+    event.event_kind === "decision" &&
+    isDecisionOpen(p as { status?: string; approved_by?: string })
+  ) {
+    newStatus = "decided";
+    label = "Tandai diputuskan";
+  } else if (
+    event.event_kind === "client_request" &&
+    isClientRequestOpen(p as { status?: string })
+  ) {
+    newStatus = "answered";
+    label = "Tandai terjawab";
+  }
+  if (!newStatus) return null;
+  return (
+    <form
+      action={async (fd: FormData) => {
+        await resolveCardEvent(fd);
+      }}
+      className="flex-shrink-0 self-start"
+    >
+      <input type="hidden" name="eventId" value={event.id} />
+      <input type="hidden" name="projectCode" value={projectCode} />
+      <input type="hidden" name="cardSlug" value={cardSlug} />
+      <input type="hidden" name="newStatus" value={newStatus} />
+      <button
+        type="submit"
+        className="rounded border border-[var(--border)] bg-[var(--surface-alt)] px-2 py-0.5 text-[10px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)]"
+      >
+        {label}
+      </button>
+    </form>
   );
 }

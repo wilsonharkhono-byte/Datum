@@ -102,7 +102,12 @@ export default async function CardDetailPage({
                 <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
                   Timeline aktivitas
                 </h2>
-                <Timeline events={detail.events} attachmentsByEvent={attachmentsByEvent} />
+                <Timeline
+                  events={detail.events}
+                  attachmentsByEvent={attachmentsByEvent}
+                  projectCode={project.project_code}
+                  cardSlug={cardSlug}
+                />
               </div>
               <div className="mt-6 border-t border-[var(--border)] pt-4">
                 <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">

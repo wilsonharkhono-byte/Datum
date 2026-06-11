@@ -9,9 +9,13 @@ import { TimelineFilter } from "./TimelineFilter";
 export function Timeline({
   events,
   attachmentsByEvent,
+  projectCode,
+  cardSlug,
 }: {
   events: CardEvent[];
   attachmentsByEvent: Map<string, CardAttachment[]>;
+  projectCode: string;
+  cardSlug: string;
 }) {
   const router = useRouter();
 
@@ -97,7 +101,13 @@ export function Timeline({
       ) : (
         <ol className="mt-4 space-y-2">
           {visible.map((ev) => (
-            <EventRow key={ev.id} event={ev} attachments={attachmentsByEvent.get(ev.id) ?? []} />
+            <EventRow
+              key={ev.id}
+              event={ev}
+              attachments={attachmentsByEvent.get(ev.id) ?? []}
+              projectCode={projectCode}
+              cardSlug={cardSlug}
+            />
           ))}
         </ol>
       )}
