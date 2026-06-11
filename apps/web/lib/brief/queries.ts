@@ -8,6 +8,7 @@ import {
   type QuoteEvent,
 } from "@/lib/brief/bottlenecks";
 import { ACTOR_LABELS } from "@/lib/cards/labels";
+import { compareEventTime, type OrderableEvent } from "@/lib/cards/event-order";
 
 export type BriefItem = {
   id: string;
@@ -85,7 +86,7 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
   const { data: blockedRaw } = await supabase
     .from("card_events")
     .select(`
-      id, payload, occurred_at, card_id,
+      id, payload, occurred_at, created_at, card_id,
       cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
     `)
     .eq("event_kind", "work")
@@ -94,24 +95,27 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     .limit(100);
 
   const blockedCardIds = [...new Set((blockedRaw ?? []).map((e) => e.card_id))];
-  const lastNonBlockedByCard = new Map<string, string>();
+  // Latest non-blocked work EVENT per card, chosen by the canonical total
+  // order (occurred_at, created_at, id) — same-day ties must resolve the
+  // same way here as on the board and in the gate rules.
+  const lastNonBlockedByCard = new Map<string, OrderableEvent>();
   if (blockedCardIds.length > 0) {
     // TODO(scale): relies on PostgREST's implicit 1000-row cap; add occurred_at lower bound if work-event volume grows.
     const { data: workEvs } = await supabase
       .from("card_events")
-      .select("card_id, occurred_at, payload")
+      .select("id, card_id, occurred_at, created_at, payload")
       .eq("event_kind", "work")
       .in("card_id", blockedCardIds);
     for (const w of workEvs ?? []) {
       const status = (w.payload as { status?: string } | null)?.status;
       if (status === "blocked") continue;
-      const prev = lastNonBlockedByCard.get(w.card_id) ?? "";
-      if ((w.occurred_at ?? "") > prev) lastNonBlockedByCard.set(w.card_id, w.occurred_at ?? "");
+      const prev = lastNonBlockedByCard.get(w.card_id);
+      if (!prev || compareEventTime(prev, w) < 0) lastNonBlockedByCard.set(w.card_id, w);
     }
   }
   const liveBlockers = (blockedRaw ?? []).filter((e) => {
     const cleared = lastNonBlockedByCard.get(e.card_id);
-    return !cleared || cleared < (e.occurred_at ?? "");
+    return !cleared || compareEventTime(e, cleared) > 0;
   });
 
   const blockers = {

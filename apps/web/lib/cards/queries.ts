@@ -47,7 +47,7 @@ export async function getBoardForProject(
     // and open loops don't expire, so no time window.
     supabase
       .from("card_events")
-      .select("card_id, event_kind, payload, occurred_at")
+      .select("id, card_id, event_kind, payload, occurred_at, created_at")
       .eq("project_id", project.id)
       .in("event_kind", ["decision", "client_request", "work"]),
   ]);
@@ -64,6 +64,8 @@ export async function getBoardForProject(
       event_kind: ev.event_kind,
       payload: ev.payload as Record<string, unknown> | null,
       occurred_at: ev.occurred_at,
+      created_at: ev.created_at,
+      id: ev.id,
     });
     eventsByCard.set(ev.card_id, arr);
   }

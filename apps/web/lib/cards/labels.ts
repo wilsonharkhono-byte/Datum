@@ -9,6 +9,7 @@
 
 import type { Card } from "@datum/db";
 import { isClientRequestOpen, isDecisionOpen } from "@datum/types";
+import { compareEventTime } from "@/lib/cards/event-order";
 import type { CardDeadline } from "@/lib/gates/board-deadlines";
 
 export type CardLabelKind =
@@ -28,6 +29,8 @@ export type LabelEvent = {
   event_kind: string;
   payload: Record<string, unknown> | null;
   occurred_at: string | null;
+  created_at?: string | null;
+  id?: string | null;
 };
 
 export type CardWithLabels = Card & {
@@ -64,8 +67,7 @@ export function computeCardLabels(card: Card, events: LabelEvent[]): CardLabel[]
   if (card.status === "dormant") return [{ kind: "pending", label: "Tertunda" }];
 
   const out: CardLabel[] = [];
-  const byTime = [...events].sort((a, b) =>
-    (a.occurred_at ?? "").localeCompare(b.occurred_at ?? ""));
+  const byTime = [...events].sort(compareEventTime);
 
   // 1. Blocked: the latest work event is a blocker (append-only log — a
   //    later work entry supersedes an older blocker).

@@ -62,6 +62,14 @@ describe("computeCardLabels v2", () => {
     ])).toEqual([]);
   });
 
+  it("same-day tie resolves by created_at (blocker cleared)", () => {
+    const labels = computeCardLabels(card("active"), [
+      { event_kind: "work", payload: { status: "blocked" }, occurred_at: "2026-06-01T00:00:00Z", created_at: "2026-06-01T08:00:00Z", id: "e1" },
+      { event_kind: "work", payload: { status: "in_progress" }, occurred_at: "2026-06-01T00:00:00Z", created_at: "2026-06-01T09:00:00Z", id: "e2" },
+    ]);
+    expect(labels).toEqual([]);
+  });
+
   it("open client_request → Menunggu Klien (deduped against decision-awaiting-client)", () => {
     const labels = computeCardLabels(card("active"), [
       ev("decision", { status: "needs_decision", awaiting: "client" }),

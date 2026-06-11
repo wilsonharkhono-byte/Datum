@@ -1,5 +1,6 @@
 import type { GateCode } from "@datum/types";
 import type { CardEvent, CardEventKind } from "@datum/db";
+import { compareEventTime } from "@/lib/cards/event-order";
 
 export type ReadinessState =
   | "not_started"
@@ -38,19 +39,6 @@ const RELEVANT_KINDS: Record<GateCode, ReadonlySet<CardEventKind>> = {
 
 export const RULE_VERSION = 2;
 
-/**
- * Stable comparator for work events. Compares occurred_at first, then
- * created_at (to break same-day ties from manual date-only inputs), then
- * id as a final tiebreaker to ensure a deterministic order across recomputes.
- */
-function compareWorkEvents(a: CardEvent, b: CardEvent): number {
-  const byOccurred = (a.occurred_at ?? "").localeCompare(b.occurred_at ?? "");
-  if (byOccurred !== 0) return byOccurred;
-  const byCreated = (a.created_at ?? "").localeCompare(b.created_at ?? "");
-  if (byCreated !== 0) return byCreated;
-  return a.id.localeCompare(b.id);
-}
-
 export function evaluateGate(gate: GateCode, input: GateInput): GateResult {
   const relevant = RELEVANT_KINDS[gate];
   const events = input.events.filter((e) => relevant.has(e.event_kind));
@@ -72,7 +60,7 @@ export function evaluateGate(gate: GateCode, input: GateInput): GateResult {
     const byCard = new Map<string, CardEvent>();
     for (const e of workEvents) {
       const current = byCard.get(e.card_id);
-      if (!current || compareWorkEvents(current, e) < 0) {
+      if (!current || compareEventTime(current, e) < 0) {
         byCard.set(e.card_id, e);
       }
     }
@@ -86,7 +74,7 @@ export function evaluateGate(gate: GateCode, input: GateInput): GateResult {
     });
 
     if (blockers.length > 0) {
-      const mostRecentBlocker = blockers.sort(compareWorkEvents).at(-1)!;
+      const mostRecentBlocker = blockers.sort(compareEventTime).at(-1)!;
       const wp = mostRecentBlocker.payload as {
         blocked_on?: string;
         description?: string;
