@@ -14,7 +14,7 @@ export default async function BriefPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">Morning brief</p>
         <h1 className="text-3xl font-semibold text-[#141210]">Apa yang butuh perhatian hari ini</h1>
         <p className="mt-1 text-sm text-[#524E49]">
-          Ringkasan lintas-proyek: draft menunggu, pending, defect, permintaan klien, dan readiness yang perlu di-recompute.
+          Ringkasan lintas-proyek: keputusan yang dibutuhkan, pekerjaan terblokir, defect, permintaan klien, quote kedaluwarsa, dan gate berisiko.
         </p>
       </header>
 
@@ -35,15 +35,29 @@ export default async function BriefPage() {
           showAllHref="/review"
         />
         <BriefSection
-          title="Pending unresolved"
-          emoji="⏳"
-          count={brief.openPendings.count}
-          items={brief.openPendings.items}
+          title="Keputusan dibutuhkan"
+          emoji="⚖️"
+          count={brief.decisionsNeeded.count}
+          items={brief.decisionsNeeded.items}
           emptyMessage={
             <>
-              <p className="text-xs italic text-[#524E49]">Tidak ada item pending.</p>
+              <p className="text-xs italic text-[#524E49]">Tidak ada keputusan yang menunggu.</p>
               <p className="mt-1 text-[10px] text-[#847E78]">
-                Item pending muncul saat seseorang mencatat &ldquo;pending&rdquo; sebagai jenis aktivitas di kartu.
+                Keputusan terbuka (status: butuh keputusan) muncul di sini, dengan siapa yang ditunggu.
+              </p>
+            </>
+          }
+        />
+        <BriefSection
+          title="Pekerjaan terblokir"
+          emoji="⏳"
+          count={brief.blockers.count}
+          items={brief.blockers.items}
+          emptyMessage={
+            <>
+              <p className="text-xs italic text-[#524E49]">Tidak ada pekerjaan terblokir.</p>
+              <p className="mt-1 text-[10px] text-[#847E78]">
+                Catat pekerjaan dengan status &ldquo;terblokir&rdquo; + alasannya agar muncul di sini.
               </p>
             </>
           }
@@ -57,7 +71,7 @@ export default async function BriefPage() {
             <>
               <p className="text-xs italic text-[#524E49]">Tidak ada defect terbaru.</p>
               <p className="mt-1 text-[10px] text-[#847E78]">
-                Catat defect dengan severity dan lokasi di kartu untuk muncul di sini.
+                Catat pekerjaan dengan jenis isu &ldquo;defect&rdquo; + severity agar muncul di sini.
               </p>
             </>
           }
@@ -76,7 +90,49 @@ export default async function BriefPage() {
             </>
           }
         />
+        <BriefSection
+          title="Quote akan kedaluwarsa"
+          emoji="💸"
+          count={brief.expiringQuotes.count}
+          items={brief.expiringQuotes.items}
+          emptyMessage={
+            <>
+              <p className="text-xs italic text-[#524E49]">Tidak ada quote yang akan kedaluwarsa.</p>
+              <p className="mt-1 text-[10px] text-[#847E78]">
+                Quote vendor dengan tanggal berlaku, yang belum dipilih vendornya, muncul 7 hari sebelum habis.
+              </p>
+            </>
+          }
+        />
       </div>
+
+      <section className="mt-6 rounded border border-[#B5AFA8] bg-[#FDFAF6] p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#141210]">
+          ⛓️ Gate berisiko (cascade)
+        </h2>
+        {brief.gateRisks.length === 0 ? (
+          <p className="text-xs italic text-[#847E78]">Tidak ada gate yang berisiko terlambat berantai.</p>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {brief.gateRisks.slice(0, 12).map((r) => (
+              <li key={`${r.projectCode}-${r.areaName}-${r.gateCode}`}>
+                <Link
+                  href={`/project/${r.projectCode}/schedule`}
+                  className="block rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs hover:border-[var(--sand-dark)]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[#141210]">{r.projectCode} · {r.areaName}</span>
+                    <span className="rounded bg-[var(--flag-warning-bg)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--flag-warning)]">
+                      Gate {r.gateCode}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-[#524E49]">{r.reason}</div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="mt-6 rounded border border-[#B5AFA8] bg-[#FDFAF6] p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#141210]">

@@ -1,5 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
+import {
+  findCascadeRisks,
+  findExpiringQuotes,
+  type GateRisk,
+  type ScheduleCell,
+  type QuoteEvent,
+} from "@/lib/brief/bottlenecks";
+import { ACTOR_LABELS } from "@/lib/cards/labels";
 
 export type BriefItem = {
   id: string;
@@ -11,11 +19,14 @@ export type BriefItem = {
 };
 
 export type BriefData = {
-  pendingDrafts:    { count: number; items: BriefItem[] };
-  openPendings:     { count: number; items: BriefItem[] };
-  defects:          { count: number; items: BriefItem[] };
-  awaitingClient:   { count: number; items: BriefItem[] };
-  staleByProject:   { projectCode: string; projectName: string; staleCount: number }[];
+  pendingDrafts:   { count: number; items: BriefItem[] };
+  blockers:        { count: number; items: BriefItem[] };
+  defects:         { count: number; items: BriefItem[] };
+  decisionsNeeded: { count: number; items: BriefItem[] };
+  awaitingClient:  { count: number; items: BriefItem[] };
+  expiringQuotes:  { count: number; items: BriefItem[] };
+  gateRisks:       GateRisk[];
+  staleByProject:  { projectCode: string; projectName: string; staleCount: number }[];
 };
 
 const TOP_N = 5;
@@ -68,34 +79,56 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     }),
   };
 
-  // 2. Open pending events (event_kind='pending', no subsequent progress event on same card after it)
-  const { data: pendingEvs, count: pendingCount } = await supabase
+  // 2. Live blockers: work events with status=blocked not superseded by a
+  //    later non-blocked work event on the same card (append-only log).
+  const { data: blockedRaw } = await supabase
     .from("card_events")
     .select(`
-      id, payload, occurred_at,
+      id, payload, occurred_at, card_id,
       cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
-    `, { count: "exact" })
-    .eq("event_kind", "pending")
+    `)
+    .eq("event_kind", "work")
+    .contains("payload", { status: "blocked" })
     .order("occurred_at", { ascending: true })
-    .limit(TOP_N);
+    .limit(100);
 
-  const openPendings = {
-    count: pendingCount ?? 0,
-    items: (pendingEvs ?? []).map((e) => {
+  const blockedCardIds = [...new Set((blockedRaw ?? []).map((e) => e.card_id))];
+  const lastNonBlockedByCard = new Map<string, string>();
+  if (blockedCardIds.length > 0) {
+    const { data: workEvs } = await supabase
+      .from("card_events")
+      .select("card_id, occurred_at, payload")
+      .eq("event_kind", "work")
+      .in("card_id", blockedCardIds);
+    for (const w of workEvs ?? []) {
+      const status = (w.payload as { status?: string } | null)?.status;
+      if (status === "blocked") continue;
+      const prev = lastNonBlockedByCard.get(w.card_id) ?? "";
+      if ((w.occurred_at ?? "") > prev) lastNonBlockedByCard.set(w.card_id, w.occurred_at ?? "");
+    }
+  }
+  const liveBlockers = (blockedRaw ?? []).filter((e) => {
+    const cleared = lastNonBlockedByCard.get(e.card_id);
+    return !cleared || cleared < (e.occurred_at ?? "");
+  });
+
+  const blockers = {
+    count: liveBlockers.length,
+    items: liveBlockers.slice(0, TOP_N).map((e) => {
       const c = (e as { cards: CardRef | null }).cards;
-      const p = e.payload as { what?: string };
+      const p = e.payload as { blocked_on?: string; description?: string };
       return {
-        id: `pend_${e.id}`,
+        id: `blk_${e.id}`,
         projectCode: c?.projects?.project_code ?? "?",
         cardTitle: c?.title ?? "(kartu)",
         cardHref: c ? `/project/${c.projects?.project_code}/cards/${c.slug}` : "#",
-        detail: p.what ?? "",
+        detail: p.blocked_on ?? p.description ?? "",
         meta: ageMeta(e.occurred_at ?? ""),
       };
     }),
   };
 
-  // 3. Defects (last 30 days, high or medium)
+  // 3. Defects (last 30 days; work events flagged issue=defect)
   const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const { data: defectEvs, count: defectCount } = await supabase
     .from("card_events")
@@ -103,7 +136,8 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
       id, payload, occurred_at,
       cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
     `, { count: "exact" })
-    .eq("event_kind", "defect")
+    .eq("event_kind", "work")
+    .contains("payload", { issue: "defect" })
     .gte("occurred_at", thirtyAgo)
     .order("occurred_at", { ascending: false })
     .limit(TOP_N);
@@ -124,8 +158,7 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     }),
   };
 
-  // 4. Awaiting client (client_request events; heuristic: any in last 60 days)
-  const sixtyAgo = new Date(Date.now() - 60 * 86_400_000).toISOString();
+  // 4. Awaiting client (open client_request events, oldest first)
   const { data: crEvs, count: crCount } = await supabase
     .from("card_events")
     .select(`
@@ -133,8 +166,8 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
       cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
     `, { count: "exact" })
     .eq("event_kind", "client_request")
-    .gte("occurred_at", sixtyAgo)
-    .order("occurred_at", { ascending: false })
+    .contains("payload", { status: "open" })
+    .order("occurred_at", { ascending: true })
     .limit(TOP_N);
 
   const awaitingClient = {
@@ -153,7 +186,90 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     }),
   };
 
-  // 5. Stale by project
+  // 5. Decisions needed — the core coordination list, actor in meta
+  const { data: decEvs, count: decCount } = await supabase
+    .from("card_events")
+    .select(`
+      id, payload, occurred_at,
+      cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
+    `, { count: "exact" })
+    .eq("event_kind", "decision")
+    .contains("payload", { status: "needs_decision" })
+    .order("occurred_at", { ascending: true })
+    .limit(TOP_N);
+
+  const decisionsNeeded = {
+    count: decCount ?? 0,
+    items: (decEvs ?? []).map((e) => {
+      const c = (e as { cards: CardRef | null }).cards;
+      const p = e.payload as { topic?: string; proposed_spec?: string; awaiting?: string };
+      const actor = p.awaiting ? ACTOR_LABELS[p.awaiting] ?? p.awaiting : null;
+      return {
+        id: `dec_${e.id}`,
+        projectCode: c?.projects?.project_code ?? "?",
+        cardTitle: c?.title ?? "(kartu)",
+        cardHref: c ? `/project/${c.projects?.project_code}/cards/${c.slug}` : "#",
+        detail: `${p.topic ?? ""}${p.proposed_spec ? ` — ${p.proposed_spec}` : ""}`,
+        meta: `${ageMeta(e.occurred_at ?? "")}${actor ? ` · menunggu ${actor}` : ""}`,
+      };
+    }),
+  };
+
+  // 6. Expiring vendor quotes (cost-visible staff only — RLS hides these
+  //    events from everyone else, so the section degrades to empty).
+  const { data: vendorEvs } = await supabase
+    .from("card_events")
+    .select(`
+      id, card_id, payload, occurred_at,
+      cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
+    `)
+    .eq("event_kind", "vendor")
+    .limit(500);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const expiring = findExpiringQuotes((vendorEvs ?? []) as unknown as QuoteEvent[], todayIso);
+  const expiringQuotes = {
+    count: expiring.length,
+    items: expiring.slice(0, TOP_N).map((e) => {
+      const c = ((e as unknown) as { cards: CardRef | null }).cards;
+      return {
+        id: `quo_${e.id}`,
+        projectCode: c?.projects?.project_code ?? "?",
+        cardTitle: c?.title ?? "(kartu)",
+        cardHref: c ? `/project/${c.projects?.project_code}/cards/${c.slug}` : "#",
+        detail: `${e.payload.vendor_name ?? "vendor"} — berlaku sampai ${e.payload.expires_at}`,
+        meta: ageMeta(e.occurred_at ?? ""),
+      };
+    }),
+  };
+
+  // 7. Gates at cascade risk: window started but predecessor gate not ready
+  const { data: cellRows } = await supabase
+    .from("area_gate_status")
+    .select(`
+      area_id, gate_code, status, target_start_date, target_end_date,
+      areas:area_id (area_name),
+      projects:project_id (project_code, project_name)
+    `)
+    .not("target_start_date", "is", null);
+
+  const scheduleCells: ScheduleCell[] = (cellRows ?? []).map((r) => {
+    const area = (r as { areas: { area_name: string } | null }).areas;
+    const proj = (r as { projects: { project_code: string; project_name: string } | null }).projects;
+    return {
+      project_code: proj?.project_code ?? "?",
+      project_name: proj?.project_name ?? "?",
+      area_id: r.area_id,
+      area_name: area?.area_name ?? r.area_id,
+      gate_code: r.gate_code,
+      status: r.status,
+      target_start_date: r.target_start_date,
+      target_end_date: r.target_end_date,
+    };
+  });
+  const gateRisks = findCascadeRisks(scheduleCells, todayIso);
+
+  // 8. Stale by project
   const { data: staleRows } = await supabase
     .from("area_gate_status")
     .select(`
@@ -175,5 +291,5 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     .map((v) => ({ projectCode: v.code, projectName: v.name, staleCount: v.n }))
     .sort((a, b) => b.staleCount - a.staleCount);
 
-  return { pendingDrafts, openPendings, defects, awaitingClient, staleByProject };
+  return { pendingDrafts, blockers, defects, decisionsNeeded, awaitingClient, expiringQuotes, gateRisks, staleByProject };
 }
