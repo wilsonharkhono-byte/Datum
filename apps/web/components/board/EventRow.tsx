@@ -167,7 +167,8 @@ function ResolveAction({
   return (
     <form
       action={async (fd: FormData) => {
-        await resolveCardEvent(fd);
+        const res = await resolveCardEvent(fd);
+        if (!res.ok) alert(`Gagal menandai: ${res.error}`);
       }}
       className="flex-shrink-0 self-start"
     >

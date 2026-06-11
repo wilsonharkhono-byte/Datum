@@ -77,12 +77,14 @@ const VALUE_LABELS: Record<string, string> = {
   quote:           "Penawaran",
   pick:            "Dipilih",
   contract:        "Kontrak",
+  survey:          "Survei",
   defect:          "Defect",
   client:          "Klien",
   principal:       "Prinsipal",
   pic:             "PIC",
   contractor:      "Kontraktor",
   architect:       "Arsitek",
+  vendor:          "Vendor",
 };
 
 export function valueLabel(v: string): string {
