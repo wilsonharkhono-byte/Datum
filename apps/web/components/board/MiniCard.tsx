@@ -12,7 +12,7 @@ export function MiniCard({ card, projectCode }: { card: CardWithLabels; projectC
         <div className="mb-1 flex flex-wrap gap-1">
           {card.labels.map((l) => (
             <span
-              key={l.kind}
+              key={`${l.kind}-${l.label}`}
               className="inline-flex items-center rounded-sm px-1.5 py-px text-[8.5px] font-bold uppercase tracking-[0.06em] leading-tight"
               style={{ background: LABEL_STYLE[l.kind].bg, color: LABEL_STYLE[l.kind].fg }}
               title={l.label}

@@ -9,6 +9,9 @@ function fakeClient(map: Record<string, unknown>) {
     const builder: any = {
       eq: () => builder,
       gte: () => builder,
+      in: () => builder,
+      not: () => builder,
+      contains: () => builder,
       order: () => Promise.resolve({ data, error: null }),
       single: () => Promise.resolve({ data: (data as any)?.[0], error: null }),
       maybeSingle: () => Promise.resolve({ data: (data as any)?.[0] ?? null, error: null }),
@@ -43,6 +46,24 @@ describe("getBoardForProject", () => {
     expect(board.columns).toHaveLength(2);
     expect(board.columns[0]!.topic.code).toBe("A05");
     expect(board.columns[0]!.cards.map((c) => c.slug)).toEqual(["pintu"]);
+  });
+
+  it("derives open-loop labels and a null deadline without area links", async () => {
+    const supa = fakeClient({
+      projects: [{ id: "p1", project_code: "BDG-H1", project_name: "BDG H1" }],
+      topics: [{ id: "t1", project_id: "p1", code: "A09", name: "A09 — Detail Kamar Mandi", sort_order: 1 }],
+      cards: [{ id: "c1", project_id: "p1", topic_id: "t1", title: "Master bathroom", slug: "master", status: "active" }],
+      card_events: [
+        { card_id: "c1", event_kind: "decision",
+          payload: { topic: "marmer", status: "needs_decision", awaiting: "client" },
+          occurred_at: "2026-06-01T00:00:00Z" },
+      ],
+    });
+    const board = await getBoardForProject(supa, "bdg-h1");
+    const card = board.columns[0]!.cards[0]!;
+    expect(card.labels.map((l) => l.kind)).toEqual(["needs_decision", "awaiting"]);
+    expect(card.labels[1]!.label).toBe("Menunggu Klien");
+    expect(card.deadline).toBeNull();
   });
 });
 

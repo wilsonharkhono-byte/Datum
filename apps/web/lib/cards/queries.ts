@@ -11,12 +11,12 @@ import type {
   Staff,
 } from "@datum/db";
 import { computeCardLabels, type CardWithLabels } from "@/lib/cards/labels";
+import { computeCardDeadlines, type CardDeadline, type DeadlineCell } from "@/lib/gates/board-deadlines";
+import type { LabelEvent } from "@/lib/cards/labels";
 
 export type BoardColumn = { topic: Topic; cards: CardWithLabels[] };
 export type Board = { project: Project; columns: BoardColumn[] };
 export type CardDetail = { card: Card; events: CardEvent[] };
-
-const LABEL_LOOKBACK_DAYS = 30;
 
 export async function getBoardForProject(
   supabase: SupabaseClient<Database>,
@@ -32,9 +32,7 @@ export async function getBoardForProject(
   if (projErr) throw projErr;
   if (!project) throw new Error(`Project not found: ${projectSlug}`);
 
-  const sinceIso = new Date(Date.now() - LABEL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
-
-  const [topicsRes, cardsRes, recentEventsRes] = await Promise.all([
+  const [topicsRes, cardsRes, loopEventsRes] = await Promise.all([
     supabase
       .from("topics")
       .select("*")
@@ -45,30 +43,55 @@ export async function getBoardForProject(
       .select("*")
       .eq("project_id", project.id)
       .order("last_event_at", { ascending: false, nullsFirst: false }),
+    // Open-loop kinds only — labels derive from decision/request/work state,
+    // and open loops don't expire, so no time window.
     supabase
       .from("card_events")
-      .select("card_id, event_kind")
+      .select("card_id, event_kind, payload, occurred_at")
       .eq("project_id", project.id)
-      .gte("occurred_at", sinceIso),
+      .in("event_kind", ["decision", "client_request", "work"]),
   ]);
   if (topicsRes.error) throw topicsRes.error;
   if (cardsRes.error) throw cardsRes.error;
-  if (recentEventsRes.error) {
-    console.warn("[getBoardForProject] recent events query failed — labels will be empty:", recentEventsRes.error.message);
+  if (loopEventsRes.error) {
+    console.warn("[getBoardForProject] open-loop events query failed — labels will be empty:", loopEventsRes.error.message);
   }
 
-  // Group recent event kinds by card so we can derive labels without a per-card round-trip.
-  const recentKindsByCard = new Map<string, Set<string>>();
-  for (const ev of recentEventsRes.data ?? []) {
-    const set = recentKindsByCard.get(ev.card_id) ?? new Set<string>();
-    set.add(ev.event_kind);
-    recentKindsByCard.set(ev.card_id, set);
+  const eventsByCard = new Map<string, LabelEvent[]>();
+  for (const ev of loopEventsRes.data ?? []) {
+    const arr = eventsByCard.get(ev.card_id) ?? [];
+    arr.push({
+      event_kind: ev.event_kind,
+      payload: ev.payload as Record<string, unknown> | null,
+      occurred_at: ev.occurred_at,
+    });
+    eventsByCard.set(ev.card_id, arr);
+  }
+
+  // Per-card next gate deadline (one pass for the whole board).
+  const cardIds = (cardsRes.data ?? []).map((c) => c.id);
+  let deadlines = new Map<string, CardDeadline>();
+  if (cardIds.length > 0) {
+    const [linksRes, cellsRes] = await Promise.all([
+      supabase.from("card_areas").select("card_id, area_id").in("card_id", cardIds),
+      supabase
+        .from("area_gate_status")
+        .select("area_id, gate_code, status, target_start_date, target_end_date")
+        .eq("project_id", project.id)
+        .in("status", ["not_started", "in_progress"])
+        .not("target_start_date", "is", null),
+    ]);
+    deadlines = computeCardDeadlines(
+      linksRes.data ?? [],
+      (cellsRes.data ?? []) as DeadlineCell[],
+      new Date().toISOString().slice(0, 10),
+    );
   }
 
   const cardsByTopic = new Map<string, CardWithLabels[]>();
   for (const c of cardsRes.data ?? []) {
-    const labels = computeCardLabels(c, recentKindsByCard.get(c.id) ?? new Set());
-    const withLabels: CardWithLabels = { ...c, labels };
+    const labels = computeCardLabels(c, eventsByCard.get(c.id) ?? []);
+    const withLabels: CardWithLabels = { ...c, labels, deadline: deadlines.get(c.id) ?? null };
     const arr = cardsByTopic.get(c.topic_id) ?? [];
     arr.push(withLabels);
     cardsByTopic.set(c.topic_id, arr);
