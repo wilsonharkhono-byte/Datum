@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
+import { type EventKind } from "@datum/types";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Supa = SupabaseClient<Database>;
@@ -45,13 +46,13 @@ export async function notifyMentions(supabase: Supa, args: {
 // 2. Watcher event: fan out to card_members (owner/watcher/assignee).
 //    Decisions and client requests always notify; work only when it is a
 //    blocker or a defect — routine progress logs would be noise.
-const NOTIFIABLE_KINDS = new Set(["decision", "client_request", "work"]);
+const NOTIFIABLE_KINDS: ReadonlySet<EventKind> = new Set(["decision", "client_request", "work"]);
 
 export function shouldNotifyWatchers(
   eventKind: string,
   payload?: Record<string, unknown> | null,
 ): boolean {
-  if (!NOTIFIABLE_KINDS.has(eventKind)) return false;
+  if (!NOTIFIABLE_KINDS.has(eventKind as EventKind)) return false;
   if (eventKind === "work") {
     return payload?.status === "blocked" || payload?.issue === "defect";
   }
@@ -61,7 +62,7 @@ export function shouldNotifyWatchers(
 export async function notifyWatchersOfEvent(supabase: Supa, args: {
   eventId: string;
   eventKind: string;
-  payload?: Record<string, unknown> | null;
+  payload: Record<string, unknown> | null;
   actorId: string;
   projectId: string;
   projectCode: string;

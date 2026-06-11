@@ -17,6 +17,8 @@ describe("shouldNotifyWatchers", () => {
     expect(shouldNotifyWatchers("work", { status: "in_progress" })).toBe(false);
     expect(shouldNotifyWatchers("work", { status: "blocked", blocked_on: "tunggu klien" })).toBe(true);
     expect(shouldNotifyWatchers("work", { status: "in_progress", issue: "defect", severity: "high" })).toBe(true);
+    expect(shouldNotifyWatchers("work", undefined)).toBe(false);
+    expect(shouldNotifyWatchers("work", null)).toBe(false);
   });
 
   it("does not notify for retired kinds", () => {
