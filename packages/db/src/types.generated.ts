@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       area_gate_blockers: {
@@ -2338,6 +2363,7 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: undefined
       }
+      current_can_manage_projects: { Args: never; Returns: boolean }
       current_can_read_project: {
         Args: { p_project_id: string }
         Returns: boolean
@@ -2354,6 +2380,10 @@ export type Database = {
         Returns: undefined
       }
       path_project_id: { Args: { p_path: string }; Returns: string }
+      reorder_project_areas: {
+        Args: { p_area_ids: string[]; p_project_id: string }
+        Returns: undefined
+      }
       seed_default_topics: {
         Args: { p_project_id: string }
         Returns: undefined
@@ -2673,6 +2703,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       area_type: [
