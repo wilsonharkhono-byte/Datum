@@ -15,6 +15,12 @@ const DecisionPayload = z.object({
   topic: z.string().min(1),
   current_spec: z.string().optional(),
   proposed_spec: z.string().optional(),
+  // Lifecycle: an open decision ("needs_decision") is the unit the board,
+  // brief and reminders operate on. Absent status on legacy rows is
+  // interpreted via isDecisionOpen() below.
+  status: z.enum(["needs_decision", "decided", "superseded"]).optional(),
+  // Whose ball is it — drives the "Menunggu X" board label.
+  awaiting: z.enum(["client", "principal", "pic", "contractor", "architect", "vendor"]).optional(),
   approved_by: z.enum(["client","principal","pic"]).optional(),
   approval_evidence: z.string().optional(),
   ...aiRationale,
@@ -63,6 +69,11 @@ const WorkPayload = z.object({
   severity: z.enum(["low","medium","high"]).optional(),
   location: z.string().optional(),
   notes: z.string().optional(),
+  // Blocker: who/what the work is waiting on (shown as blocking reason).
+  blocked_on: z.string().optional(),
+  // Quality issue marker — distinguishes a defect from merely stalled work.
+  issue: z.enum(["defect"]).optional(),
+  fix_required_by: z.string().optional(),
   ...aiRationale,
 });
 
@@ -70,6 +81,7 @@ const ClientRequestPayload = z.object({
   request_text: z.string().min(1),
   requested_by: z.string().optional(),
   awaiting: z.string().optional(),
+  status: z.enum(["open", "answered"]).optional(),
   ...aiRationale,
 });
 
@@ -140,3 +152,19 @@ export const HIGH_RISK_KINDS: ReadonlySet<EventKind> = new Set([
   "client_request",
   "work",  // because work includes defects
 ]);
+
+// ─── Open-loop helpers ────────────────────────────────────────────────────────
+// "Open" decisions/requests are what labels, the brief, and reminders count.
+// Legacy rows (pre-lifecycle backfill) may lack `status`; fall back sensibly.
+
+export function isDecisionOpen(payload: {
+  status?: string | null;
+  approved_by?: string | null;
+}): boolean {
+  if (payload.status) return payload.status === "needs_decision";
+  return !payload.approved_by;
+}
+
+export function isClientRequestOpen(payload: { status?: string | null }): boolean {
+  return (payload.status ?? "open") === "open";
+}
