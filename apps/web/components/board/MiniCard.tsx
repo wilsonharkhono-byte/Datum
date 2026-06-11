@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TrelloIcon } from "@/components/icons/Icon";
 import { LABEL_STYLE, type CardWithLabels } from "@/lib/cards/labels";
+import type { CardDeadline } from "@/lib/gates/board-deadlines";
 
 export function MiniCard({ card, projectCode }: { card: CardWithLabels; projectCode: string }) {
   return (
@@ -8,7 +9,7 @@ export function MiniCard({ card, projectCode }: { card: CardWithLabels; projectC
       href={`/project/${projectCode}/cards/${card.slug}`}
       className="block rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs hover:border-[var(--sand-dark)]"
     >
-      {card.labels.length > 0 ? (
+      {card.labels.length > 0 || card.deadline ? (
         <div className="mb-1 flex flex-wrap gap-1">
           {card.labels.map((l) => (
             <span
@@ -20,6 +21,7 @@ export function MiniCard({ card, projectCode }: { card: CardWithLabels; projectC
               {l.label}
             </span>
           ))}
+          {card.deadline ? <DeadlineChip deadline={card.deadline} /> : null}
         </div>
       ) : null}
       <div className="font-medium text-foreground">{card.title}</div>
@@ -38,5 +40,33 @@ export function MiniCard({ card, projectCode }: { card: CardWithLabels; projectC
         </div>
       ) : null}
     </Link>
+  );
+}
+
+/** Compact gate-deadline chip: "B lewat 3 hari" / "B hari ini" / "B · 12 hari". */
+function DeadlineChip({ deadline }: { deadline: CardDeadline }) {
+  const daysLeft = Math.floor(
+    (new Date(deadline.targetEndDate).getTime() - Date.now()) / 86_400_000,
+  );
+  const overdue = daysLeft < 0;
+  const urgent = !overdue && daysLeft <= 14;
+  const style = overdue
+    ? { background: "var(--flag-critical-bg)", color: "var(--flag-critical)" }
+    : urgent
+      ? { background: "var(--flag-warning-bg)", color: "var(--flag-warning)" }
+      : { background: "var(--sand-tint)", color: "var(--sand-dark)" };
+  const text = overdue
+    ? `${deadline.gateCode} lewat ${-daysLeft} hari`
+    : daysLeft === 0
+      ? `${deadline.gateCode} hari ini`
+      : `${deadline.gateCode} · ${daysLeft} hari`;
+  return (
+    <span
+      className="inline-flex items-center rounded-sm px-1.5 py-px text-[8.5px] font-bold uppercase tracking-[0.06em] leading-tight"
+      style={style}
+      title={`Target gate ${deadline.gateCode}: ${deadline.targetEndDate}`}
+    >
+      {text}
+    </span>
   );
 }
