@@ -31,6 +31,14 @@ describe("decision lifecycle", () => {
   });
 });
 
+describe("lifecycle status defaults", () => {
+  it("defaults status on parse: open decision unless approved, open request", () => {
+    expect(parseEventPayload("decision", { topic: "x" }).status).toBe("needs_decision");
+    expect(parseEventPayload("decision", { topic: "x", approved_by: "client" }).status).toBe("decided");
+    expect(parseEventPayload("client_request", { request_text: "y" }).status).toBe("open");
+  });
+});
+
 describe("client_request lifecycle", () => {
   it("accepts open/answered status", () => {
     const p = parseEventPayload("client_request", { request_text: "ubah warna kusen", status: "open" });

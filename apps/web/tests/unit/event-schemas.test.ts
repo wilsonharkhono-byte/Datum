@@ -58,7 +58,8 @@ describe("event-kind schemas", () => {
 
   it("provides a type-safe discriminated union", () => {
     // compile-time check: the union covers all 9 kinds
-    const x: EventPayloadByKind["decision"] = { topic: "x" };
+    // status is required on the parsed (output) type since the lifecycle fix.
+    const x: EventPayloadByKind["decision"] = { topic: "x", status: "needs_decision" };
     expect(x.topic).toBe("x");
   });
 });

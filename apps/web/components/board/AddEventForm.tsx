@@ -39,6 +39,16 @@ const FIELDS_BY_KIND: Record<EventKind, FieldDef[]> = {
       placeholder: "mis. marmer lantai master bath" },
     { name: "current_spec", label: "Spec saat ini", type: "text" },
     { name: "proposed_spec", label: "Spec yang diusulkan", type: "text" },
+    { name: "awaiting", label: "Menunggu siapa?", type: "select",
+      options: [
+        { value: "", label: "—" },
+        { value: "client", label: "Klien" },
+        { value: "principal", label: "Prinsipal" },
+        { value: "pic", label: "PIC" },
+        { value: "contractor", label: "Kontraktor" },
+        { value: "architect", label: "Arsitek" },
+        { value: "vendor", label: "Vendor" },
+      ] },
     { name: "approved_by", label: "Disetujui oleh", type: "select",
       options: [
         { value: "", label: "—" },
@@ -90,14 +100,20 @@ const FIELDS_BY_KIND: Record<EventKind, FieldDef[]> = {
     { name: "status", label: "Status", type: "select", required: true, options: [
       { value: "assigned",    label: "Tukang ditugaskan" },
       { value: "in_progress", label: "Sedang dikerjakan" },
-      { value: "blocked",     label: "Defect / terblokir" },
+      { value: "blocked",     label: "Terblokir" },
       { value: "done",        label: "Selesai" },
     ] },
+    { name: "blocked_on", label: "Terblokir oleh", type: "text",
+      placeholder: "mis. menunggu keputusan klien soal granit" },
     { name: "worker_name", label: "Tukang / mandor", type: "text" },
     { name: "role", label: "Peran", type: "text", placeholder: "mis. mandor cat" },
     { name: "scope", label: "Lingkup kerja", type: "textarea", rows: 2 },
     { name: "percent_complete", label: "% selesai (opsional)", type: "number", min: 0, max: 100, step: "1" },
     { name: "description", label: "Deskripsi (terutama untuk defect)", type: "textarea", rows: 2 },
+    { name: "issue", label: "Jenis isu", type: "select", options: [
+      { value: "", label: "—" },
+      { value: "defect", label: "Defect" },
+    ] },
     { name: "severity", label: "Severity (untuk defect)", type: "select", options: [
       { value: "", label: "—" },
       { value: "low", label: "Rendah" },

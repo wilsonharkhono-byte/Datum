@@ -16,15 +16,23 @@ const DecisionPayload = z.object({
   current_spec: z.string().optional(),
   proposed_spec: z.string().optional(),
   // Lifecycle: an open decision ("needs_decision") is the unit the board,
-  // brief and reminders operate on. Absent status on legacy rows is
-  // interpreted via isDecisionOpen() below.
+  // brief and reminders operate on. The transform below guarantees parsed
+  // payloads always carry a status (the brief's contains-queries depend on
+  // it); rows that predate the lifecycle backfill are still read defensively
+  // via isDecisionOpen() below.
   status: z.enum(["needs_decision", "decided", "superseded"]).optional(),
   // Whose ball is it — drives the "Menunggu X" board label.
   awaiting: z.enum(["client", "principal", "pic", "contractor", "architect", "vendor"]).optional(),
   approved_by: z.enum(["client","principal","pic"]).optional(),
   approval_evidence: z.string().optional(),
   ...aiRationale,
-});
+})
+  // Default depends on a sibling field, so a plain .default() won't do:
+  // logging an already-approved decision must not create a phantom open loop.
+  .transform((p) => ({
+    ...p,
+    status: p.status ?? (p.approved_by ? ("decided" as const) : ("needs_decision" as const)),
+  }));
 
 const DrawingPayload = z.object({
   drawing_code: z.string().optional(),
@@ -81,7 +89,8 @@ const ClientRequestPayload = z.object({
   request_text: z.string().min(1),
   requested_by: z.string().optional(),
   awaiting: z.string().optional(),
-  status: z.enum(["open", "answered"]).optional(),
+  // New requests always start open so the brief's contains-query sees them.
+  status: z.enum(["open", "answered"]).default("open"),
   ...aiRationale,
 });
 
