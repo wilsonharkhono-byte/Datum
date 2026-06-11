@@ -2,6 +2,16 @@
 
 export type StatusFilter = Set<"active" | "dormant" | "closed">;
 
+export type LabelFilterKind = "needs_decision" | "blocked" | "awaiting" | "overdue";
+export type LabelFilter = Set<LabelFilterKind>;
+
+const LABEL_FILTER_LABELS: Record<LabelFilterKind, string> = {
+  needs_decision: "Butuh keputusan",
+  blocked:        "Terblokir",
+  awaiting:       "Menunggu",
+  overdue:        "Lewat target",
+};
+
 const STATUS_LABELS: Record<"active" | "dormant" | "closed", string> = {
   active:  "Aktif",
   dormant: "Tertunda",
@@ -13,6 +23,8 @@ export function BoardFilter({
   onQueryChange,
   statuses,
   onStatusesChange,
+  labelFilter,
+  onLabelFilterChange,
   matched,
   total,
 }: {
@@ -20,6 +32,8 @@ export function BoardFilter({
   onQueryChange: (q: string) => void;
   statuses: StatusFilter;
   onStatusesChange: (s: StatusFilter) => void;
+  labelFilter: LabelFilter;
+  onLabelFilterChange: (s: LabelFilter) => void;
   matched: number;
   total: number;
 }) {
@@ -29,6 +43,13 @@ export function BoardFilter({
     else next.add(s);
     if (next.size === 0) next.add(s); // never empty
     onStatusesChange(next);
+  }
+
+  function toggleLabel(k: LabelFilterKind) {
+    const next = new Set(labelFilter);
+    if (next.has(k)) next.delete(k);
+    else next.add(k);
+    onLabelFilterChange(next); // empty = "no label filtering"
   }
 
   return (
@@ -61,6 +82,23 @@ export function BoardFilter({
               className={`chip${on ? " chip-on" : ""}`}
             >
               {STATUS_LABELS[s]}
+            </button>
+          );
+        })}
+      </div>
+      <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">perlu</span>
+      <div className="flex gap-1.5">
+        {(Object.keys(LABEL_FILTER_LABELS) as LabelFilterKind[]).map((k) => {
+          const on = labelFilter.has(k);
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => toggleLabel(k)}
+              aria-pressed={on}
+              className={`chip${on ? " chip-on" : ""}`}
+            >
+              {LABEL_FILTER_LABELS[k]}
             </button>
           );
         })}
