@@ -2384,6 +2384,10 @@ export type Database = {
         Args: { p_area_ids: string[]; p_project_id: string }
         Returns: undefined
       }
+      resolve_card_event: {
+        Args: { p_event_id: string; p_new_status: string; p_reason?: string }
+        Returns: undefined
+      }
       seed_default_topics: {
         Args: { p_project_id: string }
         Returns: undefined

@@ -893,3 +893,47 @@ export async function rejectCardEventDraft(formData: FormData): Promise<MemberRe
   revalidatePath("/review");
   return { ok: true };
 }
+
+// ─── resolveCardEvent ─────────────────────────────────────────────────────────
+// Mark an open-loop event resolved (decision → decided/superseded,
+// client_request → answered). Goes through the resolve_card_event RPC so the
+// payload update and the record_revisions audit row commit atomically.
+
+const ResolveEventInput = z.object({
+  eventId:     z.string().uuid(),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+  newStatus:   z.enum(["needs_decision", "decided", "superseded", "open", "answered"]),
+  reason:      z.string().max(500).optional(),
+});
+
+export type ResolveEventResult = { ok: true } | { ok: false; error: string };
+
+export async function resolveCardEvent(formData: FormData): Promise<ResolveEventResult> {
+  let input;
+  try {
+    input = ResolveEventInput.parse({
+      eventId:     formData.get("eventId"),
+      projectCode: formData.get("projectCode"),
+      cardSlug:    formData.get("cardSlug"),
+      newStatus:   formData.get("newStatus"),
+      reason:      formData.get("reason") || undefined,
+    });
+  } catch {
+    return { ok: false, error: "Form tidak valid" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
+
+  const { error } = await supabase.rpc("resolve_card_event", {
+    p_event_id:   input.eventId,
+    p_new_status: input.newStatus,
+    p_reason:     input.reason ?? undefined,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  return { ok: true };
+}
