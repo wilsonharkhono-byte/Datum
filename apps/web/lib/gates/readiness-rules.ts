@@ -21,21 +21,22 @@ export type GateResult = {
 };
 
 /**
- * Per-gate "relevant" event kinds. Used both to filter inputs and to give
- * the gate its own taxonomy of what counts as progress evidence.
+ * Per-gate "relevant" event kinds — rule version 2, aligned with the
+ * consolidated 9-kind taxonomy (slice 1.9). `work` carries all process
+ * state (assigned/in_progress/blocked/done) and is relevant to every gate.
  */
 const RELEVANT_KINDS: Record<GateCode, ReadonlySet<CardEventKind>> = {
-  A: new Set(["worker_assigned", "progress", "defect", "drawing", "pending"]),
-  B: new Set(["material", "decision", "vendor_pick", "vendor_quote", "progress", "pending"]),
-  C: new Set(["material", "progress", "defect", "pending"]),
-  D: new Set(["material", "decision", "vendor_pick", "drawing", "progress", "pending"]),
-  E: new Set(["material", "progress", "defect", "pending"]),
-  F: new Set(["vendor_pick", "material", "progress", "drawing", "pending"]),
-  G: new Set(["worker_assigned", "progress", "defect", "pending"]),
-  H: new Set(["client_request", "decision", "document", "progress", "pending"]),
+  A: new Set(["work", "drawing"]),
+  B: new Set(["material", "decision", "vendor", "work"]),
+  C: new Set(["material", "work"]),
+  D: new Set(["material", "decision", "vendor", "drawing", "work"]),
+  E: new Set(["material", "work"]),
+  F: new Set(["vendor", "material", "drawing", "work"]),
+  G: new Set(["work"]),
+  H: new Set(["client_request", "decision", "document", "work"]),
 };
 
-const RULE_VERSION = 1;
+const RULE_VERSION = 2;
 
 export function evaluateGate(gate: GateCode, input: GateInput): GateResult {
   const relevant = RELEVANT_KINDS[gate];
@@ -45,31 +46,32 @@ export function evaluateGate(gate: GateCode, input: GateInput): GateResult {
     return { status: "not_started", readinessScore: 0, blockingReason: null };
   }
 
-  // Has any pending event → blocked
-  const pendings = events.filter((e) => e.event_kind === "pending");
-  if (pendings.length > 0) {
-    // Use most recent pending's `what` as the blocking reason
-    const latest = pendings.sort((a, b) =>
-      (b.occurred_at ?? "").localeCompare(a.occurred_at ?? ""))[0];
-    const what = (latest?.payload as { what?: string })?.what;
+  // The latest work event determines the work-stream state. The log is
+  // append-only, so a newer entry supersedes an older blocker or completion.
+  const latestWork = events
+    .filter((e) => e.event_kind === "work")
+    .sort((a, b) => (a.occurred_at ?? "").localeCompare(b.occurred_at ?? ""))
+    .at(-1);
+  const wp = latestWork?.payload as {
+    status?: string;
+    percent_complete?: number;
+    blocked_on?: string;
+    description?: string;
+    notes?: string;
+  } | undefined;
+
+  if (wp?.status === "blocked") {
     return {
       status: "blocked",
       readinessScore: 0.25,
-      blockingReason: what ?? "Ada item pending",
+      blockingReason: wp.blocked_on ?? wp.description ?? wp.notes ?? "Ada pekerjaan terblokir",
     };
   }
 
-  // Has a 100% progress event → ready_for_handoff (passed once handed off in a later slice)
-  const has100 = events.some((e) => {
-    if (e.event_kind !== "progress") return false;
-    const p = e.payload as { percent_complete?: number };
-    return typeof p.percent_complete === "number" && p.percent_complete >= 100;
-  });
-  if (has100) {
+  if (wp && (wp.status === "done" || (typeof wp.percent_complete === "number" && wp.percent_complete >= 100))) {
     return { status: "ready_for_handoff", readinessScore: 1.0, blockingReason: null };
   }
 
-  // Otherwise: in_progress, score proportional to evidence count (capped)
   const score = Math.min(0.9, 0.3 + events.length * 0.05);
   return { status: "in_progress", readinessScore: Number(score.toFixed(2)), blockingReason: null };
 }
