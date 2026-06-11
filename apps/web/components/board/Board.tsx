@@ -18,6 +18,9 @@ export function Board({ board }: { board: BoardData }) {
   const filteredColumns = useMemo(() => {
     const q = query.trim().toLowerCase();
     const includeAllColumns = q === "" && labelFilter.size === 0;
+    // Use WIB (Asia/Jakarta) calendar-day semantics so overdue flips at WIB
+    // midnight, consistent with the deadline chip in MiniCard.
+    const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
     const cols: BoardColumn[] = [];
     for (const col of board.columns) {
       const matchedCards = col.cards.filter((c) => {
@@ -26,7 +29,7 @@ export function Board({ board }: { board: BoardData }) {
           const overdueMatch =
             labelFilter.has("overdue") &&
             c.deadline != null &&
-            new Date(c.deadline.targetEndDate).getTime() < Date.now();
+            c.deadline.targetEndDate < todayStr;
           const labelMatch = c.labels.some(
             (l) => labelFilter.has(l.kind as "needs_decision" | "blocked" | "awaiting"),
           );

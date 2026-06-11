@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RULE_VERSION } from "@/lib/gates/readiness-rules";
 
 type StatusKey =
   | "not_started"
@@ -20,28 +21,29 @@ const STATUS_STYLE: Record<StatusKey, { bg: string; fg: string; border: string }
 };
 
 const STATUS_ROWS: { key: StatusKey; label: string; rule: string }[] = [
-  { key: "not_started",       label: "Belum mulai",   rule: "Tidak ada event relevan pada kartu area ini." },
-  { key: "in_progress",       label: "Dikerjakan",    rule: "Ada event relevan, belum 100% dan tidak ada pending." },
-  { key: "ready_for_handoff", label: "Siap handoff",  rule: "Ada event progress dengan percent_complete ≥ 100." },
-  { key: "blocked",           label: "Terblokir",     rule: "Ada event pending; alasan diambil dari payload.what." },
+  { key: "not_started",       label: "Belum mulai",   rule: "Belum ada aktivitas relevan di area ini." },
+  { key: "in_progress",       label: "Dikerjakan",    rule: "Ada aktivitas relevan; skor naik dengan jumlah bukti (maks 0.9)." },
+  { key: "ready_for_handoff", label: "Siap handoff",  rule: "Semua kartu dengan event kerja sudah selesai (status done atau progres 100%)." },
+  { key: "blocked",           label: "Terblokir",     rule: "Event kerja terakhir pada salah satu kartu berstatus terblokir; alasan diambil dari blocked_on / deskripsi." },
   { key: "passed",            label: "Lulus",         rule: "Disetel manual setelah serah terima gate (slice berikutnya)." },
   { key: "not_applicable",    label: "Tidak relevan", rule: "Gate ditandai tidak berlaku untuk area tersebut." },
 ];
 
 /**
- * Mirror of RELEVANT_KINDS in apps/web/lib/gates/readiness-rules.ts.
+ * Mirror of RELEVANT_KINDS in apps/web/lib/gates/readiness-rules.ts (rule v2).
  * Kept inline so this viewer remains a pure "documentation" component
  * without coupling to the runtime engine's internal Set type.
+ * Update together with RELEVANT_KINDS whenever the rule version changes.
  */
 const RELEVANT_EVENTS_PER_GATE: Record<string, string[]> = {
-  A: ["worker_assigned", "progress", "defect", "drawing", "pending"],
-  B: ["material", "decision", "vendor_pick", "vendor_quote", "progress", "pending"],
-  C: ["material", "progress", "defect", "pending"],
-  D: ["material", "decision", "vendor_pick", "drawing", "progress", "pending"],
-  E: ["material", "progress", "defect", "pending"],
-  F: ["vendor_pick", "material", "progress", "drawing", "pending"],
-  G: ["worker_assigned", "progress", "defect", "pending"],
-  H: ["client_request", "decision", "document", "progress", "pending"],
+  A: ["work", "drawing"],
+  B: ["material", "decision", "vendor", "work"],
+  C: ["material", "work"],
+  D: ["material", "decision", "vendor", "drawing", "work"],
+  E: ["material", "work"],
+  F: ["vendor", "material", "drawing", "work"],
+  G: ["work"],
+  H: ["client_request", "decision", "document", "work"],
 };
 
 const GATE_NAMES_ID: Record<string, string> = {
@@ -56,18 +58,13 @@ const GATE_NAMES_ID: Record<string, string> = {
 };
 
 const EVENT_KIND_LABEL_ID: Record<string, string> = {
-  worker_assigned: "Tukang",
-  progress:        "Progres",
-  defect:          "Defect",
-  drawing:         "Gambar",
-  pending:         "Menunggu",
-  material:        "Material",
-  decision:        "Keputusan",
-  vendor:          "Vendor",
-  vendor_pick:     "Vendor dipilih",
-  vendor_quote:    "Quote vendor",
-  client_request:  "Permintaan klien",
-  document:        "Dokumen",
+  work:           "Kerja",
+  drawing:        "Gambar",
+  material:       "Material",
+  decision:       "Keputusan",
+  vendor:         "Vendor",
+  client_request: "Permintaan klien",
+  document:       "Dokumen",
 };
 
 const GATE_ORDER = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -88,7 +85,7 @@ function StatusChip({ s }: { s: StatusKey }) {
   );
 }
 
-export function RulesViewer({ ruleVersion }: { ruleVersion: number }) {
+export function RulesViewer() {
   const [open, setOpen] = useState(false);
 
   return (
@@ -200,19 +197,26 @@ export function RulesViewer({ ruleVersion }: { ruleVersion: number }) {
                 Tidak ada event relevan &rarr; <StatusChip s="not_started" />
               </li>
               <li>
-                Ada event <code className="rounded bg-[var(--surface-alt)] px-1">pending</code>{" "}
+                Event <code className="rounded bg-[var(--surface-alt)] px-1">work</code> terakhir
+                pada salah satu kartu berstatus{" "}
+                <code className="rounded bg-[var(--surface-alt)] px-1">blocked</code>{" "}
                 &rarr; <StatusChip s="blocked" />{" "}
                 <span style={{ color: "var(--sand-dark)" }}>
-                  (alasan dari <code className="rounded bg-[var(--surface-alt)] px-1">pending.what</code>)
+                  (alasan dari{" "}
+                  <code className="rounded bg-[var(--surface-alt)] px-1">blocked_on</code>{" "}
+                  atau{" "}
+                  <code className="rounded bg-[var(--surface-alt)] px-1">description</code>)
                 </span>
               </li>
               <li>
-                Ada event <code className="rounded bg-[var(--surface-alt)] px-1">progress</code> dengan{" "}
+                Semua kartu: event <code className="rounded bg-[var(--surface-alt)] px-1">work</code> terakhir
+                berstatus{" "}
+                <code className="rounded bg-[var(--surface-alt)] px-1">done</code> atau{" "}
                 <code className="rounded bg-[var(--surface-alt)] px-1">percent_complete ≥ 100</code>{" "}
                 &rarr; <StatusChip s="ready_for_handoff" />
               </li>
               <li>
-                Ada event relevan lain &rarr; <StatusChip s="in_progress" />{" "}
+                Ada event relevan &rarr; <StatusChip s="in_progress" />{" "}
                 <span style={{ color: "var(--sand-dark)" }}>
                   (skor 0.3 + n × 0.05, maks 0.9)
                 </span>
@@ -272,7 +276,7 @@ export function RulesViewer({ ruleVersion }: { ruleVersion: number }) {
             className="border-t pt-3 text-xs italic"
             style={{ borderColor: "var(--border)", color: "var(--sand-dark)" }}
           >
-            Versi aturan: v{ruleVersion}. Untuk mengubah aturan, edit{" "}
+            Versi aturan: v{RULE_VERSION}. Untuk mengubah aturan, edit{" "}
             <code className="rounded bg-[var(--surface-alt)] px-1 not-italic">
               apps/web/lib/gates/readiness-rules.ts
             </code>{" "}

@@ -82,7 +82,7 @@ export default async function ProjectSchedulePage({
       </header>
 
       <section className="mb-4">
-        <RulesViewer ruleVersion={RULE_VERSION} />
+        <RulesViewer />
       </section>
 
       <section className="mb-6">

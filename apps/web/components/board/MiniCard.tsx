@@ -45,8 +45,11 @@ export function MiniCard({ card, projectCode }: { card: CardWithLabels; projectC
 
 /** Compact gate-deadline chip: "B lewat 3 hari" / "B hari ini" / "B · 12 hari". */
 function DeadlineChip({ deadline }: { deadline: CardDeadline }) {
-  const daysLeft = Math.floor(
-    (new Date(deadline.targetEndDate).getTime() - Date.now()) / 86_400_000,
+  // Use WIB (Asia/Jakarta) calendar-day semantics so "hari ini" holds all day
+  // and "lewat" only flips at WIB midnight, not UTC midnight (~07:00 WIB).
+  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  const daysLeft = Math.round(
+    (Date.parse(deadline.targetEndDate) - Date.parse(todayStr)) / 86_400_000,
   );
   const overdue = daysLeft < 0;
   const urgent = !overdue && daysLeft <= 14;
