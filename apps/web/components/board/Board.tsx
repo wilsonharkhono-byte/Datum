@@ -17,7 +17,7 @@ export function Board({ board }: { board: BoardData }) {
 
   const filteredColumns = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const includeAllColumns = q === "";
+    const includeAllColumns = q === "" && labelFilter.size === 0;
     const cols: BoardColumn[] = [];
     for (const col of board.columns) {
       const matchedCards = col.cards.filter((c) => {

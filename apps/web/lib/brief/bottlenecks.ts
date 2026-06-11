@@ -16,6 +16,7 @@ export type ScheduleCell = {
 
 export type GateRisk = {
   projectCode: string;
+  areaId: string;
   areaName: string;
   gateCode: string;
   reason: string;
@@ -23,6 +24,12 @@ export type GateRisk = {
 
 const GATE_ORDER = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 const SATISFIED = new Set(["passed", "ready_for_handoff", "not_applicable"]);
+
+const STATUS_LABELS: Record<string, string> = {
+  not_started: "belum mulai",
+  in_progress: "sedang berjalan",
+  blocked: "terblokir",
+};
 
 /**
  * Cascade rule: gate N's target window has started, but gate N-1 in the
@@ -48,9 +55,10 @@ export function findCascadeRisks(cells: ScheduleCell[], todayIso: string): GateR
       if (windowStarted && !SATISFIED.has(prev.status)) {
         risks.push({
           projectCode: cur.project_code,
+          areaId: cur.area_id,
           areaName: cur.area_name,
           gateCode: cur.gate_code,
-          reason: `Gate ${cur.gate_code} sudah masuk jadwal, tapi Gate ${prev.gate_code} belum siap (${prev.status})`,
+          reason: `Gate ${cur.gate_code} sudah masuk jadwal, tapi Gate ${prev.gate_code} belum siap (${STATUS_LABELS[prev.status] ?? prev.status})`,
         });
       }
     }

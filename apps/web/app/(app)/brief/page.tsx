@@ -115,7 +115,7 @@ export default async function BriefPage() {
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
             {brief.gateRisks.slice(0, 12).map((r) => (
-              <li key={`${r.projectCode}-${r.areaName}-${r.gateCode}`}>
+              <li key={`${r.areaId}-${r.gateCode}`}>
                 <Link
                   href={`/project/${r.projectCode}/schedule`}
                   className="block rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs hover:border-[var(--sand-dark)]"

@@ -81,6 +81,7 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
 
   // 2. Live blockers: work events with status=blocked not superseded by a
   //    later non-blocked work event on the same card (append-only log).
+  // TODO(scale): limit(100) oldest-first truncates count and can drop newest blockers past 100 rows; revisit with a server-side open-blocker view.
   const { data: blockedRaw } = await supabase
     .from("card_events")
     .select(`
@@ -95,6 +96,7 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
   const blockedCardIds = [...new Set((blockedRaw ?? []).map((e) => e.card_id))];
   const lastNonBlockedByCard = new Map<string, string>();
   if (blockedCardIds.length > 0) {
+    // TODO(scale): relies on PostgREST's implicit 1000-row cap; add occurred_at lower bound if work-event volume grows.
     const { data: workEvs } = await supabase
       .from("card_events")
       .select("card_id, occurred_at, payload")
