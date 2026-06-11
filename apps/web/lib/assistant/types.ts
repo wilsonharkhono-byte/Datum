@@ -9,7 +9,7 @@ export const ChatRequest = z.object({
 export type ChatRequest = z.infer<typeof ChatRequest>;
 
 export type ChatResponse = {
-  sessionId: string;
+  sessionId: string | null;
   answer: string;
   citations: { cardId: string; eventIds: string[] }[];
 };

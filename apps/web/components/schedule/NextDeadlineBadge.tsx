@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { gateShortName } from "@/lib/gates/labels";
 
 type Deadline = {
   gateCode: string;
@@ -46,7 +47,7 @@ export function NextDeadlineBadge({ cardId }: { cardId: string }) {
       className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${tone}`}
     >
       <span aria-hidden="true">📅</span>
-      <span>Gate {deadline.gateCode}</span>
+      <span>{deadline.gateCode} · {gateShortName(deadline.gateCode)}</span>
       <span className="opacity-70">·</span>
       <span>{label}</span>
     </span>

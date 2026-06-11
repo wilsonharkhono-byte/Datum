@@ -10,10 +10,13 @@ import type {
   CardMember,
   Staff,
 } from "@datum/db";
+import { computeCardLabels, type CardWithLabels } from "@/lib/cards/labels";
 
-export type BoardColumn = { topic: Topic; cards: Card[] };
+export type BoardColumn = { topic: Topic; cards: CardWithLabels[] };
 export type Board = { project: Project; columns: BoardColumn[] };
 export type CardDetail = { card: Card; events: CardEvent[] };
+
+const LABEL_LOOKBACK_DAYS = 30;
 
 export async function getBoardForProject(
   supabase: SupabaseClient<Database>,
@@ -29,7 +32,9 @@ export async function getBoardForProject(
   if (projErr) throw projErr;
   if (!project) throw new Error(`Project not found: ${projectSlug}`);
 
-  const [topicsRes, cardsRes] = await Promise.all([
+  const sinceIso = new Date(Date.now() - LABEL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+  const [topicsRes, cardsRes, recentEventsRes] = await Promise.all([
     supabase
       .from("topics")
       .select("*")
@@ -40,14 +45,32 @@ export async function getBoardForProject(
       .select("*")
       .eq("project_id", project.id)
       .order("last_event_at", { ascending: false, nullsFirst: false }),
+    supabase
+      .from("card_events")
+      .select("card_id, event_kind")
+      .eq("project_id", project.id)
+      .gte("occurred_at", sinceIso),
   ]);
   if (topicsRes.error) throw topicsRes.error;
   if (cardsRes.error) throw cardsRes.error;
+  if (recentEventsRes.error) {
+    console.warn("[getBoardForProject] recent events query failed — labels will be empty:", recentEventsRes.error.message);
+  }
 
-  const cardsByTopic = new Map<string, Card[]>();
+  // Group recent event kinds by card so we can derive labels without a per-card round-trip.
+  const recentKindsByCard = new Map<string, Set<string>>();
+  for (const ev of recentEventsRes.data ?? []) {
+    const set = recentKindsByCard.get(ev.card_id) ?? new Set<string>();
+    set.add(ev.event_kind);
+    recentKindsByCard.set(ev.card_id, set);
+  }
+
+  const cardsByTopic = new Map<string, CardWithLabels[]>();
   for (const c of cardsRes.data ?? []) {
+    const labels = computeCardLabels(c, recentKindsByCard.get(c.id) ?? new Set());
+    const withLabels: CardWithLabels = { ...c, labels };
     const arr = cardsByTopic.get(c.topic_id) ?? [];
-    arr.push(c);
+    arr.push(withLabels);
     cardsByTopic.set(c.topic_id, arr);
   }
 

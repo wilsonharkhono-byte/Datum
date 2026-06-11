@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import type { CardAttachment } from "@datum/db";
 import { signAttachment } from "@/lib/cards/mutations";
+import { PaperclipIcon } from "@/components/icons/Icon";
 
 type ResolvedAttachment = CardAttachment & { signedUrl: string | null };
 
@@ -75,9 +76,9 @@ export function EventAttachments({ attachments }: { attachments: CardAttachment[
                 href={a.signedUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:text-[var(--sand-dark)]"
+                className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:text-[var(--sand-dark)]"
               >
-                📎 {fileName}
+                <PaperclipIcon size={11} /> {fileName}
               </a>
             );
           })}

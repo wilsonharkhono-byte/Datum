@@ -2,6 +2,7 @@ import type { MatrixData } from "@/lib/matrix/fetch-matrix";
 import { Fragment } from "react";
 import { Cell, CellChip } from "./cell";
 import { StatusLegend } from "./status-legend";
+import { gateShortName } from "@/lib/gates/labels";
 
 export function AreaGateMatrix({ data }: { data: MatrixData }) {
   const byFloor = new Map<string, typeof data.areas>();
@@ -72,7 +73,8 @@ export function AreaGateMatrix({ data }: { data: MatrixData }) {
                   key={g}
                   className="border border-[#141210] bg-[#141210] px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[#FDFAF6]"
                 >
-                  Gate {g}
+                  <span className="block text-[10px] tracking-[0.1em] text-[#FDFAF6]/70">Gate {g}</span>
+                  <span className="block normal-case tracking-normal">{gateShortName(g)}</span>
                 </th>
               ))}
             </tr>

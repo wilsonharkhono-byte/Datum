@@ -5,6 +5,7 @@ import { AreaGateMatrix } from "@/components/matrix/area-gate-matrix";
 import { RecomputeButton } from "@/components/schedule/RecomputeButton";
 import { RULE_VERSION } from "@/lib/gates/readiness-rules";
 import { Gantt } from "@/components/schedule/Gantt";
+import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells } from "@/lib/gates/schedule";
 
 export default async function ProjectSchedulePage({
@@ -79,6 +80,10 @@ export default async function ProjectSchedulePage({
           )}
         </p>
       </header>
+
+      <section className="mb-4">
+        <RulesViewer ruleVersion={RULE_VERSION} />
+      </section>
 
       <section className="mb-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">

@@ -32,7 +32,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           throw new Error(friendlyMessage);
         }
         const data = await res.json();
-        setSessionId(data.sessionId);
+        if (data.sessionId) setSessionId(data.sessionId);
         setMessages((m) => [...m, { role: "assistant", content: data.answer, citations: data.citations }]);
       } else {
         const res = await fetch("/api/assistant/capture", {
@@ -68,6 +68,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
       setPending(false);
     }
   }
+
+  const hasContent = messages.length > 0 || pending;
 
   function DockContent({ onClose }: { onClose?: () => void }) {
     return (
@@ -121,8 +123,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           )}
         </div>
 
-        {/* Layer 2 — warm-white message canvas */}
-        <MessageList messages={messages} pending={pending} />
+        {/* Layer 2 — warm-white message canvas. Only rendered once there's
+            actual conversation; the empty-state placeholder lives in the
+            input row's helper text instead so the dock collapses to a thin
+            strip and gives the board page more real estate. */}
+        {hasContent ? <MessageList messages={messages} pending={pending} /> : null}
 
         {/* Layer 3 — sand-tinted input footer band, anchored to the bottom */}
         <div className="border-t border-[var(--border)] bg-[var(--surface-alt)]">
@@ -169,9 +174,14 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         </div>
       ) : null}
 
-      {/* Desktop inline dock — md+. The shadow under the dock anchors it to the
-          screen edge and reinforces the assistant as a persistent surface. */}
-      <div className="hidden h-[26vh] flex-col border-t border-[var(--border)] bg-[var(--surface)] shadow-[0_-6px_18px_-10px_rgba(20,18,16,0.18)] md:flex">
+      {/* Desktop inline dock — md+. Compact when there's nothing to show
+          (more board area for cards); expands to 34vh once messages or
+          proposals exist so SIMPAN and replies have room to breathe. */}
+      <div
+        className={`hidden flex-col border-t border-[var(--border)] bg-[var(--surface)] shadow-[0_-6px_18px_-10px_rgba(20,18,16,0.18)] transition-[height] duration-200 ease-out md:flex ${
+          hasContent ? "h-[34vh]" : "h-auto"
+        }`}
+      >
         <DockContent />
       </div>
     </>

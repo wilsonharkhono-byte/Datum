@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentStaff, canManageAccess } from "@/lib/auth/require-role";
 import type { Database } from "@datum/db";
 
 const PROJECT_STATUS = ["design","construction","finishing","handover","closed"] as const;
@@ -46,14 +47,13 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
     return { ok: false, error: "Form tidak valid" };
   }
 
+  const creator = await getCurrentStaff();
+  if (!canManageAccess(creator)) {
+    return { ok: false, error: "Hanya principal atau admin yang bisa membuat proyek baru" };
+  }
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
-
-  // Look up the creator staff row to set principal_id / pic_id sensibly
-  const { data: creator } = await supabase
-    .from("staff").select("id, role").eq("id", user.id).maybeSingle();
-  if (!creator) return { ok: false, error: "Akun staf tidak ditemukan untuk user ini" };
 
   // Insert project
   const { data: proj, error: pErr } = await supabase.from("projects").insert({
@@ -99,6 +99,7 @@ const UpdateProjectInput = z.object({
   location:       z.string().max(200).nullable().optional(),
   status:         z.enum(PROJECT_STATUS).optional(),
   targetHandover: z.string().nullable().optional(),
+  kickoffDate:    z.string().nullable().optional(),
 });
 
 export type UpdateProjectResult = { ok: true } | { ok: false; error: string };
@@ -113,14 +114,18 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
       location:       formData.get("location") === null ? undefined : (formData.get("location") === "" ? null : formData.get("location")),
       status:         formData.get("status") || undefined,
       targetHandover: formData.get("targetHandover") === null ? undefined : (formData.get("targetHandover") === "" ? null : formData.get("targetHandover")),
+      kickoffDate:    formData.get("kickoffDate") === null ? undefined : (formData.get("kickoffDate") === "" ? null : formData.get("kickoffDate")),
     });
   } catch {
     return { ok: false, error: "Form tidak valid" };
   }
 
+  const caller = await getCurrentStaff();
+  if (!canManageAccess(caller)) {
+    return { ok: false, error: "Hanya principal atau admin yang bisa mengubah proyek" };
+  }
+
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
   const patch: Database["public"]["Tables"]["projects"]["Update"] = {};
   if (input.projectName !== undefined)    patch.project_name = input.projectName;
@@ -128,6 +133,7 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
   if (input.location !== undefined)       patch.location = input.location;
   if (input.status !== undefined)         patch.status = input.status;
   if (input.targetHandover !== undefined) patch.target_handover = input.targetHandover;
+  if (input.kickoffDate !== undefined)    patch.kickoff_date = input.kickoffDate;
 
   if (Object.keys(patch).length === 0) return { ok: true };
 
@@ -137,6 +143,10 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/");
-  if (existing?.project_code) revalidatePath(`/project/${existing.project_code}`);
+  if (existing?.project_code) {
+    revalidatePath(`/project/${existing.project_code}`);
+    revalidatePath(`/project/${existing.project_code}/settings`);
+    revalidatePath(`/project/${existing.project_code}/schedule`);
+  }
   return { ok: true };
 }

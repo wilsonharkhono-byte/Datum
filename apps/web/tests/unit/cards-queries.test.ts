@@ -8,6 +8,7 @@ function fakeClient(map: Record<string, unknown>) {
     const data = map[table];
     const builder: any = {
       eq: () => builder,
+      gte: () => builder,
       order: () => Promise.resolve({ data, error: null }),
       single: () => Promise.resolve({ data: (data as any)?.[0], error: null }),
       maybeSingle: () => Promise.resolve({ data: (data as any)?.[0] ?? null, error: null }),

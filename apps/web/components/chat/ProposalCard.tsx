@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { createCardEvent, attachToEvent, createCardEventDraft } from "@/lib/cards/mutations";
+import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
 import { HIGH_RISK_KINDS, type EventKind } from "@datum/types";
 import { CheckIcon, XIcon, PaperclipIcon } from "@/components/icons/Icon";
@@ -52,34 +52,10 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
     setStatus("saving");
 
     startTransition(async () => {
-      if (isHighRisk) {
-        // High-risk path: stage as draft, skip file upload (follow-up)
-        const dfd = new FormData();
-        dfd.set("cardId",      proposal.cardId);
-        dfd.set("projectId",   proposal.projectId);
-        dfd.set("projectCode", proposal.projectCode);
-        dfd.set("cardSlug",    proposal.cardSlug);
-        dfd.set("eventKind",   proposal.eventKind);
-        if (proposal.rationale) dfd.set("rationale", proposal.rationale);
-        for (const [k, v] of Object.entries(proposal.payload)) {
-          const value = Array.isArray(v)
-            ? v.join(",")
-            : v == null
-            ? ""
-            : String(v);
-          dfd.set(`payload_${k}`, value);
-        }
-        const dres = await createCardEventDraft(dfd);
-        if (!dres.ok) {
-          setStatus("error");
-          setError(dres.error);
-          return;
-        }
-        setStatus("saved");
-        return;
-      }
-
-      // Low-risk path: commit directly as card_event
+      // Always commit directly to the card. High-risk kinds get a label
+      // (rendered via the timeline chip + a notification to principals),
+      // not a draft gate. The principal can edit/delete the event from
+      // the card if AI got it wrong.
       const fd = new FormData();
       fd.set("cardId",      proposal.cardId);
       fd.set("projectId",   proposal.projectId);
@@ -93,6 +69,9 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
           ? ""
           : String(v);
         fd.set(`payload_${k}`, value);
+      }
+      if (proposal.rationale && proposal.rationale.trim().length > 0) {
+        fd.set("payload_ai_rationale", proposal.rationale);
       }
       const res = await createCardEvent(fd);
       if (!res.ok) {
@@ -156,33 +135,33 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
           <span>{proposal.fileMeta?.name ?? proposal.pendingFile?.name} — akan diupload setelah simpan</span>
         </div>
       ) : null}
-      <pre className="mb-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-[var(--sand)] bg-[var(--surface)] p-2 text-[10px] text-foreground">
+      <pre className="mb-2 max-h-20 overflow-y-auto whitespace-pre-wrap rounded border border-[var(--sand)] bg-[var(--surface)] p-2 text-[10px] text-foreground">
         {JSON.stringify(proposal.payload, null, 2)}
       </pre>
       {proposal.rationale ? (
         <p className="mb-2 text-[10px] italic text-[var(--text-secondary)]">"{proposal.rationale}"</p>
       ) : null}
       {isHighRisk ? (
-        <div className="mb-2 rounded border border-[var(--sand)] bg-[var(--sand-tint)] px-2 py-1 text-[10px] text-[var(--sand-dark)]">
-          🔒 Kategori berisiko tinggi — akan dikirim ke /review untuk approval principal
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--flag-high-bg)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--flag-high)]">
+          Berisiko tinggi · principal akan dinotifikasi
         </div>
       ) : null}
       {error ? <div className="mb-2 text-[10px] text-[var(--flag-critical)]">{error}</div> : null}
       {status === "pending" || status === "error" ? (
-        <div className="flex gap-1.5">
+        <div className="sticky bottom-0 -mx-3 -mb-3 flex gap-2 border-t border-[var(--sand)] bg-[var(--sand-tint)] px-3 py-2 backdrop-blur-sm">
           <button
             type="button"
             onClick={commit}
             aria-label="Simpan proposal ke kartu"
-            className="inline-flex items-center gap-1.5 rounded bg-foreground px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
+            className="inline-flex items-center gap-1.5 rounded bg-foreground px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_2px_6px_-1px_rgba(122,107,86,0.4)] hover:bg-[var(--sand-dark)]"
           >
-            <CheckIcon size={12} /> Simpan
+            <CheckIcon size={13} /> Simpan ke kartu
           </button>
           <button
             type="button"
             onClick={discard}
             aria-label="Batalkan proposal"
-            className="inline-flex items-center gap-1.5 rounded px-3 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
+            className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--text-secondary)]"
           >
             <XIcon size={12} /> Batal
           </button>
@@ -190,10 +169,18 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
       ) : status === "saving" ? (
         <div className="text-[10px] text-[var(--text-secondary)]">Menyimpan…</div>
       ) : status === "saved" ? (
-        <div className="text-[10px] text-[var(--flag-ok)]">
-          {isHighRisk
-            ? "✓ Tersimpan sebagai draft. Menunggu approval di /review."
-            : "✓ Tersimpan di kartu."}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded bg-[var(--flag-ok-bg)] px-2 py-1 text-[10px] font-semibold text-[var(--flag-ok)]">
+            <CheckIcon size={11} />
+            {isHighRisk ? "Tersimpan di kartu · principal dinotifikasi" : "Tersimpan di kartu"}
+          </span>
+          <a
+            href={`/project/${proposal.projectCode}/cards/${proposal.cardSlug}`}
+            className="inline-flex items-center gap-1 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--sand-tint)]"
+            aria-label={`Buka kartu ${proposal.cardTitle}`}
+          >
+            → Buka {proposal.cardTitle}
+          </a>
         </div>
       ) : (
         <div className="text-[10px] text-[var(--text-muted)]">Dibatalkan.</div>

@@ -9,8 +9,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!staff) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-[#D2D0C4] text-[#141210]">
-      <header className="border-b border-[#B5AFA8] bg-[#FDFAF6]">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#D2D0C4] text-[#141210]">
+      <header className="shrink-0 border-b border-[#B5AFA8] bg-[#FDFAF6]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
           <div className="flex items-center gap-4">
             <div className="grid h-10 w-10 place-items-center rounded-[8px] bg-[#141210] text-sm font-bold text-[#FDFAF6]">
@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8">{children}</main>
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-y-auto px-5 py-6 sm:px-8 sm:py-8">{children}</main>
     </div>
   );
 }

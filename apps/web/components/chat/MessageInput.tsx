@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
+import { PaperclipIcon } from "@/components/icons/Icon";
 
 export function MessageInput({
   onSend,
@@ -27,21 +28,21 @@ export function MessageInput({
   }
 
   return (
-    <form onSubmit={submit} className="border-t border-[var(--border)] bg-[var(--surface)]">
+    <form onSubmit={submit}>
       <div className="flex gap-2 px-4 py-2">
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           disabled={disabled}
           placeholder={placeholder}
-          className="flex-1 rounded border border-[var(--border)] px-3 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none"
+          className="input-strong flex-1"
         />
         {acceptFiles ? (
           <label
             aria-label="Lampirkan foto atau PDF"
             className="flex cursor-pointer items-center rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--sand-dark)] hover:text-[var(--sand-dark)]"
           >
-            <span aria-hidden="true">📎</span>
+            <PaperclipIcon size={14} />
             <input
               ref={fileInputRef}
               type="file"
@@ -61,8 +62,8 @@ export function MessageInput({
         </button>
       </div>
       {file ? (
-        <div className="border-t border-[var(--border)] bg-[var(--surface-alt)] px-4 py-1 text-[10px] text-[var(--text-secondary)]">
-          <span aria-hidden="true">📎</span> {file.name} ({Math.round(file.size / 1024)} KB) · <button
+        <div className="flex items-center gap-1.5 border-t border-[var(--border)] bg-[var(--surface-alt)] px-4 py-1 text-[10px] text-[var(--text-secondary)]">
+          <PaperclipIcon size={11} /> {file.name} ({Math.round(file.size / 1024)} KB) · <button
             type="button"
             onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
             aria-label="Hapus lampiran yang dipilih"

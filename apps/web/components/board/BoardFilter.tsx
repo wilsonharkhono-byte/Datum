@@ -48,8 +48,8 @@ export function BoardFilter({
           × bersihkan
         </button>
       ) : null}
-      <span className="ml-2 text-[10px] uppercase tracking-wide text-[#7A6B56]">status:</span>
-      <div className="flex gap-1">
+      <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">status</span>
+      <div className="flex gap-1.5">
         {(["active", "dormant", "closed"] as const).map((s) => {
           const on = statuses.has(s);
           return (
@@ -57,12 +57,8 @@ export function BoardFilter({
               key={s}
               type="button"
               onClick={() => toggle(s)}
-              className={
-                "rounded border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide " +
-                (on
-                  ? "border-[#141210] bg-[#141210] text-white"
-                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--text-secondary)]")
-              }
+              aria-pressed={on}
+              className={`chip${on ? " chip-on" : ""}`}
             >
               {STATUS_LABELS[s]}
             </button>

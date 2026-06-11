@@ -18,6 +18,7 @@ import {
   notifyDraftApproved,
   notifyDraftRejected,
   notifyDraftPending,
+  notifyPrincipalsOfHighRiskEvent,
 } from "@/lib/notifications/producers";
 
 const CreateCardInput = z.object({
@@ -183,10 +184,50 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
       cardSlug: cardRow.slug,
       cardTitle: cardRow.title,
     });
+    if (HIGH_RISK_KINDS.has(input.eventKind)) {
+      const p = parsed.data as Record<string, unknown>;
+      const preview = pickPreview(p);
+      await notifyPrincipalsOfHighRiskEvent(supabase, {
+        eventId: data.id,
+        eventKind: input.eventKind,
+        actorId: user.id,
+        projectId: input.projectId,
+        projectCode: input.projectCode,
+        cardId: input.cardId,
+        cardSlug: cardRow.slug,
+        cardTitle: cardRow.title,
+        preview,
+      });
+    }
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true, eventId: data.id };
+}
+
+function pickPreview(payload: Record<string, unknown>): string | null {
+  // The first non-empty textual field — good enough for a notification preview.
+  // Order covers every high-risk kind: client_request (request_text), decision
+  // (proposed_spec / topic), vendor (vendor_name + amount or notes), work
+  // (description), and the generic note/document/photo bodies.
+  const order = [
+    "request_text",            // client_request
+    "proposed_spec", "topic",  // decision
+    "vendor_name",             // vendor — combined with amount below if both present
+    "description",             // work / drawing
+    "body", "notes", "title", "caption",
+  ];
+  for (const k of order) {
+    const v = payload[k];
+    if (typeof v === "string" && v.trim().length > 0) {
+      // For vendor events surface "Vendor X · Rp 500.000" when amount is present
+      if (k === "vendor_name" && typeof payload.amount === "number") {
+        return `${v} · Rp ${payload.amount.toLocaleString("id-ID")}`;
+      }
+      return v;
+    }
+  }
+  return null;
 }
 
 // ─── createComment ────────────────────────────────────────────────────────────

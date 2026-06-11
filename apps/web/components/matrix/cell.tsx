@@ -1,4 +1,5 @@
 import type { MatrixCell } from "@/lib/matrix/fetch-matrix";
+import { gateShortName } from "@/lib/gates/labels";
 
 const colorByStatus: Record<MatrixCell["status"], string> = {
   not_started: "bg-[#F2EFE9] text-[#847E78]",
@@ -55,16 +56,17 @@ export function CellChip({
   const cls = colorByStatus[status];
   const sym = symbolByStatus[status];
   const label = labelByStatus[status];
+  const shortName = gateShortName(gate);
   const title = cell?.blocking_reason
-    ? `Gate ${gate} · ${status}: ${cell.blocking_reason}`
-    : `Gate ${gate} · ${status}`;
+    ? `Gate ${gate} · ${shortName} · ${status}: ${cell.blocking_reason}`
+    : `Gate ${gate} · ${shortName} · ${status}`;
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-[10px] font-semibold ${cls}`}
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-semibold ${cls}`}
     >
       <span aria-hidden="true">{sym}</span>
-      <span>G{gate}</span>
+      <span>{gate} · {shortName}</span>
       <span className="sr-only">{label}</span>
     </span>
   );

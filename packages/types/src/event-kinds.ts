@@ -6,12 +6,18 @@ export const EVENT_KINDS = [
 
 export type EventKind = (typeof EVENT_KINDS)[number];
 
+// Optional reasoning string carried on events captured via the AI chat flow.
+// Lets the principal see why the AI routed the event to this card/kind. Plain
+// human-authored events leave it unset.
+const aiRationale = { ai_rationale: z.string().optional() };
+
 const DecisionPayload = z.object({
   topic: z.string().min(1),
   current_spec: z.string().optional(),
   proposed_spec: z.string().optional(),
   approved_by: z.enum(["client","principal","pic"]).optional(),
   approval_evidence: z.string().optional(),
+  ...aiRationale,
 });
 
 const DrawingPayload = z.object({
@@ -19,6 +25,7 @@ const DrawingPayload = z.object({
   revision: z.string().optional(),
   description: z.string().min(1),
   file_ref: z.string().optional(),
+  ...aiRationale,
 });
 
 const VendorPayload = z.object({
@@ -33,6 +40,7 @@ const VendorPayload = z.object({
   attendees: z.array(z.string()).optional(),
   rationale: z.string().optional(),
   notes: z.string().optional(),
+  ...aiRationale,
 });
 
 const MaterialPayload = z.object({
@@ -41,6 +49,7 @@ const MaterialPayload = z.object({
   status: z.enum(["specified","sample_approved","ordered","delivered"]),
   quantity: z.number().optional(),
   unit: z.string().optional(),
+  ...aiRationale,
 });
 
 const WorkPayload = z.object({
@@ -54,27 +63,32 @@ const WorkPayload = z.object({
   severity: z.enum(["low","medium","high"]).optional(),
   location: z.string().optional(),
   notes: z.string().optional(),
+  ...aiRationale,
 });
 
 const ClientRequestPayload = z.object({
   request_text: z.string().min(1),
   requested_by: z.string().optional(),
   awaiting: z.string().optional(),
+  ...aiRationale,
 });
 
 const NotePayload = z.object({
   body: z.string().min(1),
+  ...aiRationale,
 });
 
 const PhotoPayload = z.object({
   caption: z.string().optional(),
   taken_at: z.string().optional(),
+  ...aiRationale,
 });
 
 const DocumentPayload = z.object({
   title: z.string().min(1),
   doc_type: z.string().optional(),
   notes: z.string().optional(),
+  ...aiRationale,
 });
 
 export const EventPayloadSchemas = {

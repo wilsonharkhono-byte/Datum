@@ -1,4 +1,5 @@
 import type { CardEvent, CardAttachment } from "@datum/db";
+import { HIGH_RISK_KINDS, type EventKind } from "@datum/types";
 import { EventAttachments } from "./EventAttachments";
 
 function extractUrls(payload: Record<string, unknown>): string[] {
@@ -87,6 +88,7 @@ export function EventRow({
   attachments: CardAttachment[];
 }) {
   const urls = extractUrls(event.payload as Record<string, unknown>);
+  const isHighRisk = HIGH_RISK_KINDS.has(event.event_kind as EventKind);
   return (
     <li className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
       <div className="flex gap-3">
@@ -97,6 +99,14 @@ export function EventRow({
           {new Date(event.occurred_at).toLocaleDateString("id-ID", { year: "2-digit", month: "short", day: "numeric" })}
         </span>
         <span className="flex-1 text-[var(--foreground)]">{summarize(event)}</span>
+        {isHighRisk ? (
+          <span
+            className="inline-flex flex-shrink-0 items-center gap-1 self-start rounded-full bg-[var(--flag-high-bg)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--flag-high)]"
+            title="Catatan berisiko tinggi — principal sudah dinotifikasi"
+          >
+            Berisiko tinggi
+          </span>
+        ) : null}
       </div>
       {urls.length > 0 ? (
         <div className="ml-[12.5rem] mt-1 flex flex-wrap gap-1.5">

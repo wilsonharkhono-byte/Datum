@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { subscribeToOwnNotifications } from "@/lib/notifications/realtime";
+import { BellIcon } from "@/components/icons/Icon";
 
 export function NotificationBadgeClient({
   staffId,
@@ -49,11 +50,11 @@ export function NotificationBadgeClient({
     <Link
       href="/notifications"
       aria-label={ariaLabel}
-      className="relative inline-flex items-center rounded border border-[#B5AFA8] bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]"
+      className="relative inline-flex items-center gap-1.5 rounded border border-[#B5AFA8] bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]"
     >
-      <span aria-hidden="true">🔔</span>
+      <BellIcon size={13} />
       {count > 0 ? (
-        <span className="ml-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--flag-warning)] px-1 text-[10px] font-bold text-white">
+        <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--flag-warning)] px-1 text-[10px] font-bold text-white">
           {count > 99 ? "99+" : count}
         </span>
       ) : null}

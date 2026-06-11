@@ -19,30 +19,53 @@ export default async function ReviewPage() {
     .limit(50);
 
   if (error) {
-    return <div className="p-6 text-red-700">Gagal memuat: {error.message}</div>;
+    return (
+      <div className="mx-auto max-w-4xl p-6 text-[var(--flag-critical)]">
+        Gagal memuat: {error.message}
+      </div>
+    );
   }
 
-  return (
-    <div className="mx-auto max-w-4xl p-6">
-      <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
-      <h1 className="mt-2 text-2xl font-semibold text-[#141210]">Review Queue</h1>
-      <p className="mt-1 text-sm text-[#524E49]">
-        Draft chat-capture berisiko tinggi yang menunggu approval.
-      </p>
+  const items = drafts ?? [];
 
-      <ol className="mt-6 space-y-3">
-        {(drafts ?? []).length === 0 ? (
-          <li className="rounded border border-dashed border-[#B5AFA8] p-6 text-center">
-            <p className="text-sm italic text-[#524E49]">Tidak ada draft yang menunggu review.</p>
-            <p className="mt-1 text-xs text-[#847E78]">
-              Draft muncul di sini saat asisten mencatat sesuatu yang berisiko tinggi (vendor_quote, decision, defect, dll) dan menunggu persetujuan principal.
+  return (
+    <div className="bg-[var(--background)] py-4 md:py-6">
+      <div className="mx-auto max-w-4xl px-3 md:px-4">
+        <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">
+          ← Beranda
+        </Link>
+
+        <header className="mt-2 mb-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--sand-dark)]">
+            Inbox principal
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">
+            Perlu dicek
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">
+            Catatan dari mode <strong>Catat</strong> dengan kategori berisiko tinggi —
+            permintaan klien, keputusan, vendor, pekerjaan. Klik <em>Setujui & tambah ke kartu</em> agar
+            catatan ini masuk ke timeline kartu, atau <em>Tolak</em> jika AI salah tangkap.
+          </p>
+        </header>
+
+        {items.length === 0 ? (
+          <div className="rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+            <p className="text-sm font-medium text-[var(--text-secondary)]">
+              Tidak ada item yang perlu dicek.
             </p>
-          </li>
-        ) : null}
-        {(drafts ?? []).map((d) => (
-          <ReviewItem key={d.id} draft={d as never} />
-        ))}
-      </ol>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Inbox ini terisi saat asisten menangkap catatan berisiko tinggi dari mode Catat.
+            </p>
+          </div>
+        ) : (
+          <ol className="space-y-4">
+            {items.map((d) => (
+              <ReviewItem key={d.id} draft={d as never} />
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
   );
 }

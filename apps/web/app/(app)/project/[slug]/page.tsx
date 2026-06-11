@@ -30,7 +30,7 @@ export default async function ProjectBoardPage({
   const showSettings = canManageAccess(caller);
 
   return (
-    <div className="flex h-[calc(100vh-3rem)] flex-col">
+    <div className="flex h-full flex-col">
       <header className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
         <div className="flex items-center justify-between">
           <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Proyek</Link>

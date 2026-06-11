@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Supa = SupabaseClient<Database>;
 
@@ -152,6 +153,50 @@ export async function notifyDraftRejected(supabase: Supa, args: {
     summary: `Draft ${args.eventKind} Anda ditolak${reasonText}`,
     link: "/review",
   }]);
+}
+
+// High-risk event went straight to a card → notify principals/admins so
+// they can spot-check it. Fires from createCardEvent when the event_kind is
+// in HIGH_RISK_KINDS. Best-effort, never throws.
+//
+// Uses the service-role client because the caller (e.g. a designer) is rarely
+// allowed to read principal/admin staff rows under the project-scoped staff
+// RLS — without it the staff select returns only the caller's own row and the
+// principal notification never fires.
+export async function notifyPrincipalsOfHighRiskEvent(_supabase: Supa, args: {
+  eventId: string;
+  eventKind: string;
+  actorId: string;
+  projectId: string;
+  projectCode: string;
+  cardId: string;
+  cardSlug: string;
+  cardTitle: string;
+  preview?: string | null;  // 1-line summary of the payload, e.g. the request_text
+}): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  const { data: reviewers } = await admin
+    .from("staff")
+    .select("id")
+    .eq("active", true)
+    .in("role", ["principal", "admin"]);
+  const recipients = (reviewers ?? [])
+    .map((s) => s.id)
+    .filter((id) => id !== args.actorId);
+  const unique = [...new Set(recipients)];
+  const previewText = args.preview && args.preview.trim().length > 0
+    ? `: "${args.preview.length > 80 ? args.preview.slice(0, 80) + "…" : args.preview}"`
+    : "";
+  await safeInsert(admin, unique.map((staffId) => ({
+    recipient_staff_id: staffId,
+    kind: "watcher_event" as const,  // reuse existing kind; semantics are "noteworthy"
+    project_id: args.projectId,
+    card_id: args.cardId,
+    card_event_id: args.eventId,
+    actor_staff_id: args.actorId,
+    summary: `${args.eventKind} berisiko tinggi di "${args.cardTitle}"${previewText}`,
+    link: `/project/${args.projectCode}/cards/${args.cardSlug}`,
+  })));
 }
 
 // 6. New draft → notify cross-project-read roles (principal/admin/estimator)
