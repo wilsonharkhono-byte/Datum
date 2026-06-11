@@ -42,14 +42,26 @@ export async function notifyMentions(supabase: Supa, args: {
     })));
 }
 
-// 2. Watcher event: fan out to card_members (owner/watcher/assignee) for key event kinds
-const NOTIFIABLE_KINDS = new Set([
-  "decision", "defect", "pending", "client_request",
-]);
+// 2. Watcher event: fan out to card_members (owner/watcher/assignee).
+//    Decisions and client requests always notify; work only when it is a
+//    blocker or a defect — routine progress logs would be noise.
+const NOTIFIABLE_KINDS = new Set(["decision", "client_request", "work"]);
+
+export function shouldNotifyWatchers(
+  eventKind: string,
+  payload?: Record<string, unknown> | null,
+): boolean {
+  if (!NOTIFIABLE_KINDS.has(eventKind)) return false;
+  if (eventKind === "work") {
+    return payload?.status === "blocked" || payload?.issue === "defect";
+  }
+  return true;
+}
 
 export async function notifyWatchersOfEvent(supabase: Supa, args: {
   eventId: string;
   eventKind: string;
+  payload?: Record<string, unknown> | null;
   actorId: string;
   projectId: string;
   projectCode: string;
@@ -57,7 +69,7 @@ export async function notifyWatchersOfEvent(supabase: Supa, args: {
   cardSlug: string;
   cardTitle: string;
 }): Promise<void> {
-  if (!NOTIFIABLE_KINDS.has(args.eventKind)) return;
+  if (!shouldNotifyWatchers(args.eventKind, args.payload)) return;
   const { data: members } = await supabase
     .from("card_members")
     .select("staff_id")

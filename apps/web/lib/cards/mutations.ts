@@ -177,6 +177,7 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
     await notifyWatchersOfEvent(supabase, {
       eventId: data.id,
       eventKind: input.eventKind,
+      payload: parsed.data as Record<string, unknown>,
       actorId: user.id,
       projectId: input.projectId,
       projectCode: input.projectCode,
