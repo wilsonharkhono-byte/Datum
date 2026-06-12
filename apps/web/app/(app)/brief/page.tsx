@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBriefData } from "@/lib/brief/queries";
+import { getAdvisorItems } from "@/lib/advisor/queries";
 import { BriefSection } from "@/components/brief/BriefSection";
+import { AdvisorFeed } from "@/components/brief/AdvisorFeed";
 
 export default async function BriefPage() {
   const supabase = await createSupabaseServerClient();
-  const brief = await getBriefData(supabase);
+  const [brief, advisorItems] = await Promise.all([
+    getBriefData(supabase),
+    getAdvisorItems(supabase, { now: new Date(), limit: 10 }),
+  ]);
 
   return (
     <div className="mx-auto max-w-5xl p-6">
@@ -17,6 +22,10 @@ export default async function BriefPage() {
           Ringkasan lintas-proyek: keputusan yang dibutuhkan, pekerjaan terblokir, defect, permintaan klien, quote kedaluwarsa, dan gate berisiko.
         </p>
       </header>
+
+      <div className="mb-4">
+        <AdvisorFeed items={advisorItems} />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <BriefSection

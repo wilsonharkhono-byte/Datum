@@ -43,9 +43,22 @@ const KIND_LABELS: Record<string, string> = {
 export function ProposalCard({ proposal }: { proposal: Proposal }) {
   const [status, setStatus] = useState<"pending" | "saving" | "saved" | "discarded" | "error">("pending");
   const [error, setError] = useState<string | null>(null);
+  const [confirmArmed, setConfirmArmed] = useState(false);
   const [, startTransition] = useTransition();
 
   const isHighRisk = HIGH_RISK_KINDS.has(proposal.eventKind as EventKind);
+  const conf = Math.round(proposal.confidence * 100);
+  const lowConfidence = conf < 50;
+
+  function handleSave() {
+    // Confidence gate: a low-confidence proposal needs a deliberate second tap
+    // before anything is written to the card.
+    if (lowConfidence && !confirmArmed) {
+      setConfirmArmed(true);
+      return;
+    }
+    commit();
+  }
 
   function commit() {
     setError(null);
@@ -110,10 +123,10 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
   }
 
   function discard() {
+    setConfirmArmed(false);
     setStatus("discarded");
   }
 
-  const conf = Math.round(proposal.confidence * 100);
   const confColor =
     conf >= 80 ? "text-[var(--flag-ok)]" : conf >= 50 ? "text-[var(--sand-dark)]" : "text-[var(--flag-critical)]";
 
@@ -146,16 +159,25 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
           Berisiko tinggi · principal akan dinotifikasi
         </div>
       ) : null}
+      {lowConfidence && (status === "pending" || status === "error") ? (
+        <div className="mb-2 flex items-center gap-1.5 rounded border border-[var(--flag-warning)]/50 bg-[var(--flag-warning-bg)] px-2 py-1 text-[10px] font-semibold text-[var(--flag-warning)]">
+          ⚠ Keyakinan AI rendah — periksa isian sebelum menyimpan
+        </div>
+      ) : null}
       {error ? <div className="mb-2 text-[10px] text-[var(--flag-critical)]">{error}</div> : null}
       {status === "pending" || status === "error" ? (
         <div className="sticky bottom-0 -mx-3 -mb-3 flex gap-2 border-t border-[var(--sand)] bg-[var(--sand-tint)] px-3 py-2 backdrop-blur-sm">
           <button
             type="button"
-            onClick={commit}
-            aria-label="Simpan proposal ke kartu"
-            className="inline-flex items-center gap-1.5 rounded bg-foreground px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_2px_6px_-1px_rgba(122,107,86,0.4)] hover:bg-[var(--sand-dark)]"
+            onClick={handleSave}
+            aria-label={confirmArmed ? "Konfirmasi simpan proposal ke kartu" : "Simpan proposal ke kartu"}
+            className={`inline-flex items-center gap-1.5 rounded px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_2px_6px_-1px_rgba(122,107,86,0.4)] ${
+              confirmArmed
+                ? "bg-[var(--flag-warning)] hover:opacity-90"
+                : "bg-foreground hover:bg-[var(--sand-dark)]"
+            }`}
           >
-            <CheckIcon size={13} /> Simpan ke kartu
+            <CheckIcon size={13} /> {confirmArmed ? "Yakin simpan?" : "Simpan ke kartu"}
           </button>
           <button
             type="button"

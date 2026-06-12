@@ -12,7 +12,8 @@ const KIND_LABELS: Record<CardEventKind, string> = {
   document:        "dokumen",
   client_request:  "permintaan klien",
   note:            "catatan",
-  // Retired kinds (still in DB enum; shown only if present on a card)
+  // Retired kinds (still in DB enum, so the Record type requires entries;
+  // never offered as chips — see KIND_ORDER)
   survey:          "survei (lama)",
   vendor_quote:    "quote vendor (lama)",
   vendor_pick:     "vendor dipilih (lama)",
@@ -22,12 +23,12 @@ const KIND_LABELS: Record<CardEventKind, string> = {
   pending:         "menunggu (lama)",
 };
 
+// Only the 9 current kinds are offered as filter chips. Retired kinds stay
+// renderable in the timeline (EventRow) — they're shown by default because
+// the active set starts as "all available" — but get no chip of their own.
 const KIND_ORDER: CardEventKind[] = [
   "note","decision","drawing","vendor","material","work",
   "client_request","photo","document",
-  // Retired kinds last so they appear only if a card still has them
-  "survey","vendor_quote","vendor_pick",
-  "worker_assigned","progress","defect","pending",
 ];
 
 export function TimelineFilter({

@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
+import type { PromptCachingBetaMessage } from "@anthropic-ai/sdk/resources/beta/prompt-caching/messages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { retrieveProjectContext } from "@/lib/assistant/retrieval";
-import { AnthropicNotConfiguredError, getModel } from "@/lib/assistant/anthropic";
+import {
+  AnthropicNotConfiguredError,
+  getAnthropicClient,
+  getModel,
+  cachedSystemBlock,
+} from "@/lib/assistant/anthropic";
 import { EVENT_KINDS, EventPayloadSchemas, type EventKind } from "@datum/types";
 
 const Body = z.object({
@@ -46,15 +51,6 @@ FORMAT OUTPUT — WAJIB JSON murni, TANPA markdown fence, TANPA penjelasan di lu
   "confidence": 0.0..1.0
 }`;
 
-let client: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (!client) {
-    if (!process.env.ANTHROPIC_API_KEY) throw new AnthropicNotConfiguredError();
-    client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  }
-  return client;
-}
-
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -83,12 +79,15 @@ export async function POST(req: Request) {
     ? `\n\nLAMPIRAN FILE TERLAMPIR:\n- Nama: ${body.file.name}\n- Mime: ${body.file.mime}\n- Ukuran: ${Math.round(body.file.size / 1024)} KB\nPilih event_kind "photo" untuk gambar (image/*) atau "document" untuk PDF, kecuali konteks input jelas-jelas berbeda.`
     : "";
 
-  let res: Anthropic.Message;
+  // Static system prompt is sent as a cache_control content block (prompt
+  // caching beta — see lib/assistant/anthropic.ts); the card list + user input
+  // change per request and stay in the user message, uncached.
+  let res: PromptCachingBetaMessage;
   try {
-    res = await getClient().messages.create({
+    res = await getAnthropicClient().beta.promptCaching.messages.create({
       model: getModel(),
       max_tokens: 1024,
-      system: CAPTURE_SYSTEM,
+      system: cachedSystemBlock(CAPTURE_SYSTEM),
       messages: [{
         role: "user",
         content: `KARTU TERSEDIA:\n${cardList}\n\nINPUT PENGGUNA:\n${body.text}${fileHint}`,
