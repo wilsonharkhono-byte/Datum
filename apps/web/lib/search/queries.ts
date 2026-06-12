@@ -3,7 +3,7 @@ import type { Database } from "@datum/db";
 
 export type SearchHit = {
   id: string;
-  kind: "card" | "event" | "comment";
+  kind: "card" | "event" | "comment" | "project";
   projectCode: string;
   cardSlug: string;
   cardTitle: string;
@@ -23,12 +23,32 @@ const PER_GROUP = 25;
 export async function searchAll(
   supabase: SupabaseClient<Database>,
   q: string,
-): Promise<{ cards: SearchHit[]; events: SearchHit[]; comments: SearchHit[] }> {
+): Promise<{ projects: SearchHit[]; cards: SearchHit[]; events: SearchHit[]; comments: SearchHit[] }> {
   const trimmed = q.trim();
   if (trimmed.length < 2) {
-    return { cards: [], events: [], comments: [] };
+    return { projects: [], cards: [], events: [], comments: [] };
   }
   const pattern = `%${trimmed.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+
+  // Projects: name / client / site address
+  const { data: projectRows } = await supabase
+    .from("projects")
+    .select("id, project_code, project_name, client_name, location")
+    .or(
+      `project_name.ilike.${pattern},client_name.ilike.${pattern},site_address.ilike.${pattern}`,
+    )
+    .limit(PER_GROUP);
+
+  const projects: SearchHit[] = (projectRows ?? []).map((p) => ({
+    id: `p_${p.id}`,
+    kind: "project" as const,
+    projectCode: p.project_code,
+    cardSlug: "",
+    cardTitle: `${p.project_code} · ${p.project_name}`,
+    snippet: [p.client_name ? `Client: ${p.client_name}` : null, p.location].filter(Boolean).join(" · "),
+    href: `/project/${p.project_code}`,
+    occurredAt: "",
+  }));
 
   // Cards: title OR current_summary
   const { data: cardRows } = await supabase
@@ -116,7 +136,7 @@ export async function searchAll(
     };
   });
 
-  return { cards, events: eventHits, comments };
+  return { projects, cards, events: eventHits, comments };
 }
 
 function highlight(text: string, q: string): string {
