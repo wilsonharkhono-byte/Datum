@@ -19,10 +19,11 @@ describe("optimisticReducer add-card", () => {
     const next = optimisticReducer(board(), { type: "add-card", topicId: "t2", title: "New room" });
     const col = next.columns.find((c) => c.topic.id === "t2")!;
     expect(col.cards).toHaveLength(1);
-    expect(col.cards[0].title).toBe("New room");
-    expect(col.cards[0].status).toBe("active");
-    expect(col.cards[0].labels).toEqual([]);
-    expect((col.cards[0] as any).__optimistic).toBe(true);
+    const ghost = col.cards[0]!;
+    expect(ghost.title).toBe("New room");
+    expect(ghost.status).toBe("active");
+    expect(ghost.labels).toEqual([]);
+    expect((ghost as any).__optimistic).toBe(true);
   });
 
   it("preserves existing cards in the target column", () => {

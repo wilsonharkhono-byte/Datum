@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { createCard } from "@/lib/cards/mutations";
+import { useOptimisticBoard } from "@/lib/cards/optimisticBoardContext";
 
 export function AddCardForm({
   projectId,
@@ -15,22 +16,29 @@ export function AddCardForm({
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { addOptimisticCard } = useOptimisticBoard();
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    const trimmed = title.trim();
+    if (!trimmed) return;
     setError(null);
     const fd = new FormData();
     fd.set("projectId", projectId);
     fd.set("topicId", topicId);
     fd.set("projectCode", projectCode);
-    fd.set("title", title.trim());
+    fd.set("title", trimmed);
+    // Paint the ghost card now and close the form — no blocking "Menyimpan…".
+    addOptimisticCard(topicId, trimmed);
+    setTitle("");
+    setOpen(false);
     startTransition(async () => {
       const res = await createCard(fd);
-      if (res.ok) {
-        setTitle("");
-        setOpen(false);
-      } else {
+      if (!res.ok) {
+        // Revert is automatic (useOptimistic); surface the error and let the
+        // user retry by re-opening the form with their text restored.
+        setTitle(trimmed);
+        setOpen(true);
         setError(res.error);
       }
     });
