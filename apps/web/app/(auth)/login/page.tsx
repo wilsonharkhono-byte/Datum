@@ -3,6 +3,7 @@
 import { useTransition, useState } from "react";
 import messages from "@/messages/id.json";
 import { signIn } from "./actions";
+import { DatumWordmark } from "@/components/DatumWordmark";
 
 export default function LoginPage() {
   const [isPending, startTransition] = useTransition();
@@ -29,9 +30,8 @@ export default function LoginPage() {
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#B29F86]">
             Sistem kontrol finishing
           </p>
-          <h1 className="text-4xl font-semibold tracking-normal text-[#FDFAF6] sm:text-5xl">
-            DATUM
-          </h1>
+          <DatumWordmark className="h-10 w-auto text-[#FDFAF6] sm:h-12" />
+          <span className="sr-only">DATUM</span>
           <p className="mt-5 max-w-sm text-sm leading-6 text-[#FDFAF6]/70">
             Dashboard internal untuk melihat proyek, area, dan kesiapan gate
             finishing dalam satu halaman kerja.

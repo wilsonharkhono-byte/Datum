@@ -3,6 +3,7 @@ import { getCurrentStaff } from "@/lib/auth/get-current-user";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
 import { NotificationBadge } from "@/components/notifications/NotificationBadge";
+import { DatumWordmark } from "@/components/DatumWordmark";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const staff = await getCurrentStaff();
@@ -13,12 +14,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <header className="shrink-0 border-b border-[#B5AFA8] bg-[#FDFAF6]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
           <div className="flex items-center gap-4">
-            <div className="grid h-10 w-10 place-items-center rounded-[8px] bg-[#141210] text-sm font-bold text-[#FDFAF6]">
-              D
-            </div>
             <div>
-              <div className="text-lg font-semibold leading-none text-[#141210]">DATUM</div>
-              <div className="mt-1 text-xs font-medium text-[#524E49]">
+              <DatumWordmark className="h-6 w-auto text-[#141210]" />
+              <div className="mt-1.5 text-xs font-medium text-[#524E49]">
                 {staff.full_name} · {staff.role}
                 {staff.cost_visible && " · cost-visible"}
               </div>
