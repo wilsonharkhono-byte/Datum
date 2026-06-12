@@ -34,8 +34,9 @@ describe("searchAll projects group", () => {
     ]);
     const res = await searchAll(supabase, "nabil");
     expect(res.projects).toHaveLength(1);
-    expect(res.projects[0].kind).toBe("project");
-    expect(res.projects[0].projectCode).toBe("ARIN-KARAWANG");
-    expect(res.projects[0].href).toBe("/project/ARIN-KARAWANG");
+    const hit = res.projects[0]!;
+    expect(hit.kind).toBe("project");
+    expect(hit.projectCode).toBe("ARIN-KARAWANG");
+    expect(hit.href).toBe("/project/ARIN-KARAWANG");
   });
 });

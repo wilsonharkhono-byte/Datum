@@ -72,27 +72,19 @@ export async function searchAll(
     };
   });
 
-  // Events: payload cast to text (jsonb::text supports ilike)
-  // Supabase doesn't directly let us .ilike on a jsonb cast; use the rpc-like trick: filter via .or() with payload::text
-  // PostgREST supports the .ilike filter on jsonb-as-text using "payload->>somefield" only for top-level keys.
-  // Workaround: use the all() RPC or the supabase REST text search via .textSearch.
-  // Simplest acceptable: query by joining and filtering with .ilike on a TEXT column we already have.
-  // We'll search a few common text-bearing fields by extracting them via PostgREST's ->> operator.
-  // Actually simplest: do 3 separate small queries on payload->>'body', payload->>'description', payload->>'topic'.
+  // Events: sweep common payload text fields in a single .or() query
   const eventFields = ["body", "description", "topic", "request_text", "what", "notes", "title", "caption"];
-  const eventResults: unknown[] = [];
-  for (const f of eventFields) {
-    const { data } = await supabase
-      .from("card_events")
-      .select(`id, event_kind, payload, occurred_at, cards:card_id (slug, title, projects:project_id (project_code))`)
-      .ilike(`payload->>${f}`, pattern)
-      .limit(PER_GROUP);
-    if (data) eventResults.push(...data);
-  }
+  const orTerm = trimmed.replace(/[,()]/g, "").replace(/[%_]/g, (m) => `\\${m}`);
+  const orPattern = `*${orTerm}*`;
+  const { data: eventRows } = await supabase
+    .from("card_events")
+    .select(`id, event_kind, payload, occurred_at, cards:card_id (slug, title, projects:project_id (project_code))`)
+    .or(eventFields.map((f) => `payload->>${f}.ilike.${orPattern}`).join(","))
+    .limit(PER_GROUP * 2);
   // Dedup by id, sort, cap
   const seen = new Set<string>();
   const eventHits: SearchHit[] = [];
-  for (const e of eventResults) {
+  for (const e of eventRows ?? []) {
     const row = e as { id: string; event_kind: string; payload: unknown; occurred_at: string; cards: CardJoin | null };
     if (seen.has(row.id)) continue;
     seen.add(row.id);

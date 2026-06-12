@@ -35,12 +35,12 @@ export async function getBoardForProject(
   const [topicsRes, cardsRes, loopEventsRes] = await Promise.all([
     supabase
       .from("topics")
-      .select("*")
+      .select("id, code, name, sort_order")
       .eq("project_id", project.id)
       .order("sort_order", { ascending: true }),
     supabase
       .from("cards")
-      .select("*")
+      .select("id, slug, title, topic_id, status, last_event_at, current_summary, properties")
       .eq("project_id", project.id)
       .order("last_event_at", { ascending: false, nullsFirst: false }),
     // Open-loop kinds only — labels derive from decision/request/work state,
@@ -71,7 +71,8 @@ export async function getBoardForProject(
   }
 
   // Per-card next gate deadline (one pass for the whole board).
-  const cardIds = (cardsRes.data ?? []).map((c) => c.id);
+  const cards = ((cardsRes.data ?? []) as unknown) as Card[];
+  const cardIds = cards.map((c) => c.id);
   let deadlines = new Map<string, CardDeadline>();
   if (cardIds.length > 0) {
     const [linksRes, cellsRes] = await Promise.all([
@@ -91,7 +92,7 @@ export async function getBoardForProject(
   }
 
   const cardsByTopic = new Map<string, CardWithLabels[]>();
-  for (const c of cardsRes.data ?? []) {
+  for (const c of cards) {
     const labels = computeCardLabels(c, eventsByCard.get(c.id) ?? []);
     const withLabels: CardWithLabels = { ...c, labels, deadline: deadlines.get(c.id) ?? null };
     const arr = cardsByTopic.get(c.topic_id) ?? [];
@@ -99,12 +100,25 @@ export async function getBoardForProject(
     cardsByTopic.set(c.topic_id, arr);
   }
 
-  const columns: BoardColumn[] = (topicsRes.data ?? []).map((t) => ({
+  const columns: BoardColumn[] = (((topicsRes.data ?? []) as unknown) as Topic[]).map((t) => ({
     topic: t,
     cards: cardsByTopic.get(t.id) ?? [],
   }));
 
   return { project, columns };
+}
+
+async function getTimelineEvents(
+  supabase: SupabaseClient<Database>,
+  cardId: string,
+): Promise<CardEvent[]> {
+  const { data: events, error: evErr } = await supabase
+    .from("card_events")
+    .select("*")
+    .eq("card_id", cardId)
+    .order("occurred_at", { ascending: false });
+  if (evErr) throw evErr;
+  return events ?? [];
 }
 
 export async function getCardWithTimeline(
@@ -121,14 +135,25 @@ export async function getCardWithTimeline(
   if (cardErr) throw cardErr;
   if (!card) throw new Error(`Card not found: ${cardSlug}`);
 
-  const { data: events, error: evErr } = await supabase
-    .from("card_events")
-    .select("*")
-    .eq("card_id", card.id)
-    .order("occurred_at", { ascending: false });
-  if (evErr) throw evErr;
+  return { card, events: await getTimelineEvents(supabase, card.id) };
+}
 
-  return { card, events: events ?? [] };
+export async function getCardWithTimelineByProjectCode(
+  supabase: SupabaseClient<Database>,
+  projectCode: string,
+  cardSlug: string,
+): Promise<CardDetail> {
+  const { data, error: cardErr } = await supabase
+    .from("cards")
+    .select("*, projects!inner(project_code)")
+    .eq("projects.project_code", projectCode)
+    .eq("slug", cardSlug)
+    .maybeSingle();
+  if (cardErr) throw cardErr;
+  if (!data) throw new Error(`Card not found: ${cardSlug}`);
+
+  const { projects: _projects, ...card } = data;
+  return { card: card as Card, events: await getTimelineEvents(supabase, card.id) };
 }
 
 export async function getCardAttachments(

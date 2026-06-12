@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCardWithTimeline, getCardAttachments, getCardMembers, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
+import { getCardWithTimelineByProjectCode, getCardAttachments, getCardMembers, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
 import { getCardAreas } from "@/lib/cards/area-link-queries";
 import { getProjectAreas } from "@/lib/projects/area-queries";
 import { CardHeader } from "@/components/board/CardHeader";
@@ -21,17 +21,19 @@ export default async function CardDetailPage({
   const { data: { user } } = await supabase.auth.getUser();
   const currentStaffId = user?.id ?? null;
 
-  const { data: project } = await supabase
-    .from("projects").select("id, project_code, project_name")
-    .eq("project_code", slug.toUpperCase()).maybeSingle();
+  const [projectRes, detailRes] = await Promise.allSettled([
+    supabase
+      .from("projects").select("id, project_code, project_name")
+      .eq("project_code", slug.toUpperCase()).maybeSingle(),
+    getCardWithTimelineByProjectCode(supabase, slug.toUpperCase(), cardSlug),
+  ]);
+  if (projectRes.status === "rejected") throw projectRes.reason;
+  const project = projectRes.value.data;
   if (!project) {
     return <div className="p-6 text-red-700">Proyek tidak ditemukan: {slug}</div>;
   }
 
-  let detail;
-  try {
-    detail = await getCardWithTimeline(supabase, project.id, cardSlug);
-  } catch {
+  if (detailRes.status === "rejected") {
     return (
       <div className="p-6 text-red-700">
         Kartu tidak ditemukan: <code>{cardSlug}</code>
@@ -39,6 +41,7 @@ export default async function CardDetailPage({
       </div>
     );
   }
+  const detail = detailRes.value;
 
   const [attachmentsByEvent, memberRows, candidates, topics, cardAreas, projectAreas] = await Promise.all([
     getCardAttachments(supabase, detail.card.id),

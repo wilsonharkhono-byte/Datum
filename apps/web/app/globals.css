@@ -208,10 +208,12 @@ body {
 .chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.3rem;
-  padding: 0.3rem 0.625rem;
+  min-height: 2.25rem; /* 36px — comfortable pointer target on desktop */
+  padding: 0.5rem 0.875rem;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -241,6 +243,38 @@ body {
   color: var(--text-inverse);
   border-color: var(--sand-dark);
   box-shadow: 0 1px 3px color-mix(in oklch, #7a6b56 30%, transparent);
+}
+
+/* Phones get the full 44px minimum tap height (Apple HIG / Material). */
+@media (max-width: 767px) {
+  .chip {
+    min-height: 2.75rem;
+  }
+}
+
+/* === LOADING SKELETONS (route-level loading.tsx) =========================
+   One shared shape class. Tone sits on the darker-oat divider color so
+   ghosts read as part of the surface system, not gray placeholders.
+   Pulse only when the user allows motion. */
+.skeleton {
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--oat-deep) 55%, transparent);
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton {
+    animation: skeleton-pulse 1.8s ease-in-out infinite;
+  }
 }
 
 /* === PRINT (PDF export via browser ctrl-P) ============================== */

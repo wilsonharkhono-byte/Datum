@@ -48,20 +48,20 @@ export async function retrieveProjectContext(
       .or(`title.ilike.${pattern},current_summary.ilike.${pattern}`)
       .limit(KEYWORD_HITS_CAP);
 
-    // 2b. Cards whose events' payload text matches (sweep common text fields)
+    // 2b. Cards whose events' payload text matches (sweep common text fields in one .or() query)
     const eventFields = ["body","description","topic","request_text","what","notes","title","caption"];
+    const orTerm = trimmed.replace(/[,()]/g, "").replace(/[%_]/g, (m) => `\\${m}`);
+    const orPattern = `*${orTerm}*`;
     const eventHitCardIds = new Set<string>();
-    for (const f of eventFields) {
-      const { data: evHits } = await supabase
-        .from("card_events")
-        .select("card_id, cards!inner(project_id)")
-        .eq("cards.project_id", projectId)
-        .ilike(`payload->>${f}`, pattern)
-        .limit(KEYWORD_HITS_CAP);
-      for (const row of evHits ?? []) {
-        if (typeof (row as { card_id?: string }).card_id === "string") {
-          eventHitCardIds.add((row as { card_id: string }).card_id);
-        }
+    const { data: evHits } = await supabase
+      .from("card_events")
+      .select("card_id, cards!inner(project_id)")
+      .eq("cards.project_id", projectId)
+      .or(eventFields.map((f) => `payload->>${f}.ilike.${orPattern}`).join(","))
+      .limit(KEYWORD_HITS_CAP * 2);
+    for (const row of evHits ?? []) {
+      if (typeof (row as { card_id?: string }).card_id === "string") {
+        eventHitCardIds.add((row as { card_id: string }).card_id);
       }
       if (eventHitCardIds.size >= KEYWORD_HITS_CAP) break;
     }
