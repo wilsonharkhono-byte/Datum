@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Board as BoardData, BoardColumn } from "@/lib/cards/queries";
+import { optimisticReducer } from "@/lib/cards/optimisticBoard";
+import { OptimisticBoardProvider, type OptimisticBoardApi } from "@/lib/cards/optimisticBoardContext";
 import { Column } from "./Column";
 import { AddColumnForm } from "./AddColumnForm";
 import { BoardFilter, type StatusFilter, type LabelFilter } from "./BoardFilter";
@@ -9,6 +11,15 @@ import { subscribeToProjectChanges } from "@/lib/cards/realtime";
 
 export function Board({ board }: { board: BoardData }) {
   const router = useRouter();
+  const [optimisticBoard, addOptimistic] = useOptimistic(board, optimisticReducer);
+  const [, startTransition] = useTransition();
+  const api: OptimisticBoardApi = useMemo(
+    () => ({
+      addOptimisticCard: (topicId, title) =>
+        startTransition(() => addOptimistic({ type: "add-card", topicId, title })),
+    }),
+    [addOptimistic],
+  );
   useEffect(() => {
     return subscribeToProjectChanges(board.project.id, () => router.refresh());
   }, [board.project.id, router]);
@@ -23,7 +34,7 @@ export function Board({ board }: { board: BoardData }) {
     // midnight, consistent with the deadline chip in MiniCard.
     const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
     const cols: BoardColumn[] = [];
-    for (const col of board.columns) {
+    for (const col of optimisticBoard.columns) {
       const matchedCards = col.cards.filter((c) => {
         if (!statuses.has(c.status as "active" | "dormant" | "closed")) return false;
         if (labelFilter.size > 0) {
@@ -45,12 +56,13 @@ export function Board({ board }: { board: BoardData }) {
       }
     }
     return cols;
-  }, [board.columns, query, statuses, labelFilter]);
+  }, [optimisticBoard.columns, query, statuses, labelFilter]);
 
-  const totalCards = board.columns.reduce((n, c) => n + c.cards.length, 0);
+  const totalCards = optimisticBoard.columns.reduce((n, c) => n + c.cards.length, 0);
   const matchedTotal = filteredColumns.reduce((n, c) => n + c.cards.length, 0);
 
   return (
+    <OptimisticBoardProvider value={api}>
     <div className="flex h-full flex-col">
       <BoardFilter
         query={query}
@@ -83,5 +95,6 @@ export function Board({ board }: { board: BoardData }) {
         />
       </div>
     </div>
+    </OptimisticBoardProvider>
   );
 }
