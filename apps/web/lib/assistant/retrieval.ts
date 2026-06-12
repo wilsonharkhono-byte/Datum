@@ -22,11 +22,15 @@ export async function retrieveProjectContext(
   supabase: SupabaseClient<Database>,
   projectId: string,
   query?: string,
+  opts?: { includeAdvisor?: boolean },
 ): Promise<CardWithEvents[]> {
   // 0. "Hari Ini" advisor + gate-deadline context — kicked off first so its
   // internal Promise.all overlaps the card queries below; attached to the
-  // result right before returning (see advisorSectionByCards).
-  const advisorPromise = buildAdvisorSections(supabase, projectId, new Date()).catch(() => "");
+  // result right before returning (see advisorSectionByCards). The capture
+  // route skips it: proposals don't use the priority section.
+  const advisorPromise = opts?.includeAdvisor === false
+    ? Promise.resolve("")
+    : buildAdvisorSections(supabase, projectId, new Date()).catch(() => "");
 
   // 1. Always: newest-active cards
   const { data: newest, error: nErr } = await supabase

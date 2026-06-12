@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  const cards = await retrieveProjectContext(supabase, body.projectId, body.text);
+  const cards = await retrieveProjectContext(supabase, body.projectId, body.text, { includeAdvisor: false });
   if (cards.length === 0) {
     return NextResponse.json({ ok: false, error: "Belum ada kartu di proyek ini — buat kartu dulu" });
   }
