@@ -297,7 +297,10 @@ export async function getAdvisorData(
   }
 
   // ── Stale active cards (no events in 30 days) ──────────────────────────────
-  for (const card of staleCards ?? []) {
+  // Trello-import template cards (GUIDE / "YYYY-MM-DD - …" placeholders) are
+  // permanently inactive by design — they'd flood the feed as false positives.
+  const TEMPLATE_TITLE = /^(guide\b|yyyy-mm-dd)/i;
+  for (const card of (staleCards ?? []).filter((c) => !TEMPLATE_TITLE.test(c.title ?? ""))) {
     const proj = (card as { projects: ProjRef }).projects;
     const age = card.last_event_at ? ageLabelFor(card.last_event_at, now) : null;
     signals.push({

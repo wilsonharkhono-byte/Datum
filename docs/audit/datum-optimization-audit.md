@@ -194,7 +194,26 @@ Retrieval adds one query (`area_gate_status` for the project's upcoming/overdue 
 
 ---
 
-## 6. Corrections to raw agent findings (for the record)
+## 6. Round 2 — re-evaluation after the 2026-06-12/13 build (branch `datum-brain-upgrade`)
+
+Phases 1, 2, 4, 5 + most of 3 shipped and verified (typecheck + 78 unit tests + production build + live mobile-viewport preview against real data, including a real streamed assistant exchange).
+
+| Dimension | Before | After | What moved it |
+|---|---|---|---|
+| Performance / latency | 2.5 | **4.0** | brief 9→2 round-trips; search & assistant retrieval 8→1 query; card detail −1 round-trip; scoped board selects; skeletons on all main routes |
+| Workflow cohesion | 3.5 | **4.5** | gate recompute auto-fires on gate-relevant events (incl. approved chat drafts); retired kinds gone from pickers; advisor stitches gates+cards+brief together |
+| Data relatability | 2.5 | **3.5** | card_links shipped as "Terkait" (bidirectional list, search-to-link form); advisor cross-references gates/cards/events; delete needs the RLS migration push |
+| Proactive advisor | 2.0 | **4.0** | "Hari Ini" ranked feed (8 signal types, tested scorer) on /brief + per-project board strip + injected into assistant context; Trello template noise filtered |
+| Mobile live UX | 2.0 | **4.0** | board = snap carousel + topic jump bar w/ counts; 44px targets; verified at 375px incl. an overflow bug found+fixed in the advisor feed |
+| Chatbot capture | 2.5 | **4.0** | streamed answers, 20s timeout + 2 retries, per-project localStorage sessions, prompt caching, low-confidence confirm gate; citation markers hidden; verified live |
+
+**Verified live on real data:** the assistant answered "Apa 3 prioritas utama proyek ini sekarang?" with a streamed, cited Bahasa answer and used the advisor context to explicitly dismiss the stale GUIDE template cards as non-priorities — the intelligence layers are now composing.
+
+**Blocked on one manual step:** `cd packages/db/supabase && supabase db push` (live-DB guard) — applies the pg_trgm search index + logged_by index + card_links DELETE policy. Then `pnpm db:types`. App works without it; search is just unindexed and Terkait-delete is a no-op until then.
+
+**Remaining backlog (next round):** stable-data caching (`revalidate` on home/schedule), offline capture queue, capture-sets-deadlines (guarded mutation), decisions-table↔event provenance link, WhatsApp/push delivery, Expo park-or-invest decision, granular realtime board patches, brief `limit(100)` truncation (server-side view).
+
+## 7. Corrections to raw agent findings (for the record)
 - ~~"Missing `project_staff(project_id)` index"~~ — **false**: PK `(project_id, staff_id)` covers it (`20260531000001_core_schema.sql:76`).
 - ~~"Board requires horizontal scroll/pinch-zoom on mobile"~~ — mechanism corrected: it's a **vertical stack** of full-width columns; the severity (hard to navigate live) stands.
 - "Add GIN(payload) to fix search" — corrected: GIN jsonb_ops does not accelerate `ilike`; the fix is tsvector FTS or pg_trgm (§4 Phase 3).

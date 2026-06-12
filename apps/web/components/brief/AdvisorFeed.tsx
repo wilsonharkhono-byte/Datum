@@ -24,19 +24,21 @@ export function AdvisorFeed({ items }: { items: AdvisorItem[] }) {
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <Link href={it.href} className="block truncate text-xs font-medium text-[#141210] hover:underline">
+                <Link href={it.href} className="line-clamp-1 break-words text-xs font-medium text-[#141210] hover:underline">
                   {it.title}
                 </Link>
                 {it.detail ? (
-                  <p className="mt-0.5 truncate text-[11px] text-[#524E49]">{it.detail}</p>
+                  <p className="mt-0.5 line-clamp-1 break-words text-[11px] text-[#524E49]">{it.detail}</p>
                 ) : null}
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="rounded bg-[var(--sand-tint)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
+                    {it.projectCode}
+                  </span>
+                  {it.dueLabel ? (
+                    <span className="text-[10px] text-[#847E78]">{it.dueLabel}</span>
+                  ) : null}
+                </p>
               </div>
-              <span className="shrink-0 rounded bg-[var(--sand-tint)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
-                {it.projectCode}
-              </span>
-              {it.dueLabel ? (
-                <span className="shrink-0 text-right text-[10px] text-[#847E78]">{it.dueLabel}</span>
-              ) : null}
             </li>
           ))}
         </ol>

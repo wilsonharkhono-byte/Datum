@@ -16,6 +16,16 @@ export type Message =
     }
   | { role: "assistant"; proposal: Proposal };
 
+/**
+ * Citation tokens ([card:uuid] / [event:uuid]) are extracted server-side and
+ * rendered as InlineCardSnippet below the bubble — hide the raw markers from
+ * the visible text. Safe mid-stream: a partially-arrived token stays visible
+ * only until its closing bracket streams in.
+ */
+function stripCitationTokens(text: string): string {
+  return text.replace(/\s*\[(?:card|event):[0-9a-f-]{36}\]/gi, "");
+}
+
 /** Subtle three-dot typing indicator. Static dots under prefers-reduced-motion. */
 function PendingDots() {
   return (
@@ -90,7 +100,7 @@ export function MessageList({
         return (
           <div key={i} className="flex flex-col gap-2">
             <div className="max-w-[80%] rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 whitespace-pre-wrap">
-              {m.content}
+              {stripCitationTokens(m.content)}
               {m.streaming ? (
                 <span className="ml-0.5 inline-block h-3 w-[2px] animate-pulse bg-[var(--sand-dark)] align-middle motion-reduce:animate-none" aria-hidden="true" />
               ) : null}
