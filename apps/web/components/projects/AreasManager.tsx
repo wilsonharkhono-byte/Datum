@@ -53,10 +53,13 @@ export function AreasManager({
   projectId,
   projectCode,
   areas,
+  canDelete,
 }: {
   projectId: string;
   projectCode: string;
   areas: Area[];
+  // Only principal/admin may delete areas; staff can still add + edit.
+  canDelete: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -176,15 +179,17 @@ export function AreasManager({
                         >
                           edit
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => remove(a)}
-                          disabled={pending}
-                          aria-label={`Hapus ${a.area_name} dari proyek`}
-                          className="rounded border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--flag-critical)] hover:bg-[var(--flag-critical-bg)] disabled:opacity-50"
-                        >
-                          hapus
-                        </button>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            onClick={() => remove(a)}
+                            disabled={pending}
+                            aria-label={`Hapus ${a.area_name} dari proyek`}
+                            className="rounded border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--flag-critical)] hover:bg-[var(--flag-critical-bg)] disabled:opacity-50"
+                          >
+                            hapus
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

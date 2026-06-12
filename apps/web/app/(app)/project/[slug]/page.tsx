@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBoardForProject } from "@/lib/cards/queries";
-import { getCurrentStaff, canManageAccess } from "@/lib/auth/require-role";
+import { getCurrentStaff } from "@/lib/auth/require-role";
 import { Board } from "@/components/board/Board";
 import { ChatDock } from "@/components/chat/ChatDock";
 import { GearIcon } from "@/components/icons/Icon";
@@ -27,7 +27,9 @@ export default async function ProjectBoardPage({
   }
 
   const caller = await getCurrentStaff();
-  const showSettings = canManageAccess(caller);
+  // Any signed-in staff can open settings (non-admins land on the Areas tab to
+  // add/edit areas). Tab-level gating lives in the settings page itself.
+  const showSettings = caller != null;
 
   return (
     <div className="flex h-full flex-col">

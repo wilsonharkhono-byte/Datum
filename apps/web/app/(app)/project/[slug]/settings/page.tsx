@@ -23,9 +23,12 @@ export default async function ProjectSettingsPage({
   const supabase = await createSupabaseServerClient();
 
   const caller = await getCurrentStaff();
-  if (!canManageAccess(caller)) {
+  // Any signed-in staff may reach this page; principal/admin see all tabs,
+  // everyone else is limited to the Areas tab (they can add/edit areas).
+  if (!caller) {
     redirect(`/project/${slug}`);
   }
+  const canManage = canManageAccess(caller);
 
   const { data: project } = await supabase
     .from("projects")
@@ -40,15 +43,23 @@ export default async function ProjectSettingsPage({
     );
   }
 
-  const activeTab: SettingsTabKey =
+  const requestedTab: SettingsTabKey =
     tab === "areas" ? "areas" : tab === "proyek" ? "proyek" : "akses";
+  // Staff (non-admin) only have the Areas tab.
+  const activeTab: SettingsTabKey = canManage ? requestedTab : "areas";
   const activeMode = mode === "baru" ? "baru" : "existing";
 
-  const [members, staff, areas] = await Promise.all([
-    getProjectMembers(supabase, project.id),
-    getAvailableStaff(supabase),
-    getProjectAreas(supabase, project.id),
-  ]);
+  // Members + staff lists are only needed (and only readable) for the access
+  // tab, which is principal/admin-only. Areas load for everyone.
+  const areas = await getProjectAreas(supabase, project.id);
+  let members: Awaited<ReturnType<typeof getProjectMembers>> = [];
+  let staff: Awaited<ReturnType<typeof getAvailableStaff>> = [];
+  if (canManage) {
+    [members, staff] = await Promise.all([
+      getProjectMembers(supabase, project.id),
+      getAvailableStaff(supabase),
+    ]);
+  }
 
   return (
     <div className="bg-[var(--background)] py-4 md:py-6">
@@ -76,7 +87,7 @@ export default async function ProjectSettingsPage({
               Pengaturan
             </h1>
             <div className="mt-3">
-              <SettingsTabs activeTab={activeTab} slug={slug} />
+              <SettingsTabs activeTab={activeTab} slug={slug} canManage={canManage} />
             </div>
           </div>
 
@@ -96,6 +107,7 @@ export default async function ProjectSettingsPage({
                 projectId={project.id}
                 projectCode={project.project_code}
                 areas={areas}
+                canDelete={canManage}
               />
             ) : (
               <ProyekTab project={project} />
@@ -195,10 +207,12 @@ function AreasTab({
   projectId,
   projectCode,
   areas,
+  canDelete,
 }: {
   projectId: string;
   projectCode: string;
   areas: Awaited<ReturnType<typeof getProjectAreas>>;
+  canDelete: boolean;
 }) {
   return (
     <div className="grid gap-4">
@@ -215,6 +229,7 @@ function AreasTab({
         projectId={projectId}
         projectCode={projectCode}
         areas={areas}
+        canDelete={canDelete}
       />
     </div>
   );

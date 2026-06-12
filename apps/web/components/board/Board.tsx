@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Board as BoardData, BoardColumn } from "@/lib/cards/queries";
 import { Column } from "./Column";
+import { AddColumnForm } from "./AddColumnForm";
 import { BoardFilter, type StatusFilter, type LabelFilter } from "./BoardFilter";
 import { subscribeToProjectChanges } from "@/lib/cards/realtime";
 
@@ -76,6 +77,10 @@ export function Board({ board }: { board: BoardData }) {
             />
           ))
         )}
+        <AddColumnForm
+          projectId={board.project.id}
+          projectCode={board.project.project_code}
+        />
       </div>
     </div>
   );

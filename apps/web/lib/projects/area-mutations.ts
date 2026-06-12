@@ -62,9 +62,11 @@ export async function createArea(formData: FormData): Promise<AreaMutationResult
     return { ok: false, error: msg ?? "Form tidak valid" };
   }
 
+  // Any project member may add an area. The areas_insert RLS policy gates on
+  // project membership; deletion stays principal/admin-only (see deleteArea).
   const caller = await getCurrentStaff();
-  if (!canManageAccess(caller)) {
-    return { ok: false, error: "Hanya principal atau admin yang bisa mengubah daftar area" };
+  if (!caller) {
+    return { ok: false, error: "Harus masuk untuk mengubah area" };
   }
   const supabase = await createSupabaseServerClient();
 
@@ -130,9 +132,10 @@ export async function updateArea(formData: FormData): Promise<AreaMutationResult
     return { ok: false, error: msg ?? "Form tidak valid" };
   }
 
+  // Project members may edit areas; deletion stays principal/admin-only.
   const caller = await getCurrentStaff();
-  if (!canManageAccess(caller)) {
-    return { ok: false, error: "Hanya principal atau admin yang bisa mengubah daftar area" };
+  if (!caller) {
+    return { ok: false, error: "Harus masuk untuk mengubah area" };
   }
   const supabase = await createSupabaseServerClient();
 
@@ -233,9 +236,10 @@ export async function reorderAreas(formData: FormData): Promise<AreaMutationResu
     return { ok: false, error: "Form tidak valid" };
   }
 
+  // Project members may reorder areas; deletion stays principal/admin-only.
   const caller = await getCurrentStaff();
-  if (!canManageAccess(caller)) {
-    return { ok: false, error: "Hanya principal atau admin yang bisa mengubah daftar area" };
+  if (!caller) {
+    return { ok: false, error: "Harus masuk untuk mengubah area" };
   }
   const supabase = await createSupabaseServerClient();
 

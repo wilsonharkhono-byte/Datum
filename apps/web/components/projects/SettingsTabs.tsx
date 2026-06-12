@@ -11,13 +11,18 @@ const TABS: Array<{ key: SettingsTabKey; label: string }> = [
 export function SettingsTabs({
   activeTab,
   slug,
+  canManage = true,
 }: {
   activeTab: SettingsTabKey;
   slug: string;
+  // Non-admin staff only see the Areas tab (they can add/edit areas but not
+  // manage access or project info).
+  canManage?: boolean;
 }) {
+  const tabs = canManage ? TABS : TABS.filter((t) => t.key === "areas");
   return (
     <div className="seg" role="tablist" aria-label="Tab pengaturan">
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const on = activeTab === t.key;
         return (
           <Link
