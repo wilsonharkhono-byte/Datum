@@ -67,8 +67,8 @@ export function deriveProjectMeta(boardName: string): ProjectMeta {
   let client: string | null = null;
 
   const seps = [...remainder.matchAll(/\s+-\s+|_/g)];
-  if (seps.length > 0) {
-    const last = seps[seps.length - 1];
+  const last = seps.at(-1);
+  if (last) {
     const idx = last.index ?? 0;
     const head = remainder.slice(0, idx).trim();
     const tail = remainder.slice(idx + last[0].length).trim();
