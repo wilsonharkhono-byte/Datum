@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveScope, deriveProjectMeta } from "../trello-normalize";
+import { deriveScope, deriveProjectMeta, normalizeBoard } from "../trello-normalize";
 
 describe("deriveScope", () => {
   it("maps prefixes to scope", () => {
@@ -40,5 +40,54 @@ describe("deriveProjectMeta", () => {
     expect(deriveProjectMeta("ARCH - BDG H-16").project_code).toBe("ARCH-BDG-H-16");
     expect(deriveProjectMeta("INTR - CITRALAND M-8").project_code).toBe("INTR-CITRALAND-M-8");
     expect(deriveProjectMeta("WHA - WORKING DRAWINGS").project_code).toBe("WHA-WORKING-DRAWINGS");
+  });
+});
+
+describe("normalizeBoard", () => {
+  const raw = {
+    id: "665e984287e87d6665545a17",
+    shortLink: "QQQcBn6d",
+    name: "AR.IN - BDG H-1",
+    lists: [{ id: "l1", name: "A04 — Tangga", closed: false }],
+    cards: [
+      {
+        id: "card1",
+        name: "Pasang kusen",
+        desc: "detail",
+        idList: "l1",
+        due: null,
+        dueComplete: false,
+        dateLastActivity: "2026-02-01T00:00:00Z",
+        shortUrl: "https://trello.com/c/x",
+        shortLink: "x",
+        closed: false,
+        attachments: [{ id: "a1", name: "foto", url: "https://img", mimeType: "image/jpeg", date: "2026-02-01T00:00:00Z" }],
+        checklists: [{ id: "cl1", name: "Checklist", checkItems: [{ id: "ci1", name: "step", state: "incomplete" }] }],
+      },
+    ],
+    actions: [
+      { id: "act1", type: "commentCard", date: "2026-02-02T00:00:00Z", data: { card: { id: "card1" }, text: "hi" } },
+      { id: "act2", type: "updateCard", date: "2026-02-02T00:00:00Z", data: { card: { id: "card1" } } },
+    ],
+  };
+
+  it("builds _meta from the board name", () => {
+    const b = normalizeBoard(raw);
+    expect(b._meta.trello_board_id).toBe("665e984287e87d6665545a17");
+    expect(b._meta.short_link).toBe("QQQcBn6d");
+    expect(b._meta.project_code).toBe("ARIN-BDG-H-1");
+  });
+
+  it("hoists card checklists to a top-level array and sets idChecklists", () => {
+    const b = normalizeBoard(raw);
+    expect(b.checklists).toHaveLength(1);
+    expect(b.checklists[0]).toMatchObject({ id: "cl1", idCard: "card1", name: "Checklist" });
+    expect((b.cards[0] as { idChecklists: string[] }).idChecklists).toEqual(["cl1"]);
+  });
+
+  it("keeps only commentCard actions", () => {
+    const b = normalizeBoard(raw);
+    expect(b.actions).toHaveLength(1);
+    expect((b.actions[0] as { type: string }).type).toBe("commentCard");
   });
 });

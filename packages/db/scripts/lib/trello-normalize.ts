@@ -87,3 +87,52 @@ export function deriveProjectMeta(boardName: string): ProjectMeta {
 
   return { scope, project_code, project_name, client_name: client, site_address, search_aliases };
 }
+
+export interface NormalizedBoard {
+  _meta: { trello_board_id: string; short_link: string; board_name: string } & ProjectMeta;
+  lists: unknown[];
+  cards: unknown[];
+  actions: unknown[];
+  checklists: unknown[];
+}
+
+interface RawCheckItem { id: string; name: string; state: string }
+interface RawChecklist { id: string; name: string; checkItems?: RawCheckItem[] }
+interface RawCard { id: string; checklists?: RawChecklist[]; [k: string]: unknown }
+interface RawBoard {
+  id: string;
+  shortLink: string;
+  name: string;
+  lists?: unknown[];
+  cards?: RawCard[];
+  actions?: Array<{ type: string; [k: string]: unknown }>;
+}
+
+export function normalizeBoard(raw: RawBoard): NormalizedBoard {
+  const meta = deriveProjectMeta(raw.name);
+  const rawCards = raw.cards ?? [];
+
+  const cards = rawCards.map((c) => ({
+    ...c,
+    idChecklists: (c.checklists ?? []).map((cl) => cl.id),
+  }));
+
+  const checklists = rawCards.flatMap((c) =>
+    (c.checklists ?? []).map((cl) => ({
+      id: cl.id,
+      idCard: c.id,
+      name: cl.name,
+      checkItems: (cl.checkItems ?? []).map((it) => ({ id: it.id, name: it.name, state: it.state })),
+    })),
+  );
+
+  const actions = (raw.actions ?? []).filter((a) => a.type === "commentCard");
+
+  return {
+    _meta: { trello_board_id: raw.id, short_link: raw.shortLink, board_name: raw.name, ...meta },
+    lists: raw.lists ?? [],
+    cards,
+    actions,
+    checklists,
+  };
+}
