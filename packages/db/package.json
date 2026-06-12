@@ -14,6 +14,7 @@
     "seed:cards": "tsx scripts/seed-cards.ts",
     "import:trello": "tsx scripts/import-trello.ts",
     "import:trello-attachments": "tsx scripts/import-trello-attachments.ts",
+    "import:trello-fetch": "tsx scripts/fetch-trello.ts",
     "import:trello-normalize": "tsx scripts/normalize-raw.ts",
     "test": "vitest run --passWithNoTests"
   },
