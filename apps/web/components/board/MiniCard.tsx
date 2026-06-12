@@ -1,14 +1,12 @@
 import Link from "next/link";
 import { TrelloIcon } from "@/components/icons/Icon";
-import { LABEL_STYLE, type CardWithLabels } from "@/lib/cards/labels";
+import { LABEL_STYLE } from "@/lib/cards/labels";
 import type { CardDeadline } from "@/lib/gates/board-deadlines";
+import type { BoardCardView } from "@/lib/cards/optimisticBoard";
 
-export function MiniCard({ card, projectCode }: { card: CardWithLabels; projectCode: string }) {
-  return (
-    <Link
-      href={`/project/${projectCode}/cards/${card.slug}`}
-      className="block rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs hover:border-[var(--sand-dark)]"
-    >
+export function MiniCard({ card, projectCode }: { card: BoardCardView; projectCode: string }) {
+  const inner = (
+    <>
       {card.labels.length > 0 || card.deadline ? (
         <div className="mb-1 flex flex-wrap gap-1">
           {card.labels.map((l) => (
@@ -39,6 +37,26 @@ export function MiniCard({ card, projectCode }: { card: CardWithLabels; projectC
           <span>Trello</span>
         </div>
       ) : null}
+    </>
+  );
+
+  if (card.__optimistic) {
+    return (
+      <div
+        aria-busy="true"
+        className="block rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs opacity-70"
+      >
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={`/project/${projectCode}/cards/${card.slug}`}
+      className="block rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs hover:border-[var(--sand-dark)]"
+    >
+      {inner}
     </Link>
   );
 }
