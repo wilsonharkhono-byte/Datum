@@ -7,9 +7,10 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Database } from "../src";
+import type { ProjectMeta } from "./lib/trello-normalize";
 
 config({ path: resolve(__dirname, "../../../.env") });
 
@@ -87,21 +88,102 @@ interface TrelloBoard {
   checklists: TrelloChecklist[];
 }
 
-// ── Import config ──────────────────────────────────────────────────────────────
+// ── Discovery ────────────────────────────────────────────────────────────────
 
 // Paths are relative to the repo root (3 levels up from packages/db/scripts/)
 const REPO_ROOT = resolve(__dirname, "../../..");
+const TRELLO_DIR = resolve(REPO_ROOT, "assets/Trello");
 
-const IMPORTS = [
-  {
-    jsonPath: resolve(REPO_ROOT, "assets/Trello/Bukit Darmo Golf H:1/QQQcBn6d - arin-bdg-h-1.json"),
-    projectCode: "BDG-H1",
-  },
-  {
-    jsonPath: resolve(REPO_ROOT, "assets/Trello/Pakuwon PC 10:12/gongzABX - arin-pakuwon-pc10-12-setiono.json"),
-    projectCode: "PKW-PC1012",
-  },
-];
+function discoverBoardFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    if (entry.startsWith(".")) continue; // skip .raw, .DS_Store
+    const full = resolve(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...discoverBoardFiles(full));
+    else if (entry.endsWith(".json")) out.push(full);
+  }
+  return out;
+}
+
+type BoardMeta = { trello_board_id: string; short_link: string; board_name: string } & ProjectMeta;
+
+// ── Project auto-create ──────────────────────────────────────────────────────
+
+async function uniqueProjectCode(base: string): Promise<string> {
+  let code = base;
+  let n = 1;
+  while (true) {
+    const { data } = await admin.from("projects").select("id").eq("project_code", code).maybeSingle();
+    if (!data) return code;
+    n++;
+    code = `${base}-${n}`;
+  }
+}
+
+async function ensureProject(
+  meta: BoardMeta,
+  wilsonId: string,
+  summary: { projectsCreated: number },
+): Promise<string | null> {
+  // 1. Idempotency: find by trello_board_id
+  const { data: existing } = await admin
+    .from("projects")
+    .select("id")
+    .eq("trello_board_id", meta.trello_board_id)
+    .maybeSingle();
+  if (existing) return existing.id;
+
+  // 2. Create
+  const code = await uniqueProjectCode(meta.project_code);
+  const { data: created, error } = await admin
+    .from("projects")
+    .insert({
+      project_code: code,
+      project_name: meta.project_name,
+      client_name: meta.client_name,
+      site_address: meta.site_address,
+      status: "construction",
+      principal_id: wilsonId,
+      search_aliases: meta.search_aliases as unknown as Database["public"]["Tables"]["projects"]["Insert"]["search_aliases"],
+      trello_board_id: meta.trello_board_id,
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    console.error(`  ✗ Failed to create project "${meta.project_name}" (${code}): ${error?.message}`);
+    return null;
+  }
+  const projectId = created.id;
+  summary.projectsCreated++;
+  console.log(`  + Project ${code} — ${meta.project_name}${meta.client_name ? " / " + meta.client_name : ""}`);
+
+  // Principal assignment (RLS visibility) — topics are auto-seeded by trigger.
+  await admin
+    .from("project_staff")
+    .upsert(
+      { project_id: projectId, staff_id: wilsonId, role_on_project: "principal", cost_visible: true },
+      { onConflict: "project_id,staff_id" },
+    );
+
+  // 8 project gates A–H
+  const gates = ["A", "B", "C", "D", "E", "F", "G", "H"].map((gate_code) => ({
+    project_id: projectId,
+    gate_code: gate_code as Database["public"]["Enums"]["gate_code"],
+  }));
+  await admin.from("project_gates").upsert(gates, { onConflict: "project_id,gate_code" });
+
+  // Duplicate-name flag (cross-workspace duplicates expected; logged, not merged)
+  const { data: dupes } = await admin
+    .from("projects")
+    .select("project_code")
+    .eq("project_name", meta.project_name)
+    .neq("id", projectId);
+  if (dupes && dupes.length > 0) {
+    console.warn(`  ⚠ "${meta.project_name}" may duplicate: ${dupes.map((d) => d.project_code).join(", ")}`);
+  }
+
+  return projectId;
+}
 
 // ── Standard topic mappings: Trello list name prefix → DATUM topic code ────────
 // Keys are normalised (uppercase, trimmed). The first match wins.
@@ -158,6 +240,7 @@ function topicCodeFromListName(listName: string): string {
 // ── Per-project summary ────────────────────────────────────────────────────────
 
 interface Summary {
+  projectsCreated: number;
   topicsCreated: number;
   cardsCreated: number;
   cardsSkipped: number;
@@ -167,41 +250,16 @@ interface Summary {
 
 // ── Main import logic ──────────────────────────────────────────────────────────
 
-async function importProject(
-  jsonPath: string,
-  projectCode: string,
+async function importBoardContents(
+  board: TrelloBoard,
+  projectId: string,
   wilsonId: string,
-): Promise<Summary> {
-  const summary: Summary = {
-    topicsCreated: 0,
-    cardsCreated: 0,
-    cardsSkipped: 0,
-    eventsInserted: 0,
-    commentsInserted: 0,
-  };
-
-  console.log(`\n──── ${projectCode} ────`);
-
-  // 1. Read JSON
-  const board: TrelloBoard = JSON.parse(readFileSync(jsonPath, "utf8"));
+  summary: Summary,
+): Promise<void> {
   console.log(
     `  Loaded: ${board.lists.length} lists, ${board.cards.length} cards, ` +
       `${board.actions.length} actions, ${board.checklists.length} checklists`,
   );
-
-  // 2. Look up project_id
-  const { data: projRow, error: projErr } = await admin
-    .from("projects")
-    .select("id")
-    .eq("project_code", projectCode)
-    .maybeSingle();
-  if (projErr) throw projErr;
-  if (!projRow) {
-    console.warn(`  ⚠ Project ${projectCode} not found — skipping`);
-    return summary;
-  }
-  const projectId = projRow.id;
-  console.log(`  project_id: ${projectId.slice(0, 8)}...`);
 
   // 3. Load existing topics for this project
   const { data: existingTopics, error: topicsErr } = await admin
@@ -239,7 +297,7 @@ async function importProject(
       if (topicId) {
         listIdToTopicId.set(list.id, topicId);
       } else {
-        console.warn(`  ⚠ Standard topic ${standardCode} not found in DB for ${projectCode}`);
+        console.warn(`  ⚠ Standard topic ${standardCode} not found in DB for ${projectId}`);
       }
       continue;
     }
@@ -550,48 +608,63 @@ async function importProject(
       summary.commentsInserted++;
     }
   }
-
-  return summary;
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("Trello import — Slice 1.7");
-  console.log("=========================");
+  console.log("Trello bulk import");
+  console.log("==================");
 
-  // Look up Wilson's staff ID
   const { data: staffRows, error: staffErr } = await admin
     .from("staff")
     .select("id, full_name")
     .eq("full_name", "Wilson Harkhono");
   if (staffErr) throw staffErr;
   const wilsonId = staffRows?.[0]?.id;
-  if (!wilsonId) {
-    throw new Error("Wilson Harkhono staff row not found — run seed-pilot.ts first");
-  }
-  console.log(`Wilson staff_id: ${wilsonId.slice(0, 8)}...`);
+  if (!wilsonId) throw new Error("Wilson Harkhono staff row not found — run seed-pilot.ts first");
 
-  const results: Record<string, Summary> = {};
+  const summary: Summary = {
+    projectsCreated: 0,
+    topicsCreated: 0,
+    cardsCreated: 0,
+    cardsSkipped: 0,
+    eventsInserted: 0,
+    commentsInserted: 0,
+  };
 
-  for (const { jsonPath, projectCode } of IMPORTS) {
+  const files = discoverBoardFiles(TRELLO_DIR);
+  console.log(`Discovered ${files.length} board files.\n`);
+
+  for (const file of files) {
+    let board: TrelloBoard & { _meta?: BoardMeta };
     try {
-      results[projectCode] = await importProject(jsonPath, projectCode, wilsonId);
+      board = JSON.parse(readFileSync(file, "utf8"));
+    } catch (e) {
+      console.error(`✗ Parse error ${file}: ${(e as Error).message}`);
+      continue;
+    }
+    if (!board._meta?.trello_board_id) {
+      console.warn(`skip (no _meta): ${file}`);
+      continue;
+    }
+    console.log(`──── ${board._meta.project_code} ────`);
+    try {
+      const projectId = await ensureProject(board._meta, wilsonId, summary);
+      if (!projectId) continue;
+      await importBoardContents(board, projectId, wilsonId, summary);
     } catch (err) {
-      console.error(`\n✗ Fatal error importing ${projectCode}:`, err);
+      console.error(`✗ Error importing ${board._meta.project_code}:`, err);
     }
   }
 
-  // Summary
   console.log("\n══════════ IMPORT SUMMARY ══════════");
-  for (const [code, s] of Object.entries(results)) {
-    console.log(`\n${code}:`);
-    console.log(`  Topics created:   ${s.topicsCreated}`);
-    console.log(`  Cards created:    ${s.cardsCreated}`);
-    console.log(`  Cards skipped:    ${s.cardsSkipped}`);
-    console.log(`  Events inserted:  ${s.eventsInserted}`);
-    console.log(`  Comments inserted: ${s.commentsInserted}`);
-  }
+  console.log(`  Projects created: ${summary.projectsCreated}`);
+  console.log(`  Topics created:   ${summary.topicsCreated}`);
+  console.log(`  Cards created:    ${summary.cardsCreated}`);
+  console.log(`  Cards skipped:    ${summary.cardsSkipped}`);
+  console.log(`  Events inserted:  ${summary.eventsInserted}`);
+  console.log(`  Comments inserted: ${summary.commentsInserted}`);
   console.log("\nDone.");
 }
 
