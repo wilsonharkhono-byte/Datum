@@ -18,7 +18,7 @@ describe("buildContextBlock", () => {
           payload: { topic: "marmer", proposed_spec: "Statuario", approved_by: "client" },
           occurred_at: "2026-05-20T14:30:00Z", logged_by_staff_id: "s1",
           source_kind: "manual", source_id: null, cost_visible: false,
-          draft_id: null, created_at: "2026-05-20T14:30:00Z" },
+          draft_id: null, created_at: "2026-05-20T14:30:00Z", search_text: null },
       ],
     },
   ];

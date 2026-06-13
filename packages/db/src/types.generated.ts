@@ -728,6 +728,7 @@ export type Database = {
           occurred_at: string
           payload: Json
           project_id: string
+          search_text: string | null
           source_id: string | null
           source_kind: Database["public"]["Enums"]["card_event_source"]
         }
@@ -742,6 +743,7 @@ export type Database = {
           occurred_at: string
           payload?: Json
           project_id: string
+          search_text?: string | null
           source_id?: string | null
           source_kind: Database["public"]["Enums"]["card_event_source"]
         }
@@ -756,6 +758,7 @@ export type Database = {
           occurred_at?: string
           payload?: Json
           project_id?: string
+          search_text?: string | null
           source_id?: string | null
           source_kind?: Database["public"]["Enums"]["card_event_source"]
         }
@@ -2395,6 +2398,8 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: undefined
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       area_type:

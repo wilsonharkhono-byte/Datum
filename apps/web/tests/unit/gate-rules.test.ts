@@ -22,6 +22,7 @@ function mockEvent(
     cost_visible: false,
     draft_id: null,
     created_at: createdAt ?? occurredAt,
+    search_text: null,
   };
 }
 
