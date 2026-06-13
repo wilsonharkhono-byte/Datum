@@ -7,12 +7,15 @@
 // dialog is unambiguous.
 
 import { useId, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { Area } from "@datum/db";
 import {
   createArea,
   updateArea,
   deleteArea,
 } from "@/lib/projects/area-mutations";
+import { AreaSetup } from "@/components/area-setup/AreaSetup";
+import { SparkIcon } from "@/components/icons/Icon";
 
 const AREA_TYPE_OPTIONS = [
   { value: "bathroom",    label: "Kamar mandi" },
@@ -61,9 +64,11 @@ export function AreasManager({
   // Only principal/admin may delete areas; staff can still add + edit.
   canDelete: boolean;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   function startEdit(id: string) {
     setError(null);
@@ -111,13 +116,22 @@ export function AreasManager({
 
   return (
     <div className="grid gap-4">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
-          Area
-        </h2>
-        <span className="text-[10px] text-[var(--text-muted)]">
-          {areas.length} area
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
+            Area
+          </h2>
+          <span className="text-[10px] text-[var(--text-muted)]">
+            {areas.length} area
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSetupOpen(true)}
+          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md border border-[var(--sand)] bg-[var(--sand-tint)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--surface)]"
+        >
+          <SparkIcon size={13} /> Deteksi ruangan otomatis
+        </button>
       </div>
 
       {areas.length === 0 ? (
@@ -209,6 +223,15 @@ export function AreasManager({
         projectId={projectId}
         projectCode={projectCode}
       />
+
+      {setupOpen ? (
+        <AreaSetup
+          projectId={projectId}
+          projectCode={projectCode}
+          onClose={() => setSetupOpen(false)}
+          onApplied={() => router.refresh()}
+        />
+      ) : null}
     </div>
   );
 }

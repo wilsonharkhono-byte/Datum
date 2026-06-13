@@ -11,6 +11,8 @@
  *   quote_expiring    50 + (7 − daysLeft) × 5      (daysLeft clamped to 0..7)
  *   schedule_rot      55  (one per project — gates >120d overdue mean the
  *                          baseline is fiction; re-baseline, don't firefight)
+ *   gate_ready        52  (opportunity, not emergency: the rule engine says an
+ *                          area's gate is done — one tap to confirm & advance)
  *   gate_soon (≤7d)   45 + (7 − daysLeft) × 4      (daysLeft clamped to 0..7)
  *   stale_card        30
  */
@@ -63,6 +65,8 @@ export function scoreItem(signal: AdvisorSignal, now: Date): number {
     }
     case "schedule_rot":
       return 55;
+    case "gate_ready":
+      return 52;
     case "stale_card":
       return 30;
   }

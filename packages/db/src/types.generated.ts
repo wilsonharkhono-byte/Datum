@@ -338,6 +338,7 @@ export type Database = {
           id: string
           project_id: string
           sort_order: number
+          target_date: string | null
           updated_at: string
         }
         Insert: {
@@ -350,6 +351,7 @@ export type Database = {
           id?: string
           project_id: string
           sort_order?: number
+          target_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -362,6 +364,7 @@ export type Database = {
           id?: string
           project_id?: string
           sort_order?: number
+          target_date?: string | null
           updated_at?: string
         }
         Relationships: [

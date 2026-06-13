@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
+import { linkCardToArea } from "@/lib/cards/area-link-mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
 import { HIGH_RISK_KINDS, type EventKind } from "@datum/types";
 import { CheckIcon, XIcon, PaperclipIcon } from "@/components/icons/Icon";
@@ -18,6 +19,10 @@ export type Proposal = {
   projectCode: string;
   fileMeta?:  { name: string; mime: string; size: number } | null;
   pendingFile?: File;
+  // Capture-time area hint: the existing project area this note most likely
+  // refers to. When present, ProposalCard offers to link the card to it on
+  // commit (the area drives the gate × area matrix).
+  areaHint?:  { areaId: string; areaCode: string; areaName: string } | null;
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -44,7 +49,13 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
   const [status, setStatus] = useState<"pending" | "saving" | "saved" | "discarded" | "error">("pending");
   const [error, setError] = useState<string | null>(null);
   const [confirmArmed, setConfirmArmed] = useState(false);
+  // Default to ON when a hint is present: linking is the whole point of the
+  // hint, but the user can opt out before committing.
+  const [linkArea, setLinkArea] = useState(true);
+  const [areaLinked, setAreaLinked] = useState(false);
   const [, startTransition] = useTransition();
+
+  const areaHint = proposal.areaHint ?? null;
 
   const isHighRisk = HIGH_RISK_KINDS.has(proposal.eventKind as EventKind);
   const conf = Math.round(proposal.confidence * 100);
@@ -118,6 +129,21 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
           return;
         }
       }
+      // Optionally link the card to the hinted area. A link failure shouldn't
+      // discard the saved event — surface it softly and still mark saved.
+      if (areaHint && linkArea) {
+        const lf = new FormData();
+        lf.set("cardId", proposal.cardId);
+        lf.set("areaId", areaHint.areaId);
+        lf.set("projectCode", proposal.projectCode);
+        lf.set("cardSlug", proposal.cardSlug);
+        const linkRes = await linkCardToArea(lf);
+        if (linkRes.ok) {
+          setAreaLinked(true);
+        } else {
+          setError(`Catatan tersimpan, tapi gagal menautkan ke ${areaHint.areaName}: ${linkRes.error}`);
+        }
+      }
       setStatus("saved");
     });
   }
@@ -142,6 +168,24 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
       <div className="mb-2 text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">
         {KIND_LABELS[proposal.eventKind] ?? proposal.eventKind}
       </div>
+      {areaHint ? (
+        status === "pending" || status === "error" ? (
+          <label className="mb-2 flex min-h-[40px] cursor-pointer items-center gap-2 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1.5">
+            <input
+              type="checkbox"
+              checked={linkArea}
+              onChange={(e) => setLinkArea(e.target.checked)}
+              aria-label={`Tautkan kartu ke area ${areaHint.areaName}`}
+              className="h-4 w-4 shrink-0 accent-[var(--foreground)]"
+            />
+            <span className="text-[10px] text-[var(--text-secondary)]">
+              Tautkan ke area{" "}
+              <span className="font-semibold text-[var(--foreground)]">{areaHint.areaName}</span>
+              <span className="ml-1 font-mono text-[var(--sand-dark)]">{areaHint.areaCode}</span>
+            </span>
+          </label>
+        ) : null
+      ) : null}
       {proposal.fileMeta || proposal.pendingFile ? (
         <div className="mb-2 inline-flex items-center gap-1.5 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
           <PaperclipIcon size={11} />
@@ -196,6 +240,11 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
             <CheckIcon size={11} />
             {isHighRisk ? "Tersimpan di kartu · principal dinotifikasi" : "Tersimpan di kartu"}
           </span>
+          {areaLinked && areaHint ? (
+            <span className="inline-flex items-center gap-1 rounded bg-[var(--sand-tint)] px-2 py-1 text-[10px] font-semibold text-[var(--sand-dark)]">
+              <CheckIcon size={11} /> Ditautkan ke {areaHint.areaName}
+            </span>
+          ) : null}
           <a
             href={`/project/${proposal.projectCode}/cards/${proposal.cardSlug}`}
             className="inline-flex items-center gap-1 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--sand-tint)]"

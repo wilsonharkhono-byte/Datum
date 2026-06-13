@@ -8,6 +8,7 @@
 export type AdvisorItemType =
   | "gate_overdue"
   | "gate_soon"
+  | "gate_ready"
   | "blocker"
   | "decision_needed"
   | "awaiting_client"
@@ -15,6 +16,18 @@ export type AdvisorItemType =
   | "cascade_risk"
   | "stale_card"
   | "schedule_rot";
+
+/**
+ * Structured payload carried by a `gate_ready` item so the AdvisorFeed can
+ * render an inline "Tandai selesai" action (the confirm sheet) without an
+ * extra round-trip. Only gate_ready items populate this.
+ */
+export type GateReadyTarget = {
+  projectId: string;
+  areaId: string;
+  areaName: string;
+  gateCode: string;
+};
 
 export type AdvisorItem = {
   type: AdvisorItemType;
@@ -26,6 +39,8 @@ export type AdvisorItem = {
   projectCode: string;
   /** Short right-aligned label, e.g. "lewat 5 hari" / "3 hari lagi". */
   dueLabel?: string;
+  /** Present only on `gate_ready` items: the cell the confirm action targets. */
+  gateReady?: GateReadyTarget;
 };
 
 /**

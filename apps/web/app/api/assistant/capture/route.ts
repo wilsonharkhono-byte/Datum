@@ -41,6 +41,7 @@ ATURAN:
 - Confidence 0–1: berapa yakin Anda dengan pilihan ini. Turunkan jika input ambigu.
 - Rationale: 1 kalimat Bahasa Indonesia pendek menjelaskan kenapa kartu+kind itu cocok.
 - Jika tidak ada kartu yang cocok sama sekali, gunakan event_kind "note" dengan body=input asli dan pilih kartu paling mungkin terkait.
+- area_hint (OPSIONAL): jika input jelas merujuk ke sebuah RUANGAN yang ada di daftar AREA TERSEDIA, sertakan area_code-nya. Pilih HANYA dari daftar AREA TERSEDIA; jangan menebak kode baru. Jika tidak ada area yang cocok atau daftar kosong, kosongkan (null).
 
 FORMAT OUTPUT — WAJIB JSON murni, TANPA markdown fence, TANPA penjelasan di luar JSON:
 {
@@ -48,7 +49,8 @@ FORMAT OUTPUT — WAJIB JSON murni, TANPA markdown fence, TANPA penjelasan di lu
   "event_kind": "<salah satu dari 9 kind>",
   "payload": { ... },
   "rationale": "<kalimat Bahasa Indonesia>",
-  "confidence": 0.0..1.0
+  "confidence": 0.0..1.0,
+  "area_hint": "<area_code dari AREA TERSEDIA, atau null>"
 }`;
 
 export async function POST(req: Request) {
@@ -75,6 +77,21 @@ export async function POST(req: Request) {
     `- card_id=${card.id} | topic="${topicName}" | title="${card.title}"${card.current_summary ? ` | summary="${card.current_summary}"` : ""}`
   ).join("\n");
 
+  // Fetch the project's existing areas so the AI can hint which room the note
+  // refers to. Read-only, room-naming fields only — no cost data.
+  const { data: areaRows } = await supabase
+    .from("areas")
+    .select("id, area_code, area_name, floor")
+    .eq("project_id", body.projectId)
+    .order("sort_order", { ascending: true });
+  const areas = areaRows ?? [];
+  const validAreaCodes = new Set(areas.map((a) => a.area_code));
+  const areaBlock = areas.length > 0
+    ? `\n\nAREA TERSEDIA (untuk area_hint — pilih hanya dari sini):\n${areas
+        .map((a) => `- ${a.area_code} | ${a.area_name}${a.floor ? ` | ${a.floor}` : ""}`)
+        .join("\n")}`
+    : "";
+
   const fileHint = body.file
     ? `\n\nLAMPIRAN FILE TERLAMPIR:\n- Nama: ${body.file.name}\n- Mime: ${body.file.mime}\n- Ukuran: ${Math.round(body.file.size / 1024)} KB\nPilih event_kind "photo" untuk gambar (image/*) atau "document" untuk PDF, kecuali konteks input jelas-jelas berbeda.`
     : "";
@@ -90,7 +107,7 @@ export async function POST(req: Request) {
       system: cachedSystemBlock(CAPTURE_SYSTEM),
       messages: [{
         role: "user",
-        content: `KARTU TERSEDIA:\n${cardList}\n\nINPUT PENGGUNA:\n${body.text}${fileHint}`,
+        content: `KARTU TERSEDIA:\n${cardList}${areaBlock}\n\nINPUT PENGGUNA:\n${body.text}${fileHint}`,
       }],
     });
   } catch (e) {
@@ -119,6 +136,7 @@ export async function POST(req: Request) {
     payload?: unknown;
     rationale?: unknown;
     confidence?: unknown;
+    area_hint?: unknown;
   };
   try {
     parsed = JSON.parse(cleaned);
@@ -150,6 +168,14 @@ export async function POST(req: Request) {
     });
   }
 
+  // Validate area_hint: must be an existing area_code in THIS project.
+  // The model can only ever choose from the list we sent; we still verify so a
+  // hallucinated/stale code never leaks into the proposal.
+  const hintStr = typeof parsed.area_hint === "string" ? parsed.area_hint.trim() : "";
+  const hintArea = hintStr && validAreaCodes.has(hintStr)
+    ? areas.find((a) => a.area_code === hintStr) ?? null
+    : null;
+
   return NextResponse.json({
     ok: true,
     proposal: {
@@ -163,6 +189,7 @@ export async function POST(req: Request) {
       rationale:  typeof parsed.rationale === "string" ? parsed.rationale : "",
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0,
       fileMeta:   body.file ? { name: body.file.name, mime: body.file.mime, size: body.file.size } : null,
+      areaHint:   hintArea ? { areaId: hintArea.id, areaCode: hintArea.area_code, areaName: hintArea.area_name } : null,
     },
   });
 }

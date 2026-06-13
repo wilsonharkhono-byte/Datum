@@ -58,7 +58,8 @@ export async function getAdvisorData(
   let gateQ = supabase
     .from("area_gate_status")
     .select(`
-      area_id, gate_code, status, target_start_date, target_end_date, project_id,
+      area_id, gate_code, status, target_start_date, target_end_date,
+      actual_end_date, project_id,
       areas:area_id (area_name),
       projects:project_id (project_code, project_name)
     `)
@@ -249,6 +250,35 @@ export async function getAdvisorData(
       detail: r.reason,
       href: `/project/${r.projectCode}/schedule`,
       projectCode: r.projectCode,
+    });
+  }
+
+  // ── Gate ready to confirm (R3) ─────────────────────────────────────────────
+  // The rule engine marked an area's gate `ready_for_handoff` (all relevant
+  // work done) but nobody has confirmed it yet (actual_end_date IS NULL).
+  // Surface a one-tap "Tandai selesai" opportunity — not an emergency, so it
+  // sits below blockers/overdue but above stale cards (score 52 in rank.ts).
+  // Carry the cell identity so the feed can open the confirm sheet inline.
+  for (const r of gateRows ?? []) {
+    if (r.status !== "ready_for_handoff" || r.actual_end_date != null) continue;
+    const proj = (r as { projects: ProjRef }).projects;
+    const area = (r as { areas: { area_name: string } | null }).areas;
+    const projectCode = proj?.project_code ?? "?";
+    if (rot.has(projectCode)) continue; // mute projects whose baseline is fiction
+    const areaName = area?.area_name ?? r.area_id;
+    signals.push({
+      type: "gate_ready",
+      title: `Tandai Gate ${r.gate_code} ${areaName} selesai?`,
+      detail: `${gateShortName(r.gate_code)} · semua pekerjaan terkait sudah beres`,
+      href: `/project/${projectCode}/schedule`,
+      projectCode,
+      dueLabel: "siap konfirmasi",
+      gateReady: {
+        projectId: r.project_id,
+        areaId: r.area_id,
+        areaName,
+        gateCode: r.gate_code,
+      },
     });
   }
 
