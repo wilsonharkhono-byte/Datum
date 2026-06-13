@@ -10,6 +10,7 @@ import {
   cachedSystemBlock,
 } from "@/lib/assistant/anthropic";
 import { EVENT_KINDS, EventPayloadSchemas, type EventKind } from "@datum/types";
+import { isTemplateCardTitle, deriveCardLabel } from "@/lib/cards/template-card";
 
 const Body = z.object({
   projectId: z.string().uuid(),
@@ -42,6 +43,7 @@ ATURAN:
 - Rationale: 1 kalimat Bahasa Indonesia pendek menjelaskan kenapa kartu+kind itu cocok.
 - Jika tidak ada kartu yang cocok sama sekali, gunakan event_kind "note" dengan body=input asli dan pilih kartu paling mungkin terkait.
 - area_hint (OPSIONAL): jika input jelas merujuk ke sebuah RUANGAN yang ada di daftar AREA TERSEDIA, sertakan area_code-nya. Pilih HANYA dari daftar AREA TERSEDIA; jangan menebak kode baru. Jika tidak ada area yang cocok atau daftar kosong, kosongkan (null).
+- suggested_title (judul kartu): Beberapa KARTU TERSEDIA adalah placeholder kosong dari import Trello — judulnya diawali "YYYY-MM-DD" atau "GUIDE". Placeholder BUKAN pekerjaan nyata; jika Anda memilih salah satunya, sistem akan MEMBUAT KARTU BARU. Dalam kasus itu WAJIB isi suggested_title: judul ringkas Bahasa Indonesia (3–8 kata) yang mendeskripsikan item/permintaan/gambar, TANPA tanggal (sistem menambah tanggal otomatis). Jika Anda memilih kartu nyata yang sudah ada, set suggested_title = null.
 
 FORMAT OUTPUT — WAJIB JSON murni, TANPA markdown fence, TANPA penjelasan di luar JSON:
 {
@@ -50,7 +52,8 @@ FORMAT OUTPUT — WAJIB JSON murni, TANPA markdown fence, TANPA penjelasan di lu
   "payload": { ... },
   "rationale": "<kalimat Bahasa Indonesia>",
   "confidence": 0.0..1.0,
-  "area_hint": "<area_code dari AREA TERSEDIA, atau null>"
+  "area_hint": "<area_code dari AREA TERSEDIA, atau null>",
+  "suggested_title": "<judul kartu ringkas tanpa tanggal, atau null>"
 }`;
 
 export async function POST(req: Request) {
@@ -137,6 +140,7 @@ export async function POST(req: Request) {
     rationale?: unknown;
     confidence?: unknown;
     area_hint?: unknown;
+    suggested_title?: unknown;
   };
   try {
     parsed = JSON.parse(cleaned);
@@ -176,6 +180,22 @@ export async function POST(req: Request) {
     ? areas.find((a) => a.area_code === hintStr) ?? null
     : null;
 
+  // If the AI matched a Trello-import template placeholder, the proposal will
+  // CREATE A NEW card (named "<WIB-date> - <label>") rather than bury the event
+  // in the stub. The placeholder card is left untouched as a naming guide.
+  const createNew = isTemplateCardTitle(target.card.title);
+  let newCardTitle: string | null = null;
+  if (createNew) {
+    const wibToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" })
+      .format(new Date());
+    const label = deriveCardLabel(
+      parsed.suggested_title,
+      payloadCheck.data as Record<string, unknown>,
+      body.text,
+    );
+    newCardTitle = `${wibToday} - ${label}`.slice(0, 120);
+  }
+
   return NextResponse.json({
     ok: true,
     proposal: {
@@ -190,6 +210,9 @@ export async function POST(req: Request) {
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0,
       fileMeta:   body.file ? { name: body.file.name, mime: body.file.mime, size: body.file.size } : null,
       areaHint:   hintArea ? { areaId: hintArea.id, areaCode: hintArea.area_code, areaName: hintArea.area_name } : null,
+      createNew,
+      newCardTitle,
+      topicId:    target.card.topic_id,
     },
   });
 }
