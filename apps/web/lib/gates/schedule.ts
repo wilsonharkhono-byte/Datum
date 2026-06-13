@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { overlayAreaTargetDates, type ScheduledCell } from "./schedule-overlay";
 
 const RecomputeInput = z.object({
   projectId:   z.string().uuid(),
@@ -41,23 +42,46 @@ export async function recomputeProjectSchedule(formData: FormData): Promise<Sche
 }
 
 // Query helpers (callable from server components)
-export type ScheduledCell = {
-  area_id: string;
-  gate_code: string;
-  status: string;
-  target_start_date: string | null;
-  target_end_date: string | null;
-  actual_start_date: string | null;
-  actual_end_date: string | null;
-};
+// ScheduledCell + the pure overlay math live in ./schedule-overlay (this file
+// is "use server", where every export must be async — a type re-export here
+// confuses Turbopack's action transform). Importers pull the type from there.
 
 export async function getProjectScheduleCells(projectId: string): Promise<ScheduledCell[]> {
   const supabase = await createSupabaseServerClient();
+  const [{ data: cellRows }, { data: areaRows }] = await Promise.all([
+    supabase
+      .from("area_gate_status")
+      .select("area_id, gate_code, status, target_start_date, target_end_date, actual_start_date, actual_end_date")
+      .eq("project_id", projectId),
+    supabase
+      .from("areas")
+      .select("id, target_date")
+      .eq("project_id", projectId),
+  ]);
+
+  const cells = (cellRows ?? []) as ScheduledCell[];
+
+  // Overlay honest per-area targets onto the stored kickoff-derived windows.
+  const targetByArea = new Map<string, string | null>();
+  for (const a of areaRows ?? []) {
+    targetByArea.set(a.id, a.target_date);
+  }
+  return overlayAreaTargetDates(cells, targetByArea);
+}
+
+/** Areas of a project that carry a real PM-set target (re-baselined), so the UI
+ *  can distinguish them from areas still on the default kickoff schedule. */
+export async function getAreaTargetDates(projectId: string): Promise<Map<string, string>> {
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase
-    .from("area_gate_status")
-    .select("area_id, gate_code, status, target_start_date, target_end_date, actual_start_date, actual_end_date")
+    .from("areas")
+    .select("id, target_date")
     .eq("project_id", projectId);
-  return (data ?? []) as ScheduledCell[];
+  const out = new Map<string, string>();
+  for (const a of data ?? []) {
+    if (a.target_date) out.set(a.id, a.target_date);
+  }
+  return out;
 }
 
 // Per-card next deadline: from the card's linked areas, find the soonest upcoming

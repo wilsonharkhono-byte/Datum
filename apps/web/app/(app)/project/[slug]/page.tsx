@@ -52,6 +52,12 @@ export default async function ProjectBoardPage({
               Cetak →
             </Link>
             <Link
+              href={`/project/${board.project.project_code}/rooms`}
+              className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+            >
+              Ruangan →
+            </Link>
+            <Link
               href={`/project/${board.project.project_code}/schedule`}
               className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
             >

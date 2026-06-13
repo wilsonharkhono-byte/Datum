@@ -1,4 +1,4 @@
-import type { ScheduledCell } from "@/lib/gates/schedule";
+import type { ScheduledCell } from "@/lib/gates/schedule-overlay";
 import { gateShortName } from "@/lib/gates/labels";
 
 type Area = { id: string; area_name: string; area_code: string };

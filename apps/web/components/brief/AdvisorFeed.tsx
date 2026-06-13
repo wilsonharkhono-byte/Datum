@@ -1,9 +1,13 @@
 import Link from "next/link";
 import type { AdvisorItem } from "@/lib/advisor/types";
+import { GateAdvanceConfirmAction } from "@/components/gates/GateAdvanceConfirm";
 
 /**
  * "Hari Ini" — ranked next-action feed (server component).
  * Numbered list: rank, title (link), project chip, dueLabel right-aligned.
+ *
+ * `gate_ready` rows render an inline client island ("Tandai selesai") that
+ * opens the confirm sheet — the row itself stays server-rendered.
  */
 export function AdvisorFeed({ items }: { items: AdvisorItem[] }) {
   return (
@@ -38,6 +42,11 @@ export function AdvisorFeed({ items }: { items: AdvisorItem[] }) {
                     <span className="text-[10px] text-[#847E78]">{it.dueLabel}</span>
                   ) : null}
                 </p>
+                {it.type === "gate_ready" && it.gateReady ? (
+                  <div className="mt-2">
+                    <GateAdvanceConfirmAction target={it.gateReady} />
+                  </div>
+                ) : null}
               </div>
             </li>
           ))}

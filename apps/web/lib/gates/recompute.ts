@@ -80,6 +80,24 @@ export async function recomputeProjectGates(
     }
   }
 
+  // 2b. A gate the PM manually confirmed (status='passed' + actual_end_date)
+  //     is a human decision, NOT a derived value — recompute must never
+  //     clobber it back to a rule-computed state, or the next gate-relevant
+  //     card_event (which fire-and-forget triggers a recompute) would silently
+  //     "un-pass" the gate. Load those sticky cells and skip their status on
+  //     the upsert below; we still refresh their recompute bookkeeping
+  //     (readiness_score/last_recomputed_at/stale) for diagnostics.
+  const { data: passedCells, error: pErr } = await supabase
+    .from("area_gate_status")
+    .select("area_id, gate_code")
+    .eq("project_id", projectId)
+    .eq("status", "passed")
+    .not("actual_end_date", "is", null);
+  if (pErr) return { ok: false, error: pErr.message };
+  const stickyPassed = new Set(
+    (passedCells ?? []).map((c) => `${c.area_id}|${c.gate_code}`),
+  );
+
   // 3. For each (area, gate), evaluate the rule and upsert area_gate_status
   const now = new Date().toISOString();
   let cellsUpdated = 0;
@@ -88,13 +106,17 @@ export async function recomputeProjectGates(
     const areaEvents = areaCardIds.flatMap((cid) => eventsByCard.get(cid) ?? []);
     for (const gate of GateCodes) {
       const result = evaluateGate(gate, { events: areaEvents });
+      const isSticky = stickyPassed.has(`${area.id}|${gate}`);
       const { error: uErr } = await supabase.from("area_gate_status").upsert({
         project_id:           projectId,
         area_id:              area.id,
         gate_code:            gate,
-        status:               result.status,
+        // Sticky-passed cells keep their confirmed status + blocking_reason;
+        // only recompute bookkeeping (score/last_recomputed_at/stale) refreshes.
+        ...(isSticky
+          ? {}
+          : { status: result.status, blocking_reason: result.blockingReason }),
         readiness_score:      result.readinessScore,
-        blocking_reason:      result.blockingReason,
         last_recomputed_at:   now,
         stale:                false,
       }, { onConflict: "project_id,area_id,gate_code" });
