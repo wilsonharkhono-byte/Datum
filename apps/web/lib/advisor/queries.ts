@@ -15,6 +15,7 @@ import {
 } from "@/lib/brief/bottlenecks";
 import { compareEventTime, type OrderableEvent } from "@/lib/cards/event-order";
 import { ACTOR_LABELS } from "@/lib/cards/labels";
+import { isTemplateCardTitle } from "@/lib/cards/template-card";
 import { gateShortName } from "@/lib/gates/labels";
 import { ageLabelFor, dueLabelFor, rankAdvisorItems } from "@/lib/advisor/rank";
 import type { AdvisorGateCell, AdvisorItem, AdvisorSignal } from "@/lib/advisor/types";
@@ -373,8 +374,7 @@ export async function getAdvisorData(
   // ── Stale active cards (no events in 30 days) ──────────────────────────────
   // Trello-import template cards (GUIDE / "YYYY-MM-DD - …" placeholders) are
   // permanently inactive by design — they'd flood the feed as false positives.
-  const TEMPLATE_TITLE = /^(guide\b|yyyy-mm-dd)/i;
-  for (const card of (staleCards ?? []).filter((c) => !TEMPLATE_TITLE.test(c.title ?? ""))) {
+  for (const card of (staleCards ?? []).filter((c) => !isTemplateCardTitle(c.title))) {
     const proj = (card as { projects: ProjRef }).projects;
     const age = card.last_event_at ? ageLabelFor(card.last_event_at, now) : null;
     signals.push({
