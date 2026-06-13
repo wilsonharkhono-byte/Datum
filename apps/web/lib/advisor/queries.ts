@@ -172,33 +172,77 @@ export async function getAdvisorData(
       targetEndDate: c.target_end_date!,
     }));
 
+  // A gate >120d overdue isn't today's task — the project's baseline is
+  // fiction. Collapse those into ONE re-baseline signal per project (and
+  // mute that project's per-cell overdue + cascade noise) so dead schedules
+  // can't drown out real priorities.
+  const SCHEDULE_ROT_DAYS = 120;
+  const rot = new Map<string, { count: number; worstDays: number; worstEnd: string }>();
+  const nowMs = now.getTime();
+
+  // Group per (project, gate, target date): "Gate H lewat 96 hari" across six
+  // areas of one project is one decision for the PM, not six feed rows.
+  const gateGroups = new Map<
+    string,
+    { kind: "gate_overdue" | "gate_soon"; projectCode: string; gateCode: string; end: string; areas: string[] }
+  >();
+
   for (const c of unsatisfied) {
     const end = c.target_end_date!;
-    const label = dueLabelFor(end, now);
     if (end < todayIso) {
-      signals.push({
-        type: "gate_overdue",
-        title: `Gate ${c.gate_code} ${c.area_name} ${label}`,
-        detail: `${gateShortName(c.gate_code)} · target selesai ${end}`,
-        href: `/project/${c.project_code}/schedule`,
-        projectCode: c.project_code,
-        dueLabel: label,
-        dueDate: end,
-      });
-    } else if (end <= soonHorizon) {
-      signals.push({
-        type: "gate_soon",
-        title: `Gate ${c.gate_code} ${c.area_name} jatuh tempo ${label}`,
-        detail: `${gateShortName(c.gate_code)} · target selesai ${end}`,
-        href: `/project/${c.project_code}/schedule`,
-        projectCode: c.project_code,
-        dueLabel: label,
-        dueDate: end,
-      });
+      const daysOverdue = Math.floor((nowMs - new Date(end).getTime()) / 86_400_000);
+      if (daysOverdue > SCHEDULE_ROT_DAYS) {
+        const r = rot.get(c.project_code) ?? { count: 0, worstDays: 0, worstEnd: end };
+        r.count += 1;
+        if (daysOverdue > r.worstDays) { r.worstDays = daysOverdue; r.worstEnd = end; }
+        rot.set(c.project_code, r);
+        continue;
+      }
+    } else if (end > soonHorizon) {
+      continue;
     }
+    const kind = end < todayIso ? "gate_overdue" : "gate_soon";
+    const key = `${kind}|${c.project_code}|${c.gate_code}|${end}`;
+    const g = gateGroups.get(key) ?? {
+      kind, projectCode: c.project_code, gateCode: c.gate_code, end, areas: [],
+    };
+    g.areas.push(c.area_name);
+    gateGroups.set(key, g);
+  }
+
+  for (const g of gateGroups.values()) {
+    const label = dueLabelFor(g.end, now);
+    const where =
+      g.areas.length === 1
+        ? g.areas[0]
+        : `${g.areas.length} area (${g.areas.slice(0, 3).join(", ")}${g.areas.length > 3 ? ", …" : ""})`;
+    signals.push({
+      type: g.kind,
+      title:
+        g.kind === "gate_overdue"
+          ? `Gate ${g.gateCode} ${where} ${label}`
+          : `Gate ${g.gateCode} ${where} jatuh tempo ${label}`,
+      detail: `${gateShortName(g.gateCode)} · target selesai ${g.end}`,
+      href: `/project/${g.projectCode}/schedule`,
+      projectCode: g.projectCode,
+      dueLabel: label,
+      dueDate: g.end,
+    });
+  }
+
+  for (const [code, r] of rot) {
+    signals.push({
+      type: "schedule_rot",
+      title: `Jadwal ${code} usang — ${r.count} gate lewat >${SCHEDULE_ROT_DAYS} hari`,
+      detail: `terlama lewat ${r.worstDays} hari · baseline ulang kickoff/target di halaman jadwal`,
+      href: `/project/${code}/schedule`,
+      projectCode: code,
+      dueLabel: "baseline ulang",
+    });
   }
 
   for (const r of findCascadeRisks(scheduleCells, todayIso)) {
+    if (rot.has(r.projectCode)) continue;
     signals.push({
       type: "cascade_risk",
       title: `Gate ${r.gateCode} ${r.areaName} berisiko terlambat berantai`,

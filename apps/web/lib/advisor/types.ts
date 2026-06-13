@@ -13,7 +13,8 @@ export type AdvisorItemType =
   | "awaiting_client"
   | "quote_expiring"
   | "cascade_risk"
-  | "stale_card";
+  | "stale_card"
+  | "schedule_rot";
 
 export type AdvisorItem = {
   type: AdvisorItemType;

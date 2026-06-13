@@ -3,17 +3,33 @@ import { useEffect, useRef, useState } from "react";
 import { MessageList, type Message } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { SparkIcon, XIcon } from "@/components/icons/Icon";
+import { drain, enqueue, readQueue, remove } from "@/lib/assistant/offline-queue";
 
 type Mode = "tanya" | "catat";
 
 const WAITING_LABEL = "Sedang memproses…";
 const RETRYING_LABEL = "Koneksi lambat — mencoba lagi…";
+const DRAINING_LABEL = "Mengirim catatan tertunda…";
+const QUEUED_NOTICE = "Tersimpan offline — akan dikirim otomatis saat koneksi kembali.";
 const STORED_MESSAGE_CAP = 30;
 const FIRST_BYTE_TIMEOUT_MS = 20_000;
 const RETRY_DELAYS_MS = [1_000, 3_000];
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Thrown when fetchWithRetry exhausts its retries without ever reaching the
+ * server (fetch rejection / first-byte timeout). These sends are parked in
+ * the offline queue rather than surfaced as failures — 4xx/5xx server
+ * rejections are NOT tagged and keep the existing error + "Coba lagi" path.
+ */
+class NetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NetworkError";
+  }
 }
 
 /**
@@ -44,9 +60,11 @@ async function fetchWithRetry(
         await sleep(RETRY_DELAYS_MS[attempt]!);
         continue;
       }
-      throw e instanceof DOMException && e.name === "AbortError"
-        ? new Error("Tidak ada respons dari server (timeout). Periksa koneksi Anda.")
-        : e;
+      throw new NetworkError(
+        e instanceof DOMException && e.name === "AbortError"
+          ? "Tidak ada respons dari server (timeout). Periksa koneksi Anda."
+          : e instanceof Error ? e.message : String(e),
+      );
     } finally {
       // Headers received = first byte arrived; body streaming has no timeout.
       clearTimeout(timer);
@@ -110,6 +128,16 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   const [lastFailed, setLastFailed] = useState<{ mode: Mode; input: string; file: File | null } | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [queueCount, setQueueCount] = useState(0);
+
+  // Offline-queue guards. busyRef mirrors `busy` so the window "online"
+  // listener can tell whether a send is in progress without a fresh render;
+  // drainingRef serializes drains; inFlightIds prevents a double-send when
+  // drains overlap on rapid online/offline flaps (items are only removed
+  // from storage once the server confirms).
+  const drainingRef = useRef(false);
+  const busyRef = useRef(false);
+  const inFlightIds = useRef<Set<string>>(new Set());
 
   const storageKey = `datum.chat.${projectId}`;
 
@@ -264,27 +292,43 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
 
   async function run(runMode: Mode, input: string, file: File | null) {
     setBusy(true);
+    busyRef.current = true;
     setPendingLabel(WAITING_LABEL);
     setLastFailed(null);
+    let succeeded = false;
     try {
       if (runMode === "tanya") await runTanya(input);
       else await runCatat(input, file);
+      succeeded = true;
     } catch (e) {
-      const msg = `Gagal: ${e instanceof Error ? e.message : String(e)}`;
-      setLastFailed({ mode: runMode, input, file });
-      setMessages((m) => {
-        // Close out any half-streamed bubble, then append the error bubble.
-        const copy = m.map((msg2) =>
-          msg2.role === "assistant" && "content" in msg2 && msg2.streaming
-            ? { ...msg2, streaming: false }
-            : msg2,
-        );
-        return [...copy, { role: "assistant" as const, content: msg, error: true }];
-      });
+      if (e instanceof NetworkError) {
+        // Never lose the text: park it in the offline queue (the user bubble
+        // stays visible in the thread) and announce it with an amber bubble.
+        // No "Coba lagi" here — the drain triggers re-send automatically.
+        enqueue(projectId, { mode: runMode, text: input, ts: Date.now() });
+        setQueueCount(readQueue(projectId).length);
+        setMessages((m) => [...m, { role: "assistant" as const, content: QUEUED_NOTICE, queued: true }]);
+      } else {
+        const msg = `Gagal: ${e instanceof Error ? e.message : String(e)}`;
+        setLastFailed({ mode: runMode, input, file });
+        setMessages((m) => {
+          // Close out any half-streamed bubble, then append the error bubble.
+          const copy = m.map((msg2) =>
+            msg2.role === "assistant" && "content" in msg2 && msg2.streaming
+              ? { ...msg2, streaming: false }
+              : msg2,
+          );
+          return [...copy, { role: "assistant" as const, content: msg, error: true }];
+        });
+      }
     } finally {
       setBusy(false);
+      busyRef.current = false;
       setPendingLabel(null);
     }
+    // A send just went through — the connection is back, so flush anything
+    // that piled up while offline.
+    if (succeeded) void drainQueue();
   }
 
   async function send(input: string, file: File | null) {
@@ -306,6 +350,72 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     });
     void run(failedMode, input, file);
   }
+
+  // ── Offline queue drain ────────────────────────────────────────────────
+  // Re-sends queued items oldest first, one at a time; stops on the first
+  // network failure (still offline). drain() prunes Tanya items older than
+  // 30 minutes — a stale question's answer is no longer wanted; Catat notes
+  // are never dropped. Items stay in storage until their send succeeds
+  // (remove-on-success), so a crash mid-send can't lose a note; inFlightIds
+  // is what stops an overlapping drain from double-sending meanwhile.
+  async function drainQueue() {
+    if (drainingRef.current || busyRef.current) return;
+    const items = drain(projectId);
+    setQueueCount(items.length);
+    if (items.length === 0) return;
+    drainingRef.current = true;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      for (const item of items) {
+        if (inFlightIds.current.has(item.id)) continue; // already being sent
+        setPendingLabel(DRAINING_LABEL);
+        inFlightIds.current.add(item.id);
+        try {
+          if (item.mode === "tanya") await runTanya(item.text);
+          else await runCatat(item.text, null);
+          remove(projectId, item.id);
+        } catch (e) {
+          if (!(e instanceof NetworkError)) {
+            // The server received and rejected this item — re-sending the
+            // same payload won't succeed, so drop it (the text stays visible
+            // in the thread) instead of wedging the queue head forever.
+            remove(projectId, item.id);
+            setMessages((m) => [...m, {
+              role: "assistant" as const,
+              content: `Gagal mengirim pesan tertunda: ${e instanceof Error ? e.message : String(e)}`,
+              error: true,
+            }]);
+          }
+          break; // stop on first failure; remaining items stay queued
+        } finally {
+          inFlightIds.current.delete(item.id);
+          setQueueCount(readQueue(projectId).length);
+        }
+      }
+    } finally {
+      drainingRef.current = false;
+      busyRef.current = false;
+      setBusy(false);
+      setPendingLabel(null);
+    }
+  }
+
+  // Latest-closure ref so the mount/"online" effect below doesn't pin a
+  // stale drainQueue (and with it a stale sessionId) for the listener's
+  // lifetime. The refs above make any overlapping invocation a safe no-op.
+  const drainQueueRef = useRef(drainQueue);
+  drainQueueRef.current = drainQueue;
+
+  useEffect(() => {
+    if (!hydrated) return;
+    // drainQueue refreshes queueCount as its first step, so the badge is
+    // initialized here even when the drain itself has nothing to send.
+    void drainQueueRef.current();
+    const onOnline = () => { void drainQueueRef.current(); };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [hydrated, projectId]);
 
   const pending = pendingLabel !== null;
   const hasContent = messages.length > 0 || pending;
@@ -348,6 +458,14 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {queueCount > 0 ? (
+              <span
+                className="rounded border border-[var(--flag-warning)]/40 bg-[var(--flag-warning-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--flag-warning)]"
+                title="Pesan menunggu koneksi untuk dikirim"
+              >
+                {queueCount} tertunda
+              </span>
+            ) : null}
             {messages.length > 0 || sessionId ? (
               <button
                 type="button"

@@ -9,6 +9,8 @@
  *   decision_needed   70 (+20 if deadline ≤ 3 days away)
  *   awaiting_client   60 + min(ageDays / 2, 15)
  *   quote_expiring    50 + (7 − daysLeft) × 5      (daysLeft clamped to 0..7)
+ *   schedule_rot      55  (one per project — gates >120d overdue mean the
+ *                          baseline is fiction; re-baseline, don't firefight)
  *   gate_soon (≤7d)   45 + (7 − daysLeft) × 4      (daysLeft clamped to 0..7)
  *   stale_card        30
  */
@@ -59,6 +61,8 @@ export function scoreItem(signal: AdvisorSignal, now: Date): number {
       const left = clamp07(daysUntil(signal.dueDate, now));
       return 45 + (7 - left) * 4;
     }
+    case "schedule_rot":
+      return 55;
     case "stale_card":
       return 30;
   }
