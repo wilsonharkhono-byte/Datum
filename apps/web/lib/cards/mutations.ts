@@ -47,7 +47,7 @@ function toSlug(title: string): string {
 }
 
 export type CreateCardResult =
-  | { ok: true; slug: string }
+  | { ok: true; slug: string; id: string }
   | { ok: false; error: string };
 
 export async function createCard(formData: FormData): Promise<CreateCardResult> {
@@ -83,17 +83,17 @@ export async function createCard(formData: FormData): Promise<CreateCardResult> 
     slug = `${base}-${i}`;
   }
 
-  const { error } = await supabase.from("cards").insert({
+  const { data: inserted, error } = await supabase.from("cards").insert({
     project_id:          input.projectId,
     topic_id:            input.topicId,
     title:               input.title,
     slug,
     created_by_staff_id: user.id,
-  });
-  if (error) return { ok: false, error: error.message };
+  }).select("id").single();
+  if (error || !inserted) return { ok: false, error: error?.message ?? "Gagal membuat kartu" };
 
   revalidatePath(`/project/${input.projectCode}`);
-  return { ok: true, slug };
+  return { ok: true, slug, id: inserted.id };
 }
 
 // ─── createTopic ──────────────────────────────────────────────────────────────
