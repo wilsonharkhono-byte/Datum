@@ -61,6 +61,19 @@ Keep: project `target_handover` (exists) + an optional **single target date per 
 
 **Sequence: R1 → R2 → R3 → R4.** Each is independently shippable; R1 alone makes the existing matrix/advisor/deadline machinery light up on real projects. Total ≈ 2 weeks of focused work to take the feature from demo-ware to the daily driver the rest of DATUM already orbits.
 
+---
+
+## STATUS — all four BUILT (2026-06-13, branch `datum-brain-upgrade`)
+
+R1–R4 shipped in parallel and integrated. Typecheck clean, 137 unit tests green, production build clean (17/17 routes), independent security review found **no vulnerabilities** (auth + project-membership + RLS + zod on every write path; AI output validated as untrusted data; no cost data in prompts; no service-role in app code).
+
+- **R1 — verified live, read-only:** on ARIN-KARAWANG (61 cards, 0 areas) the AI proposed correct rooms from Bahasa card titles — KM-ANAK←"Update kamar mandi anak 4" (95%), KM-UTAMA←"Master bathroom - bathtub" (90%), CARPORT/Utility (95%), TERRACE/Sirkulasi. Entry point: Settings → Areas → "✨ Deteksi ruangan otomatis". Apply writes areas+card_areas under session RLS. Not applied to any real project during verification (left to Wilson's judgement).
+- **R2 — verified live:** `/project/[slug]/rooms` renders per-room rows; on BDG-H1 it honestly shows "Belum mulai" because the pilot's cards aren't area-linked yet (exactly what R1 fixes). Empty state on 0-area projects points to the R1 flow.
+- **R3 — built + tested:** `gate_ready` advisor signal (score 52) + `markGatePassed` (state-guarded, race-safe, audited via current_owner_id) + confirm sheet showing Lampiran-A checklist. Couldn't exercise live (no cell is `ready_for_handoff` in seed data) — covered by build + security review + unit tests. Recompute no longer clobbers a manually-passed cell.
+- **R4 — verified live (UI):** schedule page shows "TARGET HANDOVER PER AREA" with 9 per-area editors; overlay derivation unit-tested (9 tests). **Write path blocked until migration push** — `areas.target_date` doesn't exist in the live DB yet; `getAreaTargetDates` degrades gracefully (empty) so the page renders.
+
+**Pending manual step (blocked for the agent):** `cd packages/db/supabase && supabase db push` then `pnpm db:types` — applies the R4 `area_target_date` migration (+ the still-pending search_text + card_links delete migrations from earlier). Until then: R4 target-setting is read-only, search is unindexed, Terkait-delete is a no-op. Everything else works.
+
 ## 4. What shipped today alongside this evaluation
 - **Advisor signal quality** (the stopgap for §2.2's noise): `schedule_rot` collapse + per-(project, gate, date) grouping — verified live: priorities went from 7 rows of dead-gate spam to one row per gate decision, with real blockers and a real 4-day-overdue gate surfacing.
 - **Offline chat capture queue** — failed sends persist and auto-resend (site dead-spots can't lose notes); 12 new unit tests.
