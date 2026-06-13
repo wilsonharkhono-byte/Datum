@@ -25,9 +25,12 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   const isAuthPath = request.nextUrl.pathname.startsWith("/login");
-  const isPublicApi = request.nextUrl.pathname === "/api/health";
+  // API routes must never be redirected to the HTML login page: a redirected
+  // POST lands on /login (GET-only) and returns 405 on Vercel. They enforce
+  // auth themselves (getUser → 401 JSON) and are RLS-protected regardless.
+  const isApi = request.nextUrl.pathname.startsWith("/api");
 
-  if (!user && !isAuthPath && !isPublicApi) {
+  if (!user && !isAuthPath && !isApi) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
