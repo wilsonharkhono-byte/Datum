@@ -44,7 +44,7 @@ export function MiniCard({ card, projectCode }: { card: BoardCardView; projectCo
     return (
       <div
         aria-busy="true"
-        className="block rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs opacity-70"
+        className="block min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs opacity-70 md:min-h-0"
       >
         {inner}
       </div>
@@ -54,7 +54,7 @@ export function MiniCard({ card, projectCode }: { card: BoardCardView; projectCo
   return (
     <Link
       href={`/project/${projectCode}/cards/${card.slug}`}
-      className="block rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs hover:border-[var(--sand-dark)]"
+      className="block min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs hover:border-[var(--sand-dark)] md:min-h-0"
     >
       {inner}
     </Link>

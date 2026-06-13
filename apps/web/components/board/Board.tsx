@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Board as BoardData, BoardColumn } from "@/lib/cards/queries";
 import { optimisticReducer } from "@/lib/cards/optimisticBoard";
@@ -7,6 +7,7 @@ import { OptimisticBoardProvider, type OptimisticBoardApi } from "@/lib/cards/op
 import { Column } from "./Column";
 import { AddColumnForm } from "./AddColumnForm";
 import { BoardFilter, type StatusFilter, type LabelFilter } from "./BoardFilter";
+import { BoardTabs } from "./BoardTabs";
 import { subscribeToProjectChanges } from "@/lib/cards/realtime";
 
 export function Board({ board }: { board: BoardData }) {
@@ -61,6 +62,54 @@ export function Board({ board }: { board: BoardData }) {
   const totalCards = optimisticBoard.columns.reduce((n, c) => n + c.cards.length, 0);
   const matchedTotal = filteredColumns.reduce((n, c) => n + c.cards.length, 0);
 
+  // --- Mobile column carousel (below md) ------------------------------------
+  // Columns render as a horizontal snap carousel; the BoardTabs strip above
+  // tracks and controls which column is in view. Refs live in Maps keyed by
+  // topic id so they survive columns mounting/unmounting under filters,
+  // optimistic adds, and realtime router.refresh().
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const columnRefs = useRef(new Map<string, HTMLDivElement>());
+  const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
+
+  // Re-observe whenever the visible column set changes: the observer holds
+  // direct element references, so stale ones must be dropped and new columns
+  // (e.g. after a filter change or refresh) picked up.
+  useEffect(() => {
+    const root = scrollerRef.current;
+    if (root == null || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const id = entry.target.getAttribute("data-topic-id");
+          if (id != null) setActiveTopicId(id);
+        }
+      },
+      { root, threshold: 0.6 },
+    );
+    for (const el of columnRefs.current.values()) observer.observe(el);
+    return () => observer.disconnect();
+  }, [filteredColumns]);
+
+  // If the previously active column got filtered out, fall back to the first
+  // visible one rather than showing no highlight.
+  const activeTabId =
+    activeTopicId != null && filteredColumns.some((c) => c.topic.id === activeTopicId)
+      ? activeTopicId
+      : (filteredColumns[0]?.topic.id ?? null);
+
+  function jumpToColumn(topicId: string) {
+    setActiveTopicId(topicId);
+    const el = columnRefs.current.get(topicId);
+    if (el == null) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }
+
   return (
     <OptimisticBoardProvider value={api}>
     <div className="flex h-full flex-col">
@@ -74,7 +123,19 @@ export function Board({ board }: { board: BoardData }) {
         matched={matchedTotal}
         total={totalCards}
       />
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-[var(--surface-alt)] p-3 md:flex-row md:gap-2 md:overflow-x-auto md:overflow-y-hidden">
+      <BoardTabs
+        tabs={filteredColumns.map((c) => ({
+          id: c.topic.id,
+          name: c.topic.name,
+          count: c.cards.length,
+        }))}
+        activeId={activeTabId}
+        onSelect={jumpToColumn}
+      />
+      <div
+        ref={scrollerRef}
+        className="flex flex-1 snap-x snap-mandatory flex-row gap-3 overflow-x-auto overflow-y-hidden bg-[var(--surface-alt)] p-3 md:snap-none md:flex-row md:gap-2 md:overflow-x-auto md:overflow-y-hidden"
+      >
         {filteredColumns.length === 0 ? (
           <div className="m-auto text-sm italic text-[var(--text-muted)]">
             Tidak ada kartu cocok. Coba ubah filter atau kata kunci.
@@ -86,13 +147,22 @@ export function Board({ board }: { board: BoardData }) {
               column={col}
               projectId={board.project.id}
               projectCode={board.project.project_code}
+              containerRef={(el) => {
+                if (el) columnRefs.current.set(col.topic.id, el);
+                else columnRefs.current.delete(col.topic.id);
+              }}
             />
           ))
         )}
-        <AddColumnForm
-          projectId={board.project.id}
-          projectCode={board.project.project_code}
-        />
+        {/* On mobile the add-column form becomes its own carousel slide; at
+            md+ the wrapper dissolves (display: contents) so the desktop board
+            row is byte-for-byte what it was. */}
+        <div className="w-[86vw] max-w-[22rem] shrink-0 snap-center md:contents">
+          <AddColumnForm
+            projectId={board.project.id}
+            projectCode={board.project.project_code}
+          />
+        </div>
       </div>
     </div>
     </OptimisticBoardProvider>

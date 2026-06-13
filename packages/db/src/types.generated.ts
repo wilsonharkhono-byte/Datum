@@ -1868,6 +1868,7 @@ export type Database = {
           site_address: string | null
           status: Database["public"]["Enums"]["project_status"]
           target_handover: string | null
+          trello_board_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1884,6 +1885,7 @@ export type Database = {
           site_address?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           target_handover?: string | null
+          trello_board_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1900,6 +1902,7 @@ export type Database = {
           site_address?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           target_handover?: string | null
+          trello_board_id?: string | null
           updated_at?: string
         }
         Relationships: [

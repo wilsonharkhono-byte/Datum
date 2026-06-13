@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Card, CardEvent } from "@datum/db";
+import { getAdvisorData } from "@/lib/advisor/queries";
 
 export type CardWithEvents = {
   card: Card;
@@ -21,7 +22,16 @@ export async function retrieveProjectContext(
   supabase: SupabaseClient<Database>,
   projectId: string,
   query?: string,
+  opts?: { includeAdvisor?: boolean },
 ): Promise<CardWithEvents[]> {
+  // 0. "Hari Ini" advisor + gate-deadline context — kicked off first so its
+  // internal Promise.all overlaps the card queries below; attached to the
+  // result right before returning (see advisorSectionByCards). The capture
+  // route skips it: proposals don't use the priority section.
+  const advisorPromise = opts?.includeAdvisor === false
+    ? Promise.resolve("")
+    : buildAdvisorSections(supabase, projectId, new Date()).catch(() => "");
+
   // 1. Always: newest-active cards
   const { data: newest, error: nErr } = await supabase
     .from("cards")
@@ -48,20 +58,20 @@ export async function retrieveProjectContext(
       .or(`title.ilike.${pattern},current_summary.ilike.${pattern}`)
       .limit(KEYWORD_HITS_CAP);
 
-    // 2b. Cards whose events' payload text matches (sweep common text fields)
+    // 2b. Cards whose events' payload text matches (sweep common text fields in one .or() query)
     const eventFields = ["body","description","topic","request_text","what","notes","title","caption"];
+    const orTerm = trimmed.replace(/[,()]/g, "").replace(/[%_]/g, (m) => `\\${m}`);
+    const orPattern = `*${orTerm}*`;
     const eventHitCardIds = new Set<string>();
-    for (const f of eventFields) {
-      const { data: evHits } = await supabase
-        .from("card_events")
-        .select("card_id, cards!inner(project_id)")
-        .eq("cards.project_id", projectId)
-        .ilike(`payload->>${f}`, pattern)
-        .limit(KEYWORD_HITS_CAP);
-      for (const row of evHits ?? []) {
-        if (typeof (row as { card_id?: string }).card_id === "string") {
-          eventHitCardIds.add((row as { card_id: string }).card_id);
-        }
+    const { data: evHits } = await supabase
+      .from("card_events")
+      .select("card_id, cards!inner(project_id)")
+      .eq("cards.project_id", projectId)
+      .or(eventFields.map((f) => `payload->>${f}.ilike.${orPattern}`).join(","))
+      .limit(KEYWORD_HITS_CAP * 2);
+    for (const row of evHits ?? []) {
+      if (typeof (row as { card_id?: string }).card_id === "string") {
+        eventHitCardIds.add((row as { card_id: string }).card_id);
       }
       if (eventHitCardIds.size >= KEYWORD_HITS_CAP) break;
     }
@@ -84,7 +94,11 @@ export async function retrieveProjectContext(
     cards = [...byId.values()];
   }
 
-  if (cards.length === 0) return [];
+  if (cards.length === 0) {
+    const empty: CardWithEvents[] = [];
+    advisorSectionByCards.set(empty, await advisorPromise);
+    return empty;
+  }
 
   // 3. Load events for the merged set
   const cardIds = cards.map((c) => c.id);
@@ -102,7 +116,7 @@ export async function retrieveProjectContext(
     evByCard.set(e.card_id, arr);
   }
 
-  return cards.map((c) => {
+  const result = cards.map((c) => {
     const { topics, ...cardRow } = c;
     return {
       card: cardRow as Card,
@@ -110,10 +124,17 @@ export async function retrieveProjectContext(
       events: evByCard.get(c.id) ?? [],
     };
   });
+  advisorSectionByCards.set(result, await advisorPromise);
+  return result;
 }
 
 export function buildContextBlock(cards: CardWithEvents[]): string {
-  if (cards.length === 0) return "Tidak ada kartu yang tersedia untuk proyek ini.";
+  const advisorSections = advisorSectionByCards.get(cards) ?? "";
+  if (cards.length === 0) {
+    return ["Tidak ada kartu yang tersedia untuk proyek ini.", advisorSections]
+      .filter(Boolean)
+      .join("\n\n");
+  }
   const lines: string[] = [];
   for (const { card, topicName, events } of cards) {
     lines.push(`## [card:${card.id}] ${card.title} (${topicName})`);
@@ -127,6 +148,46 @@ export function buildContextBlock(cards: CardWithEvents[]): string {
       }
     }
     lines.push("");
+  }
+  if (advisorSections) lines.push(advisorSections);
+  return lines.join("\n");
+}
+
+// ─── "Hari Ini" advisor context injection ────────────────────────────────────
+// The advisor + gate-deadline sections ride along with the cards array via a
+// WeakMap keyed on the exact array instance, so retrieveProjectContext and
+// buildContextBlock keep their public signatures (the API routes call them as
+// a pair: the block returned for a retrieved card set automatically carries
+// that project's priorities). Entries are GC'd with the arrays themselves.
+const advisorSectionByCards = new WeakMap<CardWithEvents[], string>();
+
+const MAX_ADVISOR_ITEMS_IN_CONTEXT = 5;
+const MAX_GATE_DEADLINES_IN_CONTEXT = 5;
+
+async function buildAdvisorSections(
+  supabase: SupabaseClient<Database>,
+  projectId: string,
+  now: Date,
+): Promise<string> {
+  const { items, upcomingGateCells } = await getAdvisorData(supabase, {
+    projectId,
+    now,
+    limit: MAX_ADVISOR_ITEMS_IN_CONTEXT,
+  });
+
+  const lines: string[] = [];
+  if (items.length > 0) {
+    lines.push("PRIORITAS PROYEK SAAT INI:");
+    items.forEach((it, i) => {
+      lines.push(`${i + 1}. ${it.title}${it.dueLabel ? ` (${it.dueLabel})` : ""}`);
+    });
+  }
+  if (upcomingGateCells.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push("TENGGAT GATE TERDEKAT:");
+    for (const c of upcomingGateCells.slice(0, MAX_GATE_DEADLINES_IN_CONTEXT)) {
+      lines.push(`- ${c.areaName} · Gate ${c.gateCode} — target selesai ${c.targetEndDate}`);
+    }
   }
   return lines.join("\n");
 }

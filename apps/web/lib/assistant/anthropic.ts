@@ -24,7 +24,7 @@ ATURAN:
 - Jangan ulangi pertanyaan pengguna.`;
 
 let client: Anthropic | null = null;
-function getClient(): Anthropic {
+export function getAnthropicClient(): Anthropic {
   if (!client) {
     if (!process.env.ANTHROPIC_API_KEY) throw new AnthropicNotConfiguredError();
     client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -32,20 +32,54 @@ function getClient(): Anthropic {
   return client;
 }
 
+/**
+ * Static system prompt sent as a content-block array with cache_control so the
+ * Anthropic API caches it as a prefix. SDK 0.30.x only exposes cache_control
+ * via the prompt-caching beta namespace (client.beta.promptCaching.messages),
+ * which auto-sends the `anthropic-beta: prompt-caching-2024-07-31` header.
+ * The per-request KONTEKS block stays in the user message — it changes every
+ * request and must NOT be cached.
+ */
+export function cachedSystemBlock(text: string) {
+  return [
+    {
+      type: "text" as const,
+      text,
+      cache_control: { type: "ephemeral" as const },
+    },
+  ];
+}
+
+function buildUserContent(args: { question: string; contextBlock: string }): string {
+  return `KONTEKS:\n${args.contextBlock}\n\nPERTANYAAN: ${args.question}`;
+}
+
+/**
+ * Streaming variant for the Tanya flow. Returns the SDK MessageStream so the
+ * route handler can pipe text deltas to the browser as they arrive.
+ * Use `.on("text", ...)` for deltas and `await .finalMessage()` for usage.
+ */
+export function streamAssistant(args: { question: string; contextBlock: string }) {
+  return getAnthropicClient().beta.promptCaching.messages.stream({
+    model: getModel(),
+    max_tokens: 1024,
+    system: cachedSystemBlock(SYSTEM),
+    messages: [{ role: "user", content: buildUserContent(args) }],
+  });
+}
+
+export type AssistantStream = ReturnType<typeof streamAssistant>;
+
+/** Non-streaming variant, kept for callers that need the full answer at once. */
 export async function askAssistant(args: {
   question: string;
   contextBlock: string;
 }): Promise<{ answer: string; usage: { input_tokens: number; output_tokens: number } }> {
-  const res = await getClient().messages.create({
+  const res = await getAnthropicClient().beta.promptCaching.messages.create({
     model: getModel(),
     max_tokens: 1024,
-    system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: `KONTEKS:\n${args.contextBlock}\n\nPERTANYAAN: ${args.question}`,
-      },
-    ],
+    system: cachedSystemBlock(SYSTEM),
+    messages: [{ role: "user", content: buildUserContent(args) }],
   });
   const text = res.content
     .filter((c): c is { type: "text"; text: string } => c.type === "text")

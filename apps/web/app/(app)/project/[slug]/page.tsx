@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBoardForProject } from "@/lib/cards/queries";
+import { getAdvisorItems } from "@/lib/advisor/queries";
 import { getCurrentStaff } from "@/lib/auth/require-role";
 import { Board } from "@/components/board/Board";
+import { ProjectAdvisorStrip } from "@/components/board/ProjectAdvisorStrip";
 import { ChatDock } from "@/components/chat/ChatDock";
 import { GearIcon } from "@/components/icons/Icon";
 
@@ -26,7 +28,13 @@ export default async function ProjectBoardPage({
     );
   }
 
-  const caller = await getCurrentStaff();
+  // Staff lookup and the advisor strip's top-3 are independent — fetch them
+  // together (the advisor runs its own internal Promise.all).
+  const [caller, advisorItems] = await Promise.all([
+    getCurrentStaff(),
+    getAdvisorItems(supabase, { projectId: board.project.id, now: new Date(), limit: 3 })
+      .catch(() => []),
+  ]);
   // Any signed-in staff can open settings (non-admins land on the Areas tab to
   // add/edit areas). Tab-level gating lives in the settings page itself.
   const showSettings = caller != null;
@@ -64,6 +72,7 @@ export default async function ProjectBoardPage({
           {board.project.project_code} · {board.project.project_name}
         </h1>
       </header>
+      <ProjectAdvisorStrip items={advisorItems} />
       <div className="flex-1 overflow-hidden">
         <Board board={board} />
       </div>

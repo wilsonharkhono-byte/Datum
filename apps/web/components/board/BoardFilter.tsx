@@ -58,13 +58,13 @@ export function BoardFilter({
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         placeholder="Cari judul atau ringkasan kartu…"
-        className="w-full rounded border border-[var(--border)] px-2 py-1 text-xs focus:border-[var(--sand-dark)] focus:outline-none sm:w-56"
+        className="min-h-11 w-full rounded border border-[var(--border)] px-3 py-1 text-xs focus:border-[var(--sand-dark)] focus:outline-none sm:w-56 md:min-h-0 md:px-2"
       />
       {query ? (
         <button
           type="button"
           onClick={() => onQueryChange("")}
-          className="text-[10px] text-[var(--text-muted)] hover:underline"
+          className="inline-flex min-h-11 items-center px-3 py-2.5 text-[10px] text-[var(--text-muted)] hover:underline md:min-h-0 md:py-1"
         >
           × bersihkan
         </button>

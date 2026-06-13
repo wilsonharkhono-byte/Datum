@@ -23,6 +23,11 @@ yarn-debug.log*
 .DS_Store
 .vscode/
 .idea/
+.claude/
+
+# Trello bulk-import working data (large downloaded board JSON + raw API dumps)
+# Generated locally by `pnpm --filter @datum/db import:trello-fetch`; never commit.
+assets/Trello/
 
 # tests
 coverage/

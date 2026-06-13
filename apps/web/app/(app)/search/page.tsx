@@ -4,12 +4,14 @@ import { searchAll, type SearchHit } from "@/lib/search/queries";
 import { SearchBox } from "@/components/search/SearchBox";
 
 const KIND_LABEL: Record<SearchHit["kind"], string> = {
+  project: "Proyek",
   card: "Kartu",
   event: "Aktivitas",
   comment: "Komentar",
 };
 
 const KIND_COLOR: Record<SearchHit["kind"], string> = {
+  project: "bg-[var(--sand)]/20 text-[var(--sand-dark)]",
   card: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]",
   event: "bg-[var(--sand-tint)] text-[var(--sand-dark)]",
   comment: "bg-[var(--surface-alt)] text-[var(--text-secondary)]",
@@ -22,15 +24,15 @@ export default async function SearchPage({
 }) {
   const { q = "" } = await searchParams;
   const supabase = await createSupabaseServerClient();
-  const results = q.trim().length >= 2 ? await searchAll(supabase, q) : { cards: [], events: [], comments: [] };
-  const total = results.cards.length + results.events.length + results.comments.length;
+  const results = q.trim().length >= 2 ? await searchAll(supabase, q) : { projects: [], cards: [], events: [], comments: [] };
+  const total = results.projects.length + results.cards.length + results.events.length + results.comments.length;
 
   return (
     <div className="mx-auto max-w-3xl p-6">
       <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
       <h1 className="mt-2 text-2xl font-semibold text-[#141210]">Cari</h1>
       <p className="mt-1 text-sm text-[#524E49]">
-        Pencarian teks di seluruh proyek — kartu, aktivitas, komentar.
+        Pencarian teks di seluruh proyek — proyek, kartu, aktivitas, komentar.
       </p>
       <div className="mt-4">
         <SearchBox initialQ={q} />
@@ -51,6 +53,7 @@ export default async function SearchPage({
       )}
 
       {[
+        { label: "Proyek", items: results.projects },
         { label: "Kartu", items: results.cards },
         { label: "Aktivitas", items: results.events },
         { label: "Komentar", items: results.comments },

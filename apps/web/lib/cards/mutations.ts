@@ -20,6 +20,14 @@ import {
   notifyDraftPending,
   notifyPrincipalsOfHighRiskEvent,
 } from "@/lib/notifications/producers";
+import { recomputeProjectGates } from "@/lib/gates/recompute";
+
+// Union of RELEVANT_KINDS in lib/gates/readiness-rules.ts — the kinds that can
+// move an (area, gate) cell. note and photo never affect readiness, so their
+// inserts skip the recompute trigger.
+const GATE_RELEVANT_KINDS: ReadonlySet<EventKind> = new Set([
+  "work", "material", "decision", "vendor", "drawing", "client_request", "document",
+]);
 
 const CreateCardInput = z.object({
   projectId:   z.string().uuid(),
@@ -264,6 +272,12 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
     cost_visible:       COST_VISIBLE_KINDS.has(input.eventKind),
   }).select("id").single();
   if (error) return { ok: false, error: error.message };
+
+  // Gate matrix cells depend on this event — recompute best-effort,
+  // fire-and-forget so the save never waits on it.
+  if (GATE_RELEVANT_KINDS.has(input.eventKind)) {
+    void recomputeProjectGates(input.projectId, input.projectCode).catch(console.warn);
+  }
 
   const { data: cardRow } = await supabase
     .from("cards").select("title, slug").eq("id", input.cardId).maybeSingle();
@@ -926,6 +940,9 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
     .from("cards").select("slug").eq("id", proposed.card_id).maybeSingle();
   const { data: projRow } = await supabase
     .from("projects").select("project_code").eq("id", draft.project_id).maybeSingle();
+  if (projRow && GATE_RELEVANT_KINDS.has(proposed.kind as EventKind)) {
+    void recomputeProjectGates(draft.project_id, projRow.project_code).catch(console.warn);
+  }
   if (cardRow && projRow && draft.created_by_staff_id) {
     await notifyDraftApproved(supabase, {
       draftId: draft.id,

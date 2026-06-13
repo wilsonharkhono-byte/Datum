@@ -52,17 +52,95 @@ type CardRef = {
 };
 
 export async function getBriefData(supabase: SupabaseClient<Database>): Promise<BriefData> {
-  // 1. Pending drafts (card_event drafts)
-  const { data: draftRows, count: draftCount } = await supabase
-    .from("data_drafts")
-    .select(`
-      id, created_at, proposed_payload, original_input_text,
-      projects:project_id (project_code, project_name)
-    `, { count: "exact" })
-    .eq("status", "draft")
-    .eq("draft_type", "card_event")
-    .order("created_at", { ascending: true })
-    .limit(TOP_N);
+  const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+  const [
+    { data: draftRows, count: draftCount },
+    { data: blockedRaw },
+    { data: defectEvs, count: defectCount },
+    { data: crEvs, count: crCount },
+    { data: decEvs, count: decCount },
+    { data: vendorEvs },
+    { data: gateRows },
+  ] = await Promise.all([
+    // 1. Pending drafts (card_event drafts)
+    supabase
+      .from("data_drafts")
+      .select(`
+        id, created_at, proposed_payload, original_input_text,
+        projects:project_id (project_code, project_name)
+      `, { count: "exact" })
+      .eq("status", "draft")
+      .eq("draft_type", "card_event")
+      .order("created_at", { ascending: true })
+      .limit(TOP_N),
+    // 2. Live blockers: work events with status=blocked not superseded by a
+    //    later non-blocked work event on the same card (append-only log).
+    // TODO(scale): limit(100) oldest-first truncates count and can drop newest blockers past 100 rows; revisit with a server-side open-blocker view.
+    supabase
+      .from("card_events")
+      .select(`
+        id, payload, occurred_at, created_at, card_id,
+        cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
+      `)
+      .eq("event_kind", "work")
+      .contains("payload", { status: "blocked" })
+      .order("occurred_at", { ascending: true })
+      .limit(100),
+    // 3. Defects (last 30 days; work events flagged issue=defect)
+    supabase
+      .from("card_events")
+      .select(`
+        id, payload, occurred_at,
+        cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
+      `, { count: "exact" })
+      .eq("event_kind", "work")
+      .contains("payload", { issue: "defect" })
+      .gte("occurred_at", thirtyAgo)
+      .order("occurred_at", { ascending: false })
+      .limit(TOP_N),
+    // 4. Awaiting client (open client_request events, oldest first)
+    supabase
+      .from("card_events")
+      .select(`
+        id, payload, occurred_at,
+        cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
+      `, { count: "exact" })
+      .eq("event_kind", "client_request")
+      .contains("payload", { status: "open" })
+      .order("occurred_at", { ascending: true })
+      .limit(TOP_N),
+    // 5. Decisions needed — the core coordination list, actor in meta
+    supabase
+      .from("card_events")
+      .select(`
+        id, payload, occurred_at,
+        cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
+      `, { count: "exact" })
+      .eq("event_kind", "decision")
+      .contains("payload", { status: "needs_decision" })
+      .order("occurred_at", { ascending: true })
+      .limit(TOP_N),
+    // 6. Expiring vendor quotes (cost-visible staff only — RLS hides these
+    //    events from everyone else, so the section degrades to empty).
+    supabase
+      .from("card_events")
+      .select(`
+        id, card_id, payload, occurred_at,
+        cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
+      `)
+      .eq("event_kind", "vendor")
+      .limit(500),
+    // 7+8. Gate cells: scheduled windows (cascade risks) and stale rows
+    supabase
+      .from("area_gate_status")
+      .select(`
+        area_id, gate_code, status, target_start_date, target_end_date, project_id, stale,
+        areas:area_id (area_name),
+        projects:project_id (project_code, project_name)
+      `)
+      .or("target_start_date.not.is.null,stale.eq.true"),
+  ]);
 
   const pendingDrafts = {
     count: draftCount ?? 0,
@@ -79,20 +157,6 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
       };
     }),
   };
-
-  // 2. Live blockers: work events with status=blocked not superseded by a
-  //    later non-blocked work event on the same card (append-only log).
-  // TODO(scale): limit(100) oldest-first truncates count and can drop newest blockers past 100 rows; revisit with a server-side open-blocker view.
-  const { data: blockedRaw } = await supabase
-    .from("card_events")
-    .select(`
-      id, payload, occurred_at, created_at, card_id,
-      cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
-    `)
-    .eq("event_kind", "work")
-    .contains("payload", { status: "blocked" })
-    .order("occurred_at", { ascending: true })
-    .limit(100);
 
   const blockedCardIds = [...new Set((blockedRaw ?? []).map((e) => e.card_id))];
   // Latest non-blocked work EVENT per card, chosen by the canonical total
@@ -134,20 +198,6 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     }),
   };
 
-  // 3. Defects (last 30 days; work events flagged issue=defect)
-  const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
-  const { data: defectEvs, count: defectCount } = await supabase
-    .from("card_events")
-    .select(`
-      id, payload, occurred_at,
-      cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
-    `, { count: "exact" })
-    .eq("event_kind", "work")
-    .contains("payload", { issue: "defect" })
-    .gte("occurred_at", thirtyAgo)
-    .order("occurred_at", { ascending: false })
-    .limit(TOP_N);
-
   const defects = {
     count: defectCount ?? 0,
     items: (defectEvs ?? []).map((e) => {
@@ -163,18 +213,6 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
       };
     }),
   };
-
-  // 4. Awaiting client (open client_request events, oldest first)
-  const { data: crEvs, count: crCount } = await supabase
-    .from("card_events")
-    .select(`
-      id, payload, occurred_at,
-      cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
-    `, { count: "exact" })
-    .eq("event_kind", "client_request")
-    .contains("payload", { status: "open" })
-    .order("occurred_at", { ascending: true })
-    .limit(TOP_N);
 
   const awaitingClient = {
     count: crCount ?? 0,
@@ -192,18 +230,6 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     }),
   };
 
-  // 5. Decisions needed — the core coordination list, actor in meta
-  const { data: decEvs, count: decCount } = await supabase
-    .from("card_events")
-    .select(`
-      id, payload, occurred_at,
-      cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
-    `, { count: "exact" })
-    .eq("event_kind", "decision")
-    .contains("payload", { status: "needs_decision" })
-    .order("occurred_at", { ascending: true })
-    .limit(TOP_N);
-
   const decisionsNeeded = {
     count: decCount ?? 0,
     items: (decEvs ?? []).map((e) => {
@@ -220,17 +246,6 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
       };
     }),
   };
-
-  // 6. Expiring vendor quotes (cost-visible staff only — RLS hides these
-  //    events from everyone else, so the section degrades to empty).
-  const { data: vendorEvs } = await supabase
-    .from("card_events")
-    .select(`
-      id, card_id, payload, occurred_at,
-      cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
-    `)
-    .eq("event_kind", "vendor")
-    .limit(500);
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const expiring = findExpiringQuotes((vendorEvs ?? []) as unknown as QuoteEvent[], todayIso);
@@ -250,16 +265,8 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
   };
 
   // 7. Gates at cascade risk: window started but predecessor gate not ready
-  const { data: cellRows } = await supabase
-    .from("area_gate_status")
-    .select(`
-      area_id, gate_code, status, target_start_date, target_end_date,
-      areas:area_id (area_name),
-      projects:project_id (project_code, project_name)
-    `)
-    .not("target_start_date", "is", null);
-
-  const scheduleCells: ScheduleCell[] = (cellRows ?? []).map((r) => {
+  const cellRows = (gateRows ?? []).filter((r) => r.target_start_date !== null);
+  const scheduleCells: ScheduleCell[] = cellRows.map((r) => {
     const area = (r as { areas: { area_name: string } | null }).areas;
     const proj = (r as { projects: { project_code: string; project_name: string } | null }).projects;
     return {
@@ -276,16 +283,10 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
   const gateRisks = findCascadeRisks(scheduleCells, todayIso);
 
   // 8. Stale by project
-  const { data: staleRows } = await supabase
-    .from("area_gate_status")
-    .select(`
-      project_id,
-      projects:project_id (project_code, project_name)
-    `)
-    .eq("stale", true);
+  const staleRows = (gateRows ?? []).filter((r) => r.stale === true);
 
   const byProject = new Map<string, { code: string; name: string; n: number }>();
-  for (const r of staleRows ?? []) {
+  for (const r of staleRows) {
     const proj = (r as { projects: { project_code: string; project_name: string } | null }).projects;
     if (!proj) continue;
     const cur = byProject.get(r.project_id) ?? { code: proj.project_code, name: proj.project_name, n: 0 };

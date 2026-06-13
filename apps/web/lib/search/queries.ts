@@ -3,7 +3,7 @@ import type { Database } from "@datum/db";
 
 export type SearchHit = {
   id: string;
-  kind: "card" | "event" | "comment";
+  kind: "card" | "event" | "comment" | "project";
   projectCode: string;
   cardSlug: string;
   cardTitle: string;
@@ -23,12 +23,32 @@ const PER_GROUP = 25;
 export async function searchAll(
   supabase: SupabaseClient<Database>,
   q: string,
-): Promise<{ cards: SearchHit[]; events: SearchHit[]; comments: SearchHit[] }> {
+): Promise<{ projects: SearchHit[]; cards: SearchHit[]; events: SearchHit[]; comments: SearchHit[] }> {
   const trimmed = q.trim();
   if (trimmed.length < 2) {
-    return { cards: [], events: [], comments: [] };
+    return { projects: [], cards: [], events: [], comments: [] };
   }
   const pattern = `%${trimmed.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+
+  // Projects: name / client / site address
+  const { data: projectRows } = await supabase
+    .from("projects")
+    .select("id, project_code, project_name, client_name, location")
+    .or(
+      `project_name.ilike.${pattern},client_name.ilike.${pattern},site_address.ilike.${pattern}`,
+    )
+    .limit(PER_GROUP);
+
+  const projects: SearchHit[] = (projectRows ?? []).map((p) => ({
+    id: `p_${p.id}`,
+    kind: "project" as const,
+    projectCode: p.project_code,
+    cardSlug: "",
+    cardTitle: `${p.project_code} · ${p.project_name}`,
+    snippet: [p.client_name ? `Client: ${p.client_name}` : null, p.location].filter(Boolean).join(" · "),
+    href: `/project/${p.project_code}`,
+    occurredAt: "",
+  }));
 
   // Cards: title OR current_summary
   const { data: cardRows } = await supabase
@@ -52,27 +72,19 @@ export async function searchAll(
     };
   });
 
-  // Events: payload cast to text (jsonb::text supports ilike)
-  // Supabase doesn't directly let us .ilike on a jsonb cast; use the rpc-like trick: filter via .or() with payload::text
-  // PostgREST supports the .ilike filter on jsonb-as-text using "payload->>somefield" only for top-level keys.
-  // Workaround: use the all() RPC or the supabase REST text search via .textSearch.
-  // Simplest acceptable: query by joining and filtering with .ilike on a TEXT column we already have.
-  // We'll search a few common text-bearing fields by extracting them via PostgREST's ->> operator.
-  // Actually simplest: do 3 separate small queries on payload->>'body', payload->>'description', payload->>'topic'.
+  // Events: sweep common payload text fields in a single .or() query
   const eventFields = ["body", "description", "topic", "request_text", "what", "notes", "title", "caption"];
-  const eventResults: unknown[] = [];
-  for (const f of eventFields) {
-    const { data } = await supabase
-      .from("card_events")
-      .select(`id, event_kind, payload, occurred_at, cards:card_id (slug, title, projects:project_id (project_code))`)
-      .ilike(`payload->>${f}`, pattern)
-      .limit(PER_GROUP);
-    if (data) eventResults.push(...data);
-  }
+  const orTerm = trimmed.replace(/[,()]/g, "").replace(/[%_]/g, (m) => `\\${m}`);
+  const orPattern = `*${orTerm}*`;
+  const { data: eventRows } = await supabase
+    .from("card_events")
+    .select(`id, event_kind, payload, occurred_at, cards:card_id (slug, title, projects:project_id (project_code))`)
+    .or(eventFields.map((f) => `payload->>${f}.ilike.${orPattern}`).join(","))
+    .limit(PER_GROUP * 2);
   // Dedup by id, sort, cap
   const seen = new Set<string>();
   const eventHits: SearchHit[] = [];
-  for (const e of eventResults) {
+  for (const e of eventRows ?? []) {
     const row = e as { id: string; event_kind: string; payload: unknown; occurred_at: string; cards: CardJoin | null };
     if (seen.has(row.id)) continue;
     seen.add(row.id);
@@ -116,7 +128,7 @@ export async function searchAll(
     };
   });
 
-  return { cards, events: eventHits, comments };
+  return { projects, cards, events: eventHits, comments };
 }
 
 function highlight(text: string, q: string): string {
