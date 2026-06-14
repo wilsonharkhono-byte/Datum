@@ -1,9 +1,7 @@
 "use client";
-import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Board as BoardData, BoardColumn } from "@/lib/cards/queries";
-import { optimisticReducer } from "@/lib/cards/optimisticBoard";
-import { OptimisticBoardProvider, type OptimisticBoardApi } from "@/lib/cards/optimisticBoardContext";
 import { useBoard } from "@/lib/query/hooks";
 import { keys } from "@/lib/query/keys";
 import { Column } from "./Column";
@@ -16,16 +14,10 @@ export function Board({ initialBoard }: { initialBoard: BoardData }) {
   const code = initialBoard.project.project_code;
   const queryClient = useQueryClient();
   const { data: board } = useBoard(code, initialBoard);
+  // Add/move now flow through TanStack mutations (useAddCard/useMoveCard), which
+  // optimistically write the ghost/moved card into this same query cache. The
+  // board renders directly from the live cache — no separate useOptimistic layer.
   const liveBoard = board ?? initialBoard;
-  const [optimisticBoard, addOptimistic] = useOptimistic(liveBoard, optimisticReducer);
-  const [, startTransition] = useTransition();
-  const api: OptimisticBoardApi = useMemo(
-    () => ({
-      addOptimisticCard: (topicId, title) =>
-        startTransition(() => addOptimistic({ type: "add-card", topicId, title })),
-    }),
-    [addOptimistic],
-  );
   useEffect(() => {
     return subscribeToProjectChanges(initialBoard.project.id, () => {
       queryClient.invalidateQueries({ queryKey: keys.board(code) });
@@ -42,7 +34,7 @@ export function Board({ initialBoard }: { initialBoard: BoardData }) {
     // midnight, consistent with the deadline chip in MiniCard.
     const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
     const cols: BoardColumn[] = [];
-    for (const col of optimisticBoard.columns) {
+    for (const col of liveBoard.columns) {
       const matchedCards = col.cards.filter((c) => {
         if (!statuses.has(c.status as "active" | "dormant" | "closed")) return false;
         if (labelFilter.size > 0) {
@@ -64,9 +56,9 @@ export function Board({ initialBoard }: { initialBoard: BoardData }) {
       }
     }
     return cols;
-  }, [optimisticBoard.columns, query, statuses, labelFilter]);
+  }, [liveBoard.columns, query, statuses, labelFilter]);
 
-  const totalCards = optimisticBoard.columns.reduce((n, c) => n + c.cards.length, 0);
+  const totalCards = liveBoard.columns.reduce((n, c) => n + c.cards.length, 0);
   const matchedTotal = filteredColumns.reduce((n, c) => n + c.cards.length, 0);
 
   // --- Mobile column carousel (below md) ------------------------------------
@@ -118,7 +110,6 @@ export function Board({ initialBoard }: { initialBoard: BoardData }) {
   }
 
   return (
-    <OptimisticBoardProvider value={api}>
     <div className="flex h-full flex-col">
       <BoardFilter
         query={query}
@@ -172,6 +163,5 @@ export function Board({ initialBoard }: { initialBoard: BoardData }) {
         </div>
       </div>
     </div>
-    </OptimisticBoardProvider>
   );
 }

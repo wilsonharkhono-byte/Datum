@@ -1,7 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import type { Topic } from "@datum/db";
-import { moveCard } from "@/lib/cards/mutations";
+import { useMoveCard } from "@/lib/query/mutations";
 
 export function MoveCardControl({
   cardId,
@@ -21,7 +21,7 @@ export function MoveCardControl({
   const [open, setOpen] = useState(false);
   const [targetId, setTargetId] = useState<string>(currentTopicId);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const move = useMoveCard(projectCode);
 
   const currentName = topics.find((t) => t.id === currentTopicId)?.name ?? "—";
 
@@ -51,10 +51,14 @@ export function MoveCardControl({
     fd.set("projectId", projectId);
     fd.set("projectCode", projectCode);
     fd.set("cardSlug", cardSlug);
-    startTransition(async () => {
-      const res = await moveCard(fd);
-      if (res.ok) setOpen(false);
-      else setError(res.error);
+    // Close immediately — the optimistic move lands in the cache via onMutate;
+    // on error the cache rolls back and we re-surface the message.
+    setOpen(false);
+    move.mutate(fd, {
+      onError: (err) => {
+        setOpen(true);
+        setError((err as Error).message);
+      },
     });
   }
 
@@ -65,7 +69,7 @@ export function MoveCardControl({
         id="move-card-column"
         value={targetId}
         onChange={(e) => setTargetId(e.target.value)}
-        disabled={pending}
+        disabled={move.isPending}
         className="select-brand-sm"
       >
         {topics.map((t) => (
@@ -75,16 +79,16 @@ export function MoveCardControl({
       <button
         type="button"
         onClick={submit}
-        disabled={pending || targetId === currentTopicId}
+        disabled={move.isPending || targetId === currentTopicId}
         aria-label="Pindah kartu ke kolom yang dipilih"
         className="rounded bg-[#141210] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
       >
-        {pending ? "…" : "pindah"}
+        {move.isPending ? "…" : "pindah"}
       </button>
       <button
         type="button"
         onClick={() => { setOpen(false); setTargetId(currentTopicId); setError(null); }}
-        disabled={pending}
+        disabled={move.isPending}
         aria-label="Batal pindahkan kartu"
         className="rounded px-2 py-1 text-xs font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
       >
