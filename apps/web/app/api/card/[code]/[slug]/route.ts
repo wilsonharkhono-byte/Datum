@@ -12,14 +12,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ code: s
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  let detail;
   try {
-    const detail = await getCardWithTimelineByProjectCode(supabase, code.toUpperCase(), slug);
+    detail = await getCardWithTimelineByProjectCode(supabase, code.toUpperCase(), slug);
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 404 });
+  }
+  try {
     const [comments, members] = await Promise.all([
       getCardComments(supabase, detail.card.id),
       getCardMembers(supabase, detail.card.id),
     ]);
     return NextResponse.json({ ...detail, comments, members } satisfies CardPayload);
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 404 });
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
