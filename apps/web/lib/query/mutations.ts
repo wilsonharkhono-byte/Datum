@@ -18,9 +18,10 @@ export function useAddCard(code: string) {
     onMutate: async (fd: FormData) => {
       const topicId = String(fd.get("topicId"));
       const title = String(fd.get("title"));
+      const optimisticId = `optimistic:${topicId}:${crypto.randomUUID()}`;
       await qc.cancelQueries({ queryKey: keys.board(code) });
       const prev = qc.getQueryData<Board>(keys.board(code));
-      if (prev) qc.setQueryData(keys.board(code), applyAddCard(prev, topicId, title));
+      if (prev) qc.setQueryData(keys.board(code), applyAddCard(prev, topicId, title, optimisticId));
       return { prev };
     },
     onError: (_e, _fd, ctx) => {
