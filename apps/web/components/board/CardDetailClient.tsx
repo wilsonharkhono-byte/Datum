@@ -91,7 +91,7 @@ export function CardDetailClient({
             events={card.events}
             attachmentsByEvent={attachmentsByEvent}
             projectCode={projectCode}
-            cardSlug={urlSlug}
+            cardSlug={slug}
           />
         </div>
         <div className="mt-6 border-t border-[var(--border)] pt-4">
@@ -102,7 +102,7 @@ export function CardDetailClient({
             cardId={card.card.id}
             projectId={projectId}
             projectCode={urlSlug}
-            cardSlug={urlSlug}
+            cardSlug={slug}
             cardCode={code}
             cardQuerySlug={slug}
             currentStaffId={currentStaffId}
@@ -126,7 +126,7 @@ export function CardDetailClient({
           <CardMembers
             cardId={card.card.id}
             projectCode={urlSlug}
-            cardSlug={urlSlug}
+            cardSlug={slug}
             members={members}
             candidates={candidates}
           />
