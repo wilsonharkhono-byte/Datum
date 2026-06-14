@@ -127,6 +127,8 @@ export function CardDetailClient({
             cardId={card.card.id}
             projectCode={urlSlug}
             cardSlug={slug}
+            cardCode={code}
+            cardQuerySlug={slug}
             members={members}
             candidates={candidates}
           />

@@ -118,7 +118,7 @@ export default async function CardDetailPage({
               <MoveCardControl
                 cardId={detail.card.id}
                 projectId={project.id}
-                projectCode={slug}
+                projectCode={project.project_code}
                 cardSlug={cardSlug}
                 currentTopicId={detail.card.topic_id}
                 topics={topics}
