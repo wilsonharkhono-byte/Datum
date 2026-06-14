@@ -13,9 +13,11 @@ test.describe("Project board (read-only)", () => {
     await page.getByRole("link", { name: /BDG-H1/ }).click();
     await page.waitForURL("**/project/BDG-H1");
 
-    // Board columns
-    await expect(page.getByText("A09 — Detail Kamar Mandi")).toBeVisible();
-    await expect(page.getByText("A05 — Kusen")).toBeVisible();
+    // Board columns. Area names also appear in the mobile BoardTabs chip strip
+    // (always in the DOM), so target the column <h2> heading specifically to
+    // avoid a strict-mode "resolved to 2 elements" ambiguity.
+    await expect(page.getByRole("heading", { name: "A09 — Detail Kamar Mandi" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "A05 — Kusen" })).toBeVisible();
 
     // Drill into Master bathroom
     await page.getByText("Master bathroom").click();
