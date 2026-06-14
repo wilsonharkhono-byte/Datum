@@ -1,18 +1,23 @@
 "use client";
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Board as BoardData, BoardColumn } from "@/lib/cards/queries";
 import { optimisticReducer } from "@/lib/cards/optimisticBoard";
 import { OptimisticBoardProvider, type OptimisticBoardApi } from "@/lib/cards/optimisticBoardContext";
+import { useBoard } from "@/lib/query/hooks";
+import { keys } from "@/lib/query/keys";
 import { Column } from "./Column";
 import { AddColumnForm } from "./AddColumnForm";
 import { BoardFilter, type StatusFilter, type LabelFilter } from "./BoardFilter";
 import { BoardTabs } from "./BoardTabs";
 import { subscribeToProjectChanges } from "@/lib/cards/realtime";
 
-export function Board({ board }: { board: BoardData }) {
-  const router = useRouter();
-  const [optimisticBoard, addOptimistic] = useOptimistic(board, optimisticReducer);
+export function Board({ initialBoard }: { initialBoard: BoardData }) {
+  const code = initialBoard.project.project_code;
+  const queryClient = useQueryClient();
+  const { data: board } = useBoard(code, initialBoard);
+  const liveBoard = board ?? initialBoard;
+  const [optimisticBoard, addOptimistic] = useOptimistic(liveBoard, optimisticReducer);
   const [, startTransition] = useTransition();
   const api: OptimisticBoardApi = useMemo(
     () => ({
@@ -22,8 +27,10 @@ export function Board({ board }: { board: BoardData }) {
     [addOptimistic],
   );
   useEffect(() => {
-    return subscribeToProjectChanges(board.project.id, () => router.refresh());
-  }, [board.project.id, router]);
+    return subscribeToProjectChanges(initialBoard.project.id, () => {
+      queryClient.invalidateQueries({ queryKey: keys.board(code) });
+    });
+  }, [initialBoard.project.id, code, queryClient]);
   const [query, setQuery] = useState("");
   const [statuses, setStatuses] = useState<StatusFilter>(new Set(["active"]));
   const [labelFilter, setLabelFilter] = useState<LabelFilter>(new Set());
@@ -66,7 +73,7 @@ export function Board({ board }: { board: BoardData }) {
   // Columns render as a horizontal snap carousel; the BoardTabs strip above
   // tracks and controls which column is in view. Refs live in Maps keyed by
   // topic id so they survive columns mounting/unmounting under filters,
-  // optimistic adds, and realtime router.refresh().
+  // optimistic adds, and realtime cache invalidation/refetch.
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const columnRefs = useRef(new Map<string, HTMLDivElement>());
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
@@ -145,8 +152,8 @@ export function Board({ board }: { board: BoardData }) {
             <Column
               key={col.topic.id}
               column={col}
-              projectId={board.project.id}
-              projectCode={board.project.project_code}
+              projectId={liveBoard.project.id}
+              projectCode={liveBoard.project.project_code}
               containerRef={(el) => {
                 if (el) columnRefs.current.set(col.topic.id, el);
                 else columnRefs.current.delete(col.topic.id);
@@ -159,8 +166,8 @@ export function Board({ board }: { board: BoardData }) {
             row is byte-for-byte what it was. */}
         <div className="w-[86vw] max-w-[22rem] shrink-0 snap-center md:contents">
           <AddColumnForm
-            projectId={board.project.id}
-            projectCode={board.project.project_code}
+            projectId={liveBoard.project.id}
+            projectCode={liveBoard.project.project_code}
           />
         </div>
       </div>
