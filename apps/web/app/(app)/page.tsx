@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getProjectsList } from "@/lib/projects/queries";
 import { ProjectEditDialog } from "@/components/projects/ProjectEditDialog";
 import { BellIcon, ClipboardIcon, BookIcon, SearchIcon } from "@/components/icons/Icon";
 
@@ -13,10 +14,13 @@ const statusLabel: Record<string, string> = {
 
 export default async function HomePage() {
   const supabase = await createSupabaseServerClient();
-  const { data: projects, error } = await supabase
-    .from("projects")
-    .select("id, project_code, project_name, client_name, location, status, target_handover")
-    .order("project_code");
+  let projects: Awaited<ReturnType<typeof getProjectsList>> | null = null;
+  let error: { message: string } | null = null;
+  try {
+    projects = await getProjectsList(supabase);
+  } catch (e) {
+    error = e as { message: string };
+  }
 
   const { count: pendingDraftCount } = await supabase
     .from("data_drafts")
