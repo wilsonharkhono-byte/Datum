@@ -60,6 +60,20 @@ Open screen
   └─ no (first ever / busted) ─▶ RSC server-renders & seeds the query  ────┘
 ```
 
+**Lessons folded in from the Trello tech-stack study** (the classic early write-up +
+secondary summaries):
+
+1. Trello's denormalized MongoDB "fast reads" → our single `get_board_bundle` RPC
+   so the shell never sits over a slow refresh (§2a).
+2. WebSocket push of card moves "almost instantly" to every open board →
+   realtime-first freshness with idle backoff (§5, §1).
+3. Thin 2k shell + <250k CDN bundle + cache subsequent visits → Next streaming shell
+   + persistent IndexedDB **data** cache. We persist the *data*, not just the JS
+   bundle, so revisits need zero data round-trip.
+
+Trello is pure client-fetch; we keep SSR seeding for a content-not-skeleton first
+paint (§4) — the one place we intentionally diverge.
+
 ## Architecture
 
 ### 1. Query provider + persistence
@@ -71,6 +85,11 @@ exactly the cached screens; auth pages don't need it. Config:
 
 - `QueryClient` defaults: `staleTime: 30_000`, `gcTime: 24h`,
   `refetchOnWindowFocus: true`, `refetchOnReconnect: true`, `retry: 1`.
+- **Revalidation cadence (Trello-style backoff):** realtime push is the primary
+  freshness signal (§5); periodic refetch is only a backstop. Allow focus refetch
+  while the tab is visible; when hidden/idle, suspend interval refetch
+  (`refetchIntervalInBackground: false`, no aggressive `refetchInterval`). The cache
+  must not poll a board nobody is looking at.
 - Persister: async IndexedDB persister backed by `idb-keyval` (single store, key per
   user — see §6).
 - `maxAge: 24h` and a **buster** string = build id (e.g. `NEXT_PUBLIC_BUILD_ID` /
@@ -85,13 +104,36 @@ matches the RSC seed exactly and label/deadline logic stays in one place. Each u
 `createSupabaseServerClient()` (cookie-bound → **RLS enforced**; never service role)
 and returns 401 if unauthenticated.
 
-- `GET /api/board/[code]` → `getBoardForProject(supabase, code)`
+- `GET /api/board/[code]` → **one** `get_board_bundle(code)` RPC (see §2a), then
+  `computeCardLabels` / `computeCardDeadlines` in TS — collapses today's ~6 query
+  waves into a single round-trip
 - `GET /api/projects` → the home projects list query (extract from
   `app/(app)/page.tsx` into `lib/projects/queries.ts` so route + page share it)
 - `GET /api/card/[code]/[slug]` → `getCardWithTimelineByProjectCode` (+ comments +
   members, matching what the card page renders)
 
 Middleware already allows `/api` through with its own auth, so no middleware change.
+
+### 2a. Single denormalized board read (Trello's "fast reads" lesson)
+
+Today `getBoardForProject` issues ~6 sequential/parallel Supabase queries (project →
+topics/cards/loop-events → card_areas/gate_status). Replace the *fetching* with one
+Postgres RPC `get_board_bundle(p_code text)` returning a single JSON object that
+bundles all of it:
+
+```
+{ project, topics[], cards[], loop_events[], card_areas[], gate_status[] }
+```
+
+- The RPC is a **data bundler only** — it does NOT recompute labels/deadlines in SQL.
+  The route still runs the existing, tested `computeCardLabels` and
+  `computeCardDeadlines` on the bundle, producing the same `Board` shape. Label and
+  lifecycle rules stay in one place (TS); no SQL/TS drift.
+- `SECURITY INVOKER` so RLS still applies via the caller's session.
+- `getBoardForProject` is refactored to call the RPC; **both** the RSC seed and the
+  API route go through it, so first paint and background refetch share one fast read.
+- New migration in `packages/db/supabase/migrations/`; regenerate
+  `packages/db/src/types.generated.ts` (this branch already touches db types).
 
 ### 3. Query keys + hooks
 
@@ -118,12 +160,16 @@ RSC pages keep fetching server-side and pass the result down:
 `initialData` seeds the cache so first paint is server-rendered and immediately
 persisted; subsequent visits hydrate from IndexedDB before the queryFn runs.
 
-### 5. Realtime → cache update (replaces `router.refresh()`)
+### 5. Realtime-first freshness (replaces `router.refresh()`)
 
-`lib/cards/realtime.ts` subscription callback changes from `router.refresh()` to
+Realtime push is the **primary** way the cache stays fresh — mirroring Trello pushing
+a card move to every open board "almost instantly." `lib/cards/realtime.ts`'s callback
+changes from `router.refresh()` to
 `queryClient.invalidateQueries({ queryKey: keys.board(code) })` (and
-`keys.card(code, slug)` on the card screen). Background refetch patches only what
-changed — no full server re-render. Debounce stays.
+`keys.card(code, slug)` on the card screen); the resulting background refetch (one RPC
+read, §2a) patches only what changed — no full server re-render. The existing debounce
+stays. Periodic polling is a backstop only, with idle backoff per §1 — when nobody is
+looking at a board it neither polls nor refetches.
 
 ### 6. Shared-device cache safety (flagged item A — approved)
 
@@ -161,6 +207,8 @@ the Vercel dashboard). Confirm the actual Supabase region first and match it
 ## Files touched (estimate)
 
 New:
+- `packages/db/supabase/migrations/<ts>_get_board_bundle_rpc.sql` + regenerated
+  `packages/db/src/types.generated.ts`
 - `app/providers.tsx` (query/persist provider)
 - `lib/query/{client.ts,keys.ts,hooks.ts,persister.ts}`
 - `app/api/board/[code]/route.ts`, `app/api/projects/route.ts`,
@@ -171,6 +219,7 @@ New:
 - tests (see below)
 
 Modified:
+- `lib/cards/queries.ts` (`getBoardForProject` refactored to call `get_board_bundle`)
 - root/`(app)` layout (mount provider)
 - `components/board/Board.tsx` (consume `useBoard`, optimistic mutations, realtime)
 - `components/board/AddCardForm.tsx`, `MoveCardControl.tsx` (useMutation)
@@ -208,11 +257,13 @@ E2e (Playwright):
 ## Rollout / sequencing
 
 1. Region pin (Tier 1) — independent, ship/confirm first.
-2. Provider + persister + query infra, board only (seed + read-from-cache).
-3. Board realtime → invalidate; board mutations → optimistic.
-4. Projects list.
-5. Card detail (read + comment/event/member mutations).
-6. Cache-safety (logout/login clear) + tests throughout.
+2. `get_board_bundle` RPC + refactor `getBoardForProject` to use it (one read);
+   regenerate db types.
+3. Provider + persister + query infra; board read-from-cache (SSR seed + IDB).
+4. Board realtime → invalidate (idle backoff); board mutations → optimistic.
+5. Projects list.
+6. Card detail (read + comment/event/member mutations).
+7. Cache-safety (logout/login clear) + tests throughout.
 
 ## Out of scope
 
