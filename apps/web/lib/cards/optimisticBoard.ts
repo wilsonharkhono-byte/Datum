@@ -29,16 +29,46 @@ function makeOptimisticCard(topicId: string, title: string): BoardCardView {
   return { ...(base as Card), labels: [], deadline: null, __optimistic: true };
 }
 
+/** Pure: append a ghost card to the matching column. Unknown topicId returns
+    the board unchanged. Never mutates `board`. Shared by the (legacy) reducer
+    and the TanStack add-card mutation. */
+export function applyAddCard(board: Board, topicId: string, title: string): Board {
+  let matched = false;
+  const columns = board.columns.map((col) => {
+    if (col.topic.id !== topicId) return col;
+    matched = true;
+    return { ...col, cards: [...col.cards, makeOptimisticCard(topicId, title)] };
+  });
+  return matched ? { ...board, columns } : board;
+}
+
+/** Pure: move a card to `newTopicId`. Removes it from its current column and
+    appends it to the target. Unknown card id returns the board unchanged.
+    Never mutates `board`. */
+export function applyMoveCard(board: Board, cardId: string, newTopicId: string): Board {
+  let card: BoardCardView | undefined;
+  for (const col of board.columns) {
+    const found = col.cards.find((c) => c.id === cardId);
+    if (found) { card = found; break; }
+  }
+  if (!card) return board;
+  const moved: BoardCardView = { ...card, topic_id: newTopicId };
+  const columns = board.columns.map((col) => {
+    if (col.topic.id === card!.topic_id && col.topic.id !== newTopicId) {
+      return { ...col, cards: col.cards.filter((c) => c.id !== cardId) };
+    }
+    if (col.topic.id === newTopicId) {
+      return { ...col, cards: [...col.cards.filter((c) => c.id !== cardId), moved] };
+    }
+    return col;
+  });
+  return { ...board, columns };
+}
+
 /** Pure reducer for `useOptimistic`. Returns a new Board with a ghost card
     appended to the matching column; unknown topicId returns the board unchanged.
     Never mutates `board`. */
 export function optimisticReducer(board: Board, action: OptimisticAction): Board {
   if (action.type !== "add-card") return board;
-  let matched = false;
-  const columns = board.columns.map((col) => {
-    if (col.topic.id !== action.topicId) return col;
-    matched = true;
-    return { ...col, cards: [...col.cards, makeOptimisticCard(action.topicId, action.title)] };
-  });
-  return matched ? { ...board, columns } : board;
+  return applyAddCard(board, action.topicId, action.title);
 }
