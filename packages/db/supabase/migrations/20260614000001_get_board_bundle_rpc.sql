@@ -7,6 +7,7 @@ returns jsonb
 language sql
 stable
 security invoker
+set search_path = public
 as $$
   with proj as (
     select * from public.projects
