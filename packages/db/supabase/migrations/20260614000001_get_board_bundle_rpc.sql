@@ -57,5 +57,6 @@ as $$
     ), '[]'::jsonb)
   )
   where exists (select 1 from proj);
+$$;
 
 grant execute on function public.get_board_bundle(text) to anon, authenticated;
