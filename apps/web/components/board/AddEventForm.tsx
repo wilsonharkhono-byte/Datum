@@ -194,7 +194,11 @@ export function AddEventForm({
         if (res.fieldErrors) setFieldErrors(res.fieldErrors);
         return;
       }
-      // Event created. If files were selected, upload them in series.
+      // Event created — refetch the card now so the author's own event appears
+      // deterministically (don't rely on realtime), even if an attachment upload
+      // below fails and bails out early.
+      queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
+      // If files were selected, upload them in series.
       if (files.length > 0) {
         setUploadState("uploading");
         for (const file of files) {
@@ -224,9 +228,6 @@ export function AddEventForm({
         }
         setUploadState("done");
       }
-      // Event created and any attachments settled — refetch the card so the
-      // author's own event appears deterministically (don't rely on realtime).
-      queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
       setOpen(false);
       setOccurredAt("");
       setFiles([]);
