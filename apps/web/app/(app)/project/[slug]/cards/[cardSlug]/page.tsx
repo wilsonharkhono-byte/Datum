@@ -104,6 +104,8 @@ export default async function CardDetailPage({
                 projectId={project.id}
                 projectCode={slug}
                 cardSlug={cardSlug}
+                cardCode={project.project_code}
+                cardQuerySlug={cardSlug}
               />
             }
             addEvent={
@@ -112,6 +114,8 @@ export default async function CardDetailPage({
                 projectId={project.id}
                 projectCode={slug}
                 cardSlug={cardSlug}
+                cardCode={project.project_code}
+                cardQuerySlug={cardSlug}
               />
             }
             moveControl={
@@ -129,6 +133,8 @@ export default async function CardDetailPage({
                 cardId={detail.card.id}
                 projectCode={slug}
                 cardSlug={cardSlug}
+                cardCode={project.project_code}
+                cardQuerySlug={cardSlug}
                 currentAreas={cardAreas}
                 allProjectAreas={projectAreas}
               />

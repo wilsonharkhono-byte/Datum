@@ -1,7 +1,9 @@
 "use client";
 import { useState, useTransition, useId, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
+import { keys } from "@/lib/query/keys";
 import type { EventKind } from "@datum/types";
 
 const KIND_LABELS: Record<EventKind, string> = {
@@ -148,12 +150,19 @@ export function AddEventForm({
   projectId,
   projectCode,
   cardSlug,
+  cardCode,
+  cardQuerySlug,
 }: {
   cardId: string;
   projectId: string;
   projectCode: string;
   cardSlug: string;
+  /** Canonical uppercase project_code — identity for the useCard query key. */
+  cardCode: string;
+  /** Canonical card slug — identity for the useCard query key. */
+  cardQuerySlug: string;
 }) {
+  const queryClient = useQueryClient();
   const formId = useId();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<EventKind>("note");
@@ -215,6 +224,9 @@ export function AddEventForm({
         }
         setUploadState("done");
       }
+      // Event created and any attachments settled — refetch the card so the
+      // author's own event appears deterministically (don't rely on realtime).
+      queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
       setOpen(false);
       setOccurredAt("");
       setFiles([]);

@@ -1,25 +1,34 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Area } from "@datum/db";
 import { XIcon } from "@/components/icons/Icon";
 import {
   linkCardToArea,
   unlinkCardFromArea,
 } from "@/lib/cards/area-link-mutations";
+import { keys } from "@/lib/query/keys";
 
 export function CardAreas({
   cardId,
   projectCode,
   cardSlug,
+  cardCode,
+  cardQuerySlug,
   currentAreas,
   allProjectAreas,
 }: {
   cardId: string;
   projectCode: string;
   cardSlug: string;
+  /** Canonical uppercase project_code — identity for the useCard/useBoard query keys. */
+  cardCode: string;
+  /** Canonical card slug — identity for the useCard query key. */
+  cardQuerySlug: string;
   currentAreas: Area[];
   allProjectAreas: Area[];
 }) {
+  const queryClient = useQueryClient();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +45,10 @@ export function CardAreas({
     fd.set("cardSlug", cardSlug);
     startTransition(async () => {
       const res = await linkCardToArea(fd);
-      if (!res.ok) setError(res.error);
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
+        queryClient.invalidateQueries({ queryKey: keys.board(cardCode) });
+      } else setError(res.error);
     });
   }
 
@@ -49,7 +61,10 @@ export function CardAreas({
     fd.set("cardSlug", cardSlug);
     startTransition(async () => {
       const res = await unlinkCardFromArea(fd);
-      if (!res.ok) setError(res.error);
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
+        queryClient.invalidateQueries({ queryKey: keys.board(cardCode) });
+      } else setError(res.error);
     });
   }
 
