@@ -36,4 +36,19 @@ describe("mapBoardBundle", () => {
     expect(card.labels.map((l) => l.kind)).toEqual(["needs_decision", "awaiting"]);
     expect(card.deadline).toBeNull();
   });
+
+  it("wires a card's deadline from its area links and gate status", () => {
+    const linked: BoardBundle = {
+      ...bundle,
+      card_areas: [{ card_id: "c2", area_id: "a1" }],
+      gate_status: [
+        { area_id: "a1", gate_code: "B", status: "in_progress",
+          target_start_date: "2026-06-20", target_end_date: "2026-07-05" },
+      ],
+    };
+    const board = mapBoardBundle(linked, "2026-06-14");
+    const card = board.columns[1]!.cards[0]!; // c2 = Master bathroom
+    expect(card.slug).toBe("master");
+    expect(card.deadline).toEqual({ gateCode: "B", targetEndDate: "2026-07-05" });
+  });
 });
