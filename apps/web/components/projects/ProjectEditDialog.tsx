@@ -1,7 +1,9 @@
 "use client";
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { updateProject } from "@/lib/projects/mutations";
+import { keys } from "@/lib/query/keys";
 
 type Project = {
   id: string;
@@ -16,6 +18,7 @@ type Project = {
 export function ProjectEditDialog({ project }: { project: Project }) {
   const formId = useId();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(project.project_name);
   const [client, setClient] = useState(project.client_name ?? "");
@@ -39,6 +42,7 @@ export function ProjectEditDialog({ project }: { project: Project }) {
       const res = await updateProject(fd);
       if (res.ok) {
         setOpen(false);
+        queryClient.invalidateQueries({ queryKey: keys.projects() });
         router.refresh();
       } else setError(res.error);
     });

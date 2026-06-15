@@ -1,7 +1,9 @@
 "use client";
 import { useState, useTransition, useId, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
+import { keys } from "@/lib/query/keys";
 import type { EventKind } from "@datum/types";
 
 const KIND_LABELS: Record<EventKind, string> = {
@@ -148,12 +150,19 @@ export function AddEventForm({
   projectId,
   projectCode,
   cardSlug,
+  cardCode,
+  cardQuerySlug,
 }: {
   cardId: string;
   projectId: string;
   projectCode: string;
   cardSlug: string;
+  /** Canonical uppercase project_code — identity for the useCard query key. */
+  cardCode: string;
+  /** Canonical card slug — identity for the useCard query key. */
+  cardQuerySlug: string;
 }) {
+  const queryClient = useQueryClient();
   const formId = useId();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<EventKind>("note");
@@ -185,7 +194,11 @@ export function AddEventForm({
         if (res.fieldErrors) setFieldErrors(res.fieldErrors);
         return;
       }
-      // Event created. If files were selected, upload them in series.
+      // Event created — refetch the card now so the author's own event appears
+      // deterministically (don't rely on realtime), even if an attachment upload
+      // below fails and bails out early.
+      queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
+      // If files were selected, upload them in series.
       if (files.length > 0) {
         setUploadState("uploading");
         for (const file of files) {

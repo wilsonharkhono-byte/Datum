@@ -3,11 +3,14 @@
 import { useTransition, useMemo } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearIdbCache } from "@/lib/query/idb-kv";
 
 export function LogoutButton() {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const qc = useQueryClient();
 
   return (
     <button
@@ -16,6 +19,8 @@ export function LogoutButton() {
       onClick={() =>
         startTransition(async () => {
           await supabase.auth.signOut();
+          qc.clear();
+          await clearIdbCache();
           router.push("/login");
         })
       }

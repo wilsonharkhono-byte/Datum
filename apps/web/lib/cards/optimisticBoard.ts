@@ -6,15 +6,15 @@ import type { Card } from "@datum/db";
     flag marking a still-saving optimistic (ghost) card. */
 export type BoardCardView = CardWithLabels & { __optimistic?: boolean };
 
-export type OptimisticAction = { type: "add-card"; topicId: string; title: string };
-
 /** Build the ghost card shown immediately on submit, before the server insert
-    completes. Deterministic id (topic + title) — no Date.now/Math.random so the
-    reducer stays pure and SSR-safe. The card is replaced by the real row when
-    the server action settles and fresh `board` props arrive. */
-function makeOptimisticCard(topicId: string, title: string): BoardCardView {
+    completes. Pass a unique `id` (e.g. from crypto.randomUUID()) to avoid React
+    key collisions when the same title is added multiple times. When `id` is
+    omitted the deterministic fallback `optimistic:${topicId}:${title}` is used
+    (SSR-safe, stable across renders). The card is replaced by the real row when
+    the server action settles and fresh `board` data arrives. */
+export function makeOptimisticCard(topicId: string, title: string, id?: string): BoardCardView {
   const base: Partial<Card> = {
-    id: `optimistic:${topicId}:${title}`,
+    id: id ?? `optimistic:${topicId}:${title}`,
     topic_id: topicId,
     title,
     slug: "",
@@ -29,16 +29,39 @@ function makeOptimisticCard(topicId: string, title: string): BoardCardView {
   return { ...(base as Card), labels: [], deadline: null, __optimistic: true };
 }
 
-/** Pure reducer for `useOptimistic`. Returns a new Board with a ghost card
-    appended to the matching column; unknown topicId returns the board unchanged.
-    Never mutates `board`. */
-export function optimisticReducer(board: Board, action: OptimisticAction): Board {
-  if (action.type !== "add-card") return board;
+/** Pure: append a ghost card to the matching column. Pass a unique `id` to
+    avoid React key collisions on duplicate same-title adds. Unknown topicId
+    returns the board unchanged. Never mutates `board`. */
+export function applyAddCard(board: Board, topicId: string, title: string, id?: string): Board {
   let matched = false;
   const columns = board.columns.map((col) => {
-    if (col.topic.id !== action.topicId) return col;
+    if (col.topic.id !== topicId) return col;
     matched = true;
-    return { ...col, cards: [...col.cards, makeOptimisticCard(action.topicId, action.title)] };
+    return { ...col, cards: [...col.cards, makeOptimisticCard(topicId, title, id)] };
   });
   return matched ? { ...board, columns } : board;
 }
+
+/** Pure: move a card to `newTopicId`. Removes it from its current column and
+    appends it to the target. Unknown card id returns the board unchanged.
+    Never mutates `board`. */
+export function applyMoveCard(board: Board, cardId: string, newTopicId: string): Board {
+  let card: BoardCardView | undefined;
+  for (const col of board.columns) {
+    const found = col.cards.find((c) => c.id === cardId);
+    if (found) { card = found; break; }
+  }
+  if (!card) return board;
+  const moved: BoardCardView = { ...card, topic_id: newTopicId };
+  const columns = board.columns.map((col) => {
+    if (col.topic.id === card!.topic_id && col.topic.id !== newTopicId) {
+      return { ...col, cards: col.cards.filter((c) => c.id !== cardId) };
+    }
+    if (col.topic.id === newTopicId) {
+      return { ...col, cards: [...col.cards.filter((c) => c.id !== cardId), moved] };
+    }
+    return col;
+  });
+  return { ...board, columns };
+}
+

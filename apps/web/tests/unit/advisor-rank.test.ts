@@ -57,6 +57,10 @@ describe("scoreItem", () => {
     expect(scoreItem(signal("gate_soon", { dueDate: "2026-06-15" }), NOW)).toBe(61); // 3 left
     expect(scoreItem(signal("gate_soon", { dueDate: "2026-06-12" }), NOW)).toBe(73); // today
   });
+
+  it("scores gate_ready a flat 52 (opportunity, not emergency)", () => {
+    expect(scoreItem(signal("gate_ready"), NOW)).toBe(52);
+  });
 });
 
 describe("rankAdvisorItems", () => {
@@ -96,6 +100,28 @@ describe("rankAdvisorItems", () => {
     );
     expect(ranked[0]!.type).toBe("gate_overdue");
     expect(ranked[0]!.score).toBeGreaterThan(ranked[1]!.score);
+  });
+
+  it("ranks gate_ready below blockers/overdue but above gate_soon and stale_card", () => {
+    const ranked = rankAdvisorItems(
+      [
+        signal("stale_card"),                              // 30
+        signal("gate_soon", { dueDate: "2026-06-19" }),    // 45
+        signal("gate_ready"),                              // 52
+        signal("schedule_rot"),                            // 55
+        signal("blocker", { occurredAt: NOW.toISOString() }), // 80
+        signal("gate_overdue", { dueDate: "2026-06-11" }), // 102
+      ],
+      NOW,
+    );
+    expect(ranked.map((r) => r.type)).toEqual([
+      "gate_overdue",
+      "blocker",
+      "schedule_rot",
+      "gate_ready",
+      "gate_soon",
+      "stale_card",
+    ]);
   });
 
   it("lifts a deadline-boosted decision above blockers", () => {

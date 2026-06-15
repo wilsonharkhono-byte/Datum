@@ -52,6 +52,12 @@ export default async function ProjectBoardPage({
               Cetak →
             </Link>
             <Link
+              href={`/project/${board.project.project_code}/rooms`}
+              className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+            >
+              Ruangan →
+            </Link>
+            <Link
               href={`/project/${board.project.project_code}/schedule`}
               className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
             >
@@ -74,7 +80,7 @@ export default async function ProjectBoardPage({
       </header>
       <ProjectAdvisorStrip items={advisorItems} />
       <div className="flex-1 overflow-hidden">
-        <Board board={board} />
+        <Board initialBoard={board} />
       </div>
       <ChatDock projectId={board.project.id} projectCode={board.project.project_code} />
     </div>

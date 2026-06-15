@@ -1,7 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Card } from "@datum/db";
 import { updateCard } from "@/lib/cards/mutations";
+import { keys } from "@/lib/query/keys";
 import { TrelloIcon } from "@/components/icons/Icon";
 import { NextDeadlineBadge } from "@/components/schedule/NextDeadlineBadge";
 
@@ -16,12 +18,19 @@ export function CardHeader({
   projectId,
   projectCode,
   cardSlug,
+  cardCode,
+  cardQuerySlug,
 }: {
   card: Card;
   projectId: string;
   projectCode: string;
   cardSlug: string;
+  /** Canonical uppercase project_code — identity for the useCard/useBoard query keys. */
+  cardCode: string;
+  /** Canonical card slug — identity for the useCard query key. */
+  cardQuerySlug: string;
 }) {
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(card.title);
   const [summary, setSummary] = useState(card.current_summary ?? "");
@@ -44,8 +53,11 @@ export function CardHeader({
     fd.set("status", status);
     startTransition(async () => {
       const res = await updateCard(fd);
-      if (res.ok) setEditing(false);
-      else setError(res.error);
+      if (res.ok) {
+        setEditing(false);
+        queryClient.invalidateQueries({ queryKey: keys.board(cardCode) });
+        queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
+      } else setError(res.error);
     });
   }
 

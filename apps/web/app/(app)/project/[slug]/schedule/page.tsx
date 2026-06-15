@@ -6,7 +6,8 @@ import { RecomputeButton } from "@/components/schedule/RecomputeButton";
 import { RULE_VERSION } from "@/lib/gates/readiness-rules";
 import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
-import { getProjectScheduleCells } from "@/lib/gates/schedule";
+import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
+import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
 
 export default async function ProjectSchedulePage({
   params,
@@ -32,6 +33,7 @@ export default async function ProjectSchedulePage({
 
   const matrix = await fetchMatrix(project.id);
   const scheduleCells = await getProjectScheduleCells(project.id);
+  const areaTargets = await getAreaTargetDates(project.id);
 
   // Count stale cells
   const { count: staleCount } = await supabase
@@ -84,6 +86,57 @@ export default async function ProjectSchedulePage({
       <section className="mb-4">
         <RulesViewer />
       </section>
+
+      {matrix && matrix.areas.length > 0 ? (
+        <section className="mb-6">
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
+            Target handover per area
+          </h2>
+          <p className="mb-3 text-xs text-[var(--text-secondary)]">
+            Set tanggal target nyata per area. Jika diisi, window gate area itu
+            dihitung mundur dari target (gate H berakhir di tanggal target),
+            menggantikan jadwal default dari kickoff. Kosongkan untuk kembali ke
+            jadwal default.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {matrix.areas.map((area) => {
+              const target = areaTargets.get(area.id) ?? null;
+              return (
+                <div
+                  key={area.id}
+                  className={`rounded border bg-[var(--surface)] px-3 py-2 ${
+                    target ? "border-[var(--sand-dark)]" : "border-[var(--border)]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-[var(--foreground)]">
+                        {area.area_name}
+                      </div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+                        {area.area_code}
+                      </div>
+                    </div>
+                    {target ? (
+                      <span
+                        className="shrink-0 rounded-sm border border-[var(--sand-dark)] bg-[var(--sand-tint)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--sand-dark)]"
+                        title="Area ini punya target nyata — window gate dihitung mundur dari target."
+                      >
+                        Baseline ulang
+                      </span>
+                    ) : null}
+                  </div>
+                  <AreaTargetEditor
+                    areaId={area.id}
+                    projectId={project.id}
+                    initialTarget={target}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mb-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">

@@ -1,7 +1,9 @@
 "use client";
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { updateProject } from "@/lib/projects/mutations";
+import { keys } from "@/lib/query/keys";
 import { CheckIcon } from "@/components/icons/Icon";
 
 type Project = {
@@ -18,6 +20,7 @@ type Project = {
 export function ProjectInfoForm({ project }: { project: Project }) {
   const formId = useId();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [name, setName] = useState(project.project_name);
   const [client, setClient] = useState(project.client_name ?? "");
   const [location, setLocation] = useState(project.location ?? "");
@@ -44,6 +47,7 @@ export function ProjectInfoForm({ project }: { project: Project }) {
       const res = await updateProject(fd);
       if (res.ok) {
         setSaved(true);
+        queryClient.invalidateQueries({ queryKey: keys.projects() });
         router.refresh();
         setTimeout(() => setSaved(false), 3000);
       } else {

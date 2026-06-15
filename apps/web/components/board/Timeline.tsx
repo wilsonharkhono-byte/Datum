@@ -1,11 +1,14 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useMemo, useState } from "react";
 import type { CardEvent, CardAttachment, CardEventKind } from "@datum/db";
 import { EventRow } from "./EventRow";
 import { TimelineFilter } from "./TimelineFilter";
 
+// Realtime freshness for card_events is handled once by CardDetailClient, which
+// subscribes via subscribeToProjectChanges and invalidates the card query — the
+// source of `events` here. Timeline therefore no longer runs its own
+// router.refresh() subscription (that refreshed RSC but not this cache-backed
+// list).
 export function Timeline({
   events,
   attachmentsByEvent,
@@ -17,23 +20,6 @@ export function Timeline({
   projectCode: string;
   cardSlug: string;
 }) {
-  const router = useRouter();
-
-  const cardId = events[0]?.card_id; // all events belong to the same card
-  useEffect(() => {
-    if (!cardId) return;
-    const supabase = createSupabaseBrowserClient();
-    const ch = supabase
-      .channel(`card-events:${cardId}`)
-      .on(
-        "postgres_changes" as never,
-        { event: "*", schema: "public", table: "card_events", filter: `card_id=eq.${cardId}` },
-        () => router.refresh(),
-      )
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  }, [cardId, router]);
-
   // Available kinds = those actually present on this card
   const available = useMemo(() => {
     const s = new Set<CardEventKind>();

@@ -1,38 +1,52 @@
 "use client";
-import { useState, useTransition } from "react";
-import { createComment } from "@/lib/cards/mutations";
+import { useState } from "react";
+import { useAddComment } from "@/lib/query/mutations";
 
 export function CommentInput({
   cardId,
   projectId,
   projectCode,
   cardSlug,
+  cardCode,
+  cardQuerySlug,
 }: {
   cardId: string;
   projectId: string;
+  /** projectCode/cardSlug go into the createComment FormData (revalidatePath). */
   projectCode: string;
   cardSlug: string;
+  /** cardCode/cardQuerySlug are the card-query identity (= useCard's code/slug)
+      so the optimistic ghost lands in the same cache entry the list reads. */
+  cardCode: string;
+  cardQuerySlug: string;
 }) {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // The mutation optimistically appends a ghost comment into the cached card and
+  // rolls back on error, so the comment shows instantly like the board flows.
+  const addComment = useAddComment(cardCode, cardQuerySlug);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!body.trim()) return;
+    const trimmed = body.trim();
+    if (!trimmed) return;
     setError(null);
     const fd = new FormData();
     fd.set("cardId", cardId);
     fd.set("projectId", projectId);
     fd.set("projectCode", projectCode);
     fd.set("cardSlug", cardSlug);
-    fd.set("body", body.trim());
-    startTransition(async () => {
-      const res = await createComment(fd);
-      if (res.ok) setBody("");
-      else setError(res.error);
+    fd.set("body", trimmed);
+    setBody("");
+    addComment.mutate(fd, {
+      onError: (err) => {
+        setBody(trimmed);
+        setError((err as Error).message);
+      },
     });
   }
+
+  const pending = addComment.isPending;
 
   return (
     <form onSubmit={submit} className="mt-3">

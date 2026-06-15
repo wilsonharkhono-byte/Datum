@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
-import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
+import { createCard, createCardEvent, attachToEvent } from "@/lib/cards/mutations";
+import { linkCardToArea } from "@/lib/cards/area-link-mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
 import { HIGH_RISK_KINDS, type EventKind } from "@datum/types";
 import { CheckIcon, XIcon, PaperclipIcon } from "@/components/icons/Icon";
@@ -18,6 +19,15 @@ export type Proposal = {
   projectCode: string;
   fileMeta?:  { name: string; mime: string; size: number } | null;
   pendingFile?: File;
+  // Capture-time area hint: the existing project area this note most likely
+  // refers to. When present, ProposalCard offers to link the card to it on
+  // commit (the area drives the gate × area matrix).
+  areaHint?:  { areaId: string; areaCode: string; areaName: string } | null;
+  // When the AI matched a Trello-import template placeholder card, the save
+  // creates a NEW card instead of burying the event in the placeholder.
+  createNew?:    boolean;
+  newCardTitle?: string | null;  // default title for the new card ("YYYY-MM-DD - …")
+  topicId?:      string;         // column the new card is created in
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -44,7 +54,20 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
   const [status, setStatus] = useState<"pending" | "saving" | "saved" | "discarded" | "error">("pending");
   const [error, setError] = useState<string | null>(null);
   const [confirmArmed, setConfirmArmed] = useState(false);
+  // Default to ON when a hint is present: linking is the whole point of the
+  // hint, but the user can opt out before committing.
+  const [linkArea, setLinkArea] = useState(true);
+  const [areaLinked, setAreaLinked] = useState(false);
+  const [title, setTitle] = useState(proposal.newCardTitle ?? "");
+  // The card the event ultimately landed on — equals the proposal card unless a
+  // new card was created on commit. Drives the saved-state "Buka kartu" link.
+  const [savedCard, setSavedCard] = useState<{ slug: string; title: string }>({
+    slug: proposal.cardSlug,
+    title: proposal.cardTitle,
+  });
   const [, startTransition] = useTransition();
+
+  const areaHint = proposal.areaHint ?? null;
 
   const isHighRisk = HIGH_RISK_KINDS.has(proposal.eventKind as EventKind);
   const conf = Math.round(proposal.confidence * 100);
@@ -65,15 +88,48 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
     setStatus("saving");
 
     startTransition(async () => {
-      // Always commit directly to the card. High-risk kinds get a label
-      // (rendered via the timeline chip + a notification to principals),
-      // not a draft gate. The principal can edit/delete the event from
-      // the card if AI got it wrong.
+      // 1. Resolve the target card. When the AI matched a template placeholder,
+      //    create a fresh, properly-named card instead of writing into the stub.
+      let cardId = proposal.cardId;
+      let cardSlug = proposal.cardSlug;
+      let cardTitle = proposal.cardTitle;
+
+      if (proposal.createNew) {
+        const finalTitle = (title.trim() || (proposal.newCardTitle ?? "").trim());
+        if (!finalTitle) {
+          setStatus("error");
+          setError("Judul kartu tidak boleh kosong");
+          return;
+        }
+        if (!proposal.topicId) {
+          setStatus("error");
+          setError("Kolom kartu tidak diketahui — tidak bisa membuat kartu baru");
+          return;
+        }
+        const cf = new FormData();
+        cf.set("projectId", proposal.projectId);
+        cf.set("topicId", proposal.topicId);
+        cf.set("projectCode", proposal.projectCode);
+        cf.set("title", finalTitle);
+        const created = await createCard(cf);
+        if (!created.ok) {
+          setStatus("error");
+          setError(created.error);
+          return;
+        }
+        cardId = created.id;
+        cardSlug = created.slug;
+        cardTitle = finalTitle;
+      }
+
+      // 2. Attach the event to the resolved card. High-risk kinds get a label
+      //    (timeline chip + principal notification), not a draft gate — the
+      //    principal can edit/delete the event if AI got it wrong.
       const fd = new FormData();
-      fd.set("cardId",      proposal.cardId);
+      fd.set("cardId",      cardId);
       fd.set("projectId",   proposal.projectId);
       fd.set("projectCode", proposal.projectCode);
-      fd.set("cardSlug",    proposal.cardSlug);
+      fd.set("cardSlug",    cardSlug);
       fd.set("eventKind",   proposal.eventKind);
       for (const [k, v] of Object.entries(proposal.payload)) {
         const value = Array.isArray(v)
@@ -89,15 +145,19 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
       const res = await createCardEvent(fd);
       if (!res.ok) {
         setStatus("error");
-        setError(res.error);
+        setError(
+          proposal.createNew
+            ? `Kartu "${cardTitle}" dibuat, tapi gagal menyimpan catatan: ${res.error}`
+            : res.error,
+        );
         return;
       }
-      // Upload pending file if present
+      // 3. Upload pending file if present
       if (proposal.pendingFile) {
         const up = await uploadCardAttachment({
           file: proposal.pendingFile,
           projectId: proposal.projectId,
-          cardId: proposal.cardId,
+          cardId,
           cardEventId: res.eventId,
         });
         if (!up.ok) {
@@ -108,7 +168,7 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
         const aFd = new FormData();
         aFd.set("cardEventId", res.eventId);
         aFd.set("projectCode", proposal.projectCode);
-        aFd.set("cardSlug", proposal.cardSlug);
+        aFd.set("cardSlug", cardSlug);
         aFd.set("storagePath", up.storagePath);
         aFd.set("mimeType", up.mimeType);
         const a = await attachToEvent(aFd);
@@ -118,6 +178,22 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
           return;
         }
       }
+      // 4. Optionally link the card to the hinted area. A link failure shouldn't
+      // discard the saved event — surface it softly and still mark saved.
+      if (areaHint && linkArea) {
+        const lf = new FormData();
+        lf.set("cardId", cardId);
+        lf.set("areaId", areaHint.areaId);
+        lf.set("projectCode", proposal.projectCode);
+        lf.set("cardSlug", cardSlug);
+        const linkRes = await linkCardToArea(lf);
+        if (linkRes.ok) {
+          setAreaLinked(true);
+        } else {
+          setError(`Catatan tersimpan, tapi gagal menautkan ke ${areaHint.areaName}: ${linkRes.error}`);
+        }
+      }
+      setSavedCard({ slug: cardSlug, title: cardTitle });
       setStatus("saved");
     });
   }
@@ -132,16 +208,52 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
 
   return (
     <div className="max-w-[85%] rounded-md border border-[var(--sand)] bg-[var(--sand-tint)] p-3 text-xs">
-      <div className="mb-1 flex items-center justify-between">
-        <div className="font-semibold text-foreground">
-          → {proposal.cardTitle}
-          <span className="ml-1 font-normal text-[var(--text-muted)]">· {proposal.topicName}</span>
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 font-semibold text-foreground">
+          {proposal.createNew && (status === "pending" || status === "error") ? (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--sand-dark)]">
+                Kartu baru
+              </span>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={120}
+                aria-label="Judul kartu baru"
+                className="w-full rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-xs font-semibold text-foreground focus:border-[var(--sand-dark)] focus:outline-none"
+              />
+              <span className="text-[10px] font-normal text-[var(--text-muted)]">· {proposal.topicName}</span>
+            </div>
+          ) : (
+            <>
+              → {proposal.createNew ? savedCard.title : proposal.cardTitle}
+              <span className="ml-1 font-normal text-[var(--text-muted)]">· {proposal.topicName}</span>
+            </>
+          )}
         </div>
-        <span className={`text-[10px] font-semibold uppercase ${confColor}`}>{conf}% yakin</span>
+        <span className={`shrink-0 text-[10px] font-semibold uppercase ${confColor}`}>{conf}% yakin</span>
       </div>
       <div className="mb-2 text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">
         {KIND_LABELS[proposal.eventKind] ?? proposal.eventKind}
       </div>
+      {areaHint ? (
+        status === "pending" || status === "error" ? (
+          <label className="mb-2 flex min-h-[40px] cursor-pointer items-center gap-2 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1.5">
+            <input
+              type="checkbox"
+              checked={linkArea}
+              onChange={(e) => setLinkArea(e.target.checked)}
+              aria-label={`Tautkan kartu ke area ${areaHint.areaName}`}
+              className="h-4 w-4 shrink-0 accent-[var(--foreground)]"
+            />
+            <span className="text-[10px] text-[var(--text-secondary)]">
+              Tautkan ke area{" "}
+              <span className="font-semibold text-[var(--foreground)]">{areaHint.areaName}</span>
+              <span className="ml-1 font-mono text-[var(--sand-dark)]">{areaHint.areaCode}</span>
+            </span>
+          </label>
+        ) : null
+      ) : null}
       {proposal.fileMeta || proposal.pendingFile ? (
         <div className="mb-2 inline-flex items-center gap-1.5 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
           <PaperclipIcon size={11} />
@@ -194,14 +306,23 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded bg-[var(--flag-ok-bg)] px-2 py-1 text-[10px] font-semibold text-[var(--flag-ok)]">
             <CheckIcon size={11} />
-            {isHighRisk ? "Tersimpan di kartu · principal dinotifikasi" : "Tersimpan di kartu"}
+            {isHighRisk
+              ? "Tersimpan di kartu · principal dinotifikasi"
+              : proposal.createNew
+              ? "Kartu baru dibuat · catatan tersimpan"
+              : "Tersimpan di kartu"}
           </span>
+          {areaLinked && areaHint ? (
+            <span className="inline-flex items-center gap-1 rounded bg-[var(--sand-tint)] px-2 py-1 text-[10px] font-semibold text-[var(--sand-dark)]">
+              <CheckIcon size={11} /> Ditautkan ke {areaHint.areaName}
+            </span>
+          ) : null}
           <a
-            href={`/project/${proposal.projectCode}/cards/${proposal.cardSlug}`}
+            href={`/project/${proposal.projectCode}/cards/${savedCard.slug}`}
             className="inline-flex items-center gap-1 rounded border border-[var(--sand)] bg-[var(--surface)] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--sand-tint)]"
-            aria-label={`Buka kartu ${proposal.cardTitle}`}
+            aria-label={`Buka kartu ${savedCard.title}`}
           >
-            → Buka {proposal.cardTitle}
+            → Buka {savedCard.title}
           </a>
         </div>
       ) : (

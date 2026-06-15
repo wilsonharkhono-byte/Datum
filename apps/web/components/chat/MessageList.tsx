@@ -13,6 +13,8 @@ export type Message =
       streaming?: boolean;
       /** true for failure bubbles — rendered in critical style with "Coba lagi" */
       error?: boolean;
+      /** true for offline-queue notices — rendered in amber "tersimpan offline" style */
+      queued?: boolean;
     }
   | { role: "assistant"; proposal: Proposal };
 
@@ -75,6 +77,15 @@ export function MessageList({
           return (
             <div key={i} className="flex">
               <ProposalCard proposal={m.proposal} />
+            </div>
+          );
+        }
+        if (m.queued) {
+          return (
+            <div key={i} className="flex">
+              <div className="max-w-[80%] rounded border border-[var(--flag-warning)]/40 bg-[var(--flag-warning-bg)] px-3 py-1.5 text-[var(--flag-warning)]">
+                {m.content}
+              </div>
             </div>
           );
         }

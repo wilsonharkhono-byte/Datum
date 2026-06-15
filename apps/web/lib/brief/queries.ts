@@ -56,7 +56,7 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
 
   const [
     { data: draftRows, count: draftCount },
-    { data: blockedRaw },
+    { data: blockedRaw, count: blockedCount },
     { data: defectEvs, count: defectCount },
     { data: crEvs, count: crCount },
     { data: decEvs, count: decCount },
@@ -76,16 +76,18 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
       .limit(TOP_N),
     // 2. Live blockers: work events with status=blocked not superseded by a
     //    later non-blocked work event on the same card (append-only log).
-    // TODO(scale): limit(100) oldest-first truncates count and can drop newest blockers past 100 rows; revisit with a server-side open-blocker view.
+    //    Newest-first so a backlog past 100 rows drops the stale old tail,
+    //    never fresh blockers; count:"exact" keeps the headline accurate
+    //    beyond the window.
     supabase
       .from("card_events")
       .select(`
         id, payload, occurred_at, created_at, card_id,
         cards:card_id (id, slug, title, projects:project_id (project_code, project_name))
-      `)
+      `, { count: "exact" })
       .eq("event_kind", "work")
       .contains("payload", { status: "blocked" })
-      .order("occurred_at", { ascending: true })
+      .order("occurred_at", { ascending: false })
       .limit(100),
     // 3. Defects (last 30 days; work events flagged issue=defect)
     supabase
@@ -158,18 +160,27 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     }),
   };
 
-  const blockedCardIds = [...new Set((blockedRaw ?? []).map((e) => e.card_id))];
+  const blockedEvs = blockedRaw ?? [];
+  const blockedCardIds = [...new Set(blockedEvs.map((e) => e.card_id))];
   // Latest non-blocked work EVENT per card, chosen by the canonical total
   // order (occurred_at, created_at, id) — same-day ties must resolve the
   // same way here as on the board and in the gate rules.
   const lastNonBlockedByCard = new Map<string, OrderableEvent>();
-  if (blockedCardIds.length > 0) {
-    // TODO(scale): relies on PostgREST's implicit 1000-row cap; add occurred_at lower bound if work-event volume grows.
+  // Only a strictly-later non-blocked event clears a blocker
+  // (compareEventTime orders by occurred_at first), so work events older
+  // than every blocked event in the window can't supersede anything here.
+  // blockedEvs is newest-first, so its last row bounds the scan — keeping
+  // this query under PostgREST's implicit 1000-row cap. The gte is
+  // inclusive, so same-timestamp rows still reach the created_at/id
+  // tie-break.
+  const oldestBlockedAt = blockedEvs.at(-1)?.occurred_at;
+  if (blockedCardIds.length > 0 && oldestBlockedAt !== undefined) {
     const { data: workEvs } = await supabase
       .from("card_events")
       .select("id, card_id, occurred_at, created_at, payload")
       .eq("event_kind", "work")
-      .in("card_id", blockedCardIds);
+      .in("card_id", blockedCardIds)
+      .gte("occurred_at", oldestBlockedAt);
     for (const w of workEvs ?? []) {
       const status = (w.payload as { status?: string } | null)?.status;
       if (status === "blocked") continue;
@@ -177,13 +188,19 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
       if (!prev || compareEventTime(prev, w) < 0) lastNonBlockedByCard.set(w.card_id, w);
     }
   }
-  const liveBlockers = (blockedRaw ?? []).filter((e) => {
-    const cleared = lastNonBlockedByCard.get(e.card_id);
-    return !cleared || compareEventTime(e, cleared) > 0;
-  });
+  const liveBlockers = blockedEvs
+    .filter((e) => {
+      const cleared = lastNonBlockedByCard.get(e.card_id);
+      return !cleared || compareEventTime(e, cleared) > 0;
+    })
+    // Fetch is newest-first; the brief lists blockers oldest-first.
+    .sort(compareEventTime);
 
   const blockers = {
-    count: liveBlockers.length,
+    // Window rows are filtered for supersession exactly; blocked events past
+    // the window (older than all of these) are counted as-is rather than
+    // silently dropped.
+    count: liveBlockers.length + Math.max(0, (blockedCount ?? 0) - blockedEvs.length),
     items: liveBlockers.slice(0, TOP_N).map((e) => {
       const c = (e as { cards: CardRef | null }).cards;
       const p = e.payload as { blocked_on?: string; description?: string };
