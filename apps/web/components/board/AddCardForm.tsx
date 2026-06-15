@@ -1,7 +1,6 @@
 "use client";
-import { useState, useTransition } from "react";
-import { createCard } from "@/lib/cards/mutations";
-import { useOptimisticBoard } from "@/lib/cards/optimisticBoardContext";
+import { useState } from "react";
+import { useAddCard } from "@/lib/query/mutations";
 
 export function AddCardForm({
   projectId,
@@ -15,8 +14,7 @@ export function AddCardForm({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const { addOptimisticCard } = useOptimisticBoard();
+  const addCard = useAddCard(projectCode);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,19 +26,18 @@ export function AddCardForm({
     fd.set("topicId", topicId);
     fd.set("projectCode", projectCode);
     fd.set("title", trimmed);
-    // Paint the ghost card now and close the form — no blocking "Menyimpan…".
-    addOptimisticCard(topicId, trimmed);
+    // Paint the ghost card now (via the mutation's onMutate) and close the form —
+    // no blocking "Menyimpan…".
     setTitle("");
     setOpen(false);
-    startTransition(async () => {
-      const res = await createCard(fd);
-      if (!res.ok) {
-        // Revert is automatic (useOptimistic); surface the error and let the
-        // user retry by re-opening the form with their text restored.
+    addCard.mutate(fd, {
+      onError: (err) => {
+        // The cache rollback is automatic (mutation onError); surface the error
+        // and let the user retry by re-opening the form with their text restored.
         setTitle(trimmed);
         setOpen(true);
-        setError(res.error);
-      }
+        setError((err as Error).message);
+      },
     });
   }
 
@@ -63,7 +60,7 @@ export function AddCardForm({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Judul kartu — contoh: Master bathroom"
-        disabled={pending}
+        disabled={addCard.isPending}
         maxLength={120}
         className="w-full rounded border border-[var(--border)] px-2 py-1 text-xs focus:border-[var(--sand-dark)] focus:outline-none"
       />
@@ -71,10 +68,10 @@ export function AddCardForm({
       <div className="mt-1.5 flex gap-1">
         <button
           type="submit"
-          disabled={pending || !title.trim()}
+          disabled={addCard.isPending || !title.trim()}
           className="rounded bg-[#141210] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
         >
-          {pending ? "Menyimpan…" : "Simpan"}
+          {addCard.isPending ? "Menyimpan…" : "Simpan"}
         </button>
         <button
           type="button"
@@ -83,7 +80,7 @@ export function AddCardForm({
             setTitle("");
             setError(null);
           }}
-          disabled={pending}
+          disabled={addCard.isPending}
           className="rounded px-3 py-1 text-[10px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
         >
           Batal

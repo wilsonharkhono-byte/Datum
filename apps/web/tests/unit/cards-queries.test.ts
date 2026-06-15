@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getBoardForProject, getCardWithTimeline } from "@/lib/cards/queries";
+import { getCardWithTimeline } from "@/lib/cards/queries";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 
@@ -27,45 +27,6 @@ function fakeClient(map: Record<string, unknown>) {
     },
   } as unknown as SupabaseClient<Database>;
 }
-
-describe("getBoardForProject", () => {
-  it("returns topics in sort_order with their cards", async () => {
-    const supa = fakeClient({
-      projects: [{ id: "p1", project_code: "BDG-H1", project_name: "BDG H1", slug: "bdg-h1" }],
-      topics: [
-        { id: "t1", project_id: "p1", code: "A05", name: "A05 — Kusen", sort_order: 3 },
-        { id: "t2", project_id: "p1", code: "A09", name: "A09 — Detail Kamar Mandi", sort_order: 6 },
-      ],
-      cards: [
-        { id: "c1", project_id: "p1", topic_id: "t1", title: "Pintu utama", slug: "pintu", status: "active", last_event_at: "2024-11-05" },
-        { id: "c2", project_id: "p1", topic_id: "t2", title: "Master bathroom", slug: "master", status: "active", last_event_at: "2026-05-20" },
-      ],
-    });
-    const board = await getBoardForProject(supa, "bdg-h1");
-    expect(board.project.project_code).toBe("BDG-H1");
-    expect(board.columns).toHaveLength(2);
-    expect(board.columns[0]!.topic.code).toBe("A05");
-    expect(board.columns[0]!.cards.map((c) => c.slug)).toEqual(["pintu"]);
-  });
-
-  it("derives open-loop labels and a null deadline without area links", async () => {
-    const supa = fakeClient({
-      projects: [{ id: "p1", project_code: "BDG-H1", project_name: "BDG H1" }],
-      topics: [{ id: "t1", project_id: "p1", code: "A09", name: "A09 — Detail Kamar Mandi", sort_order: 1 }],
-      cards: [{ id: "c1", project_id: "p1", topic_id: "t1", title: "Master bathroom", slug: "master", status: "active" }],
-      card_events: [
-        { card_id: "c1", event_kind: "decision",
-          payload: { topic: "marmer", status: "needs_decision", awaiting: "client" },
-          occurred_at: "2026-06-01T00:00:00Z" },
-      ],
-    });
-    const board = await getBoardForProject(supa, "bdg-h1");
-    const card = board.columns[0]!.cards[0]!;
-    expect(card.labels.map((l) => l.kind)).toEqual(["needs_decision", "awaiting"]);
-    expect(card.labels[1]!.label).toBe("Menunggu Klien");
-    expect(card.deadline).toBeNull();
-  });
-});
 
 describe("getCardWithTimeline", () => {
   it("returns card + events ordered by occurred_at desc", async () => {

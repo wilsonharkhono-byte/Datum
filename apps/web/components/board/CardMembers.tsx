@@ -1,7 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Staff } from "@datum/db";
 import { addCardMember, removeCardMember } from "@/lib/cards/mutations";
+import { keys } from "@/lib/query/keys";
 
 type StaffLite = Pick<Staff, "id" | "full_name" | "role">;
 type MemberLite = { staff_id: string; role: "owner" | "watcher" | "assignee"; staff: StaffLite | null };
@@ -15,15 +17,22 @@ export function CardMembers({
   cardId,
   projectCode,
   cardSlug,
+  cardCode,
+  cardQuerySlug,
   members,
   candidates,
 }: {
   cardId: string;
   projectCode: string;
   cardSlug: string;
+  /** Canonical uppercase project_code — identity for the useCard query key. */
+  cardCode: string;
+  /** Canonical card slug — identity for the useCard query key. */
+  cardQuerySlug: string;
   members: MemberLite[];
   candidates: StaffLite[];
 }) {
+  const queryClient = useQueryClient();
   const [picking, setPicking] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +50,10 @@ export function CardMembers({
     fd.set("cardSlug", cardSlug);
     startTransition(async () => {
       const res = await addCardMember(fd);
-      if (res.ok) setPicking(false);
-      else setError(res.error);
+      if (res.ok) {
+        setPicking(false);
+        queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
+      } else setError(res.error);
     });
   }
 
@@ -56,7 +67,9 @@ export function CardMembers({
     fd.set("cardSlug", cardSlug);
     startTransition(async () => {
       const res = await removeCardMember(fd);
-      if (!res.ok) setError(res.error);
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: keys.card(cardCode, cardQuerySlug) });
+      } else setError(res.error);
     });
   }
 

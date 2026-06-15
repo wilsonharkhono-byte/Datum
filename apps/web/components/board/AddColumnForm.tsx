@@ -1,11 +1,13 @@
 "use client";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { createTopic } from "@/lib/cards/mutations";
+import { keys } from "@/lib/query/keys";
 
-// Sits at the right edge of the board's column row. Topics (= columns) are not
-// covered by the realtime subscription (cards/events/comments only), so on
-// success we router.refresh() to pull the new column from the server.
+// Sits at the right edge of the board's column row. The board renders from the
+// TanStack Query cache, so on success we invalidate the board query to pull the
+// new column in. Other open boards pick it up via the topics realtime channel
+// (see subscribeToProjectChanges).
 export function AddColumnForm({
   projectId,
   projectCode,
@@ -13,7 +15,7 @@ export function AddColumnForm({
   projectId: string;
   projectCode: string;
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export function AddColumnForm({
       if (res.ok) {
         setName("");
         setOpen(false);
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: keys.board(projectCode) });
       } else {
         setError(res.error);
       }

@@ -1,29 +1,28 @@
 "use client";
-import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Board as BoardData, BoardColumn } from "@/lib/cards/queries";
-import { optimisticReducer } from "@/lib/cards/optimisticBoard";
-import { OptimisticBoardProvider, type OptimisticBoardApi } from "@/lib/cards/optimisticBoardContext";
+import { useBoard } from "@/lib/query/hooks";
+import { keys } from "@/lib/query/keys";
 import { Column } from "./Column";
 import { AddColumnForm } from "./AddColumnForm";
 import { BoardFilter, type StatusFilter, type LabelFilter } from "./BoardFilter";
 import { BoardTabs } from "./BoardTabs";
 import { subscribeToProjectChanges } from "@/lib/cards/realtime";
 
-export function Board({ board }: { board: BoardData }) {
-  const router = useRouter();
-  const [optimisticBoard, addOptimistic] = useOptimistic(board, optimisticReducer);
-  const [, startTransition] = useTransition();
-  const api: OptimisticBoardApi = useMemo(
-    () => ({
-      addOptimisticCard: (topicId, title) =>
-        startTransition(() => addOptimistic({ type: "add-card", topicId, title })),
-    }),
-    [addOptimistic],
-  );
+export function Board({ initialBoard }: { initialBoard: BoardData }) {
+  const code = initialBoard.project.project_code;
+  const queryClient = useQueryClient();
+  const { data: board } = useBoard(code, initialBoard);
+  // Add/move now flow through TanStack mutations (useAddCard/useMoveCard), which
+  // optimistically write the ghost/moved card into this same query cache. The
+  // board renders directly from the live cache — no separate useOptimistic layer.
+  const liveBoard = board ?? initialBoard;
   useEffect(() => {
-    return subscribeToProjectChanges(board.project.id, () => router.refresh());
-  }, [board.project.id, router]);
+    return subscribeToProjectChanges(initialBoard.project.id, () => {
+      queryClient.invalidateQueries({ queryKey: keys.board(code) });
+    });
+  }, [initialBoard.project.id, code, queryClient]);
   const [query, setQuery] = useState("");
   const [statuses, setStatuses] = useState<StatusFilter>(new Set(["active"]));
   const [labelFilter, setLabelFilter] = useState<LabelFilter>(new Set());
@@ -35,7 +34,7 @@ export function Board({ board }: { board: BoardData }) {
     // midnight, consistent with the deadline chip in MiniCard.
     const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
     const cols: BoardColumn[] = [];
-    for (const col of optimisticBoard.columns) {
+    for (const col of liveBoard.columns) {
       const matchedCards = col.cards.filter((c) => {
         if (!statuses.has(c.status as "active" | "dormant" | "closed")) return false;
         if (labelFilter.size > 0) {
@@ -57,16 +56,16 @@ export function Board({ board }: { board: BoardData }) {
       }
     }
     return cols;
-  }, [optimisticBoard.columns, query, statuses, labelFilter]);
+  }, [liveBoard.columns, query, statuses, labelFilter]);
 
-  const totalCards = optimisticBoard.columns.reduce((n, c) => n + c.cards.length, 0);
+  const totalCards = liveBoard.columns.reduce((n, c) => n + c.cards.length, 0);
   const matchedTotal = filteredColumns.reduce((n, c) => n + c.cards.length, 0);
 
   // --- Mobile column carousel (below md) ------------------------------------
   // Columns render as a horizontal snap carousel; the BoardTabs strip above
   // tracks and controls which column is in view. Refs live in Maps keyed by
   // topic id so they survive columns mounting/unmounting under filters,
-  // optimistic adds, and realtime router.refresh().
+  // optimistic adds, and realtime cache invalidation/refetch.
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const columnRefs = useRef(new Map<string, HTMLDivElement>());
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
@@ -111,7 +110,6 @@ export function Board({ board }: { board: BoardData }) {
   }
 
   return (
-    <OptimisticBoardProvider value={api}>
     <div className="flex h-full flex-col">
       <BoardFilter
         query={query}
@@ -145,8 +143,8 @@ export function Board({ board }: { board: BoardData }) {
             <Column
               key={col.topic.id}
               column={col}
-              projectId={board.project.id}
-              projectCode={board.project.project_code}
+              projectId={liveBoard.project.id}
+              projectCode={liveBoard.project.project_code}
               containerRef={(el) => {
                 if (el) columnRefs.current.set(col.topic.id, el);
                 else columnRefs.current.delete(col.topic.id);
@@ -159,12 +157,11 @@ export function Board({ board }: { board: BoardData }) {
             row is byte-for-byte what it was. */}
         <div className="w-[86vw] max-w-[22rem] shrink-0 snap-center md:contents">
           <AddColumnForm
-            projectId={board.project.id}
-            projectCode={board.project.project_code}
+            projectId={liveBoard.project.id}
+            projectCode={liveBoard.project.project_code}
           />
         </div>
       </div>
     </div>
-    </OptimisticBoardProvider>
   );
 }

@@ -80,7 +80,7 @@ export default async function ProjectBoardPage({
       </header>
       <ProjectAdvisorStrip items={advisorItems} />
       <div className="flex-1 overflow-hidden">
-        <Board board={board} />
+        <Board initialBoard={board} />
       </div>
       <ChatDock projectId={board.project.id} projectCode={board.project.project_code} />
     </div>

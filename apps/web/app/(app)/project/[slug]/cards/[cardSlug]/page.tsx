@@ -1,17 +1,16 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCardWithTimelineByProjectCode, getCardAttachments, getCardMembers, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
+import { getCardWithTimelineByProjectCode, getCardAttachments, getCardMembers, getCardComments, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
 import { getCardAreas } from "@/lib/cards/area-link-queries";
 import { getCardLinks } from "@/lib/cards/link-queries";
 import { getProjectAreas } from "@/lib/projects/area-queries";
 import { CardHeader } from "@/components/board/CardHeader";
-import { CardMembers } from "@/components/board/CardMembers";
 import { CardAreas } from "@/components/board/CardAreas";
 import { CardLinks } from "@/components/board/CardLinks";
 import { MoveCardControl } from "@/components/board/MoveCardControl";
-import { Timeline } from "@/components/board/Timeline";
 import { AddEventForm } from "@/components/board/AddEventForm";
-import { CommentsSection } from "@/components/board/CommentsSection";
+import { CardDetailClient } from "@/components/board/CardDetailClient";
+import type { CardPayload } from "@/app/api/card/[code]/[slug]/route";
 
 export default async function CardDetailPage({
   params,
@@ -45,17 +44,22 @@ export default async function CardDetailPage({
   }
   const detail = detailRes.value;
 
-  const [attachmentsByEvent, memberRows, candidates, topics, cardAreas, projectAreas, cardLinks] = await Promise.all([
+  const [attachmentsByEvent, memberRows, comments, candidates, topics, cardAreas, projectAreas, cardLinks] = await Promise.all([
     getCardAttachments(supabase, detail.card.id),
     getCardMembers(supabase, detail.card.id),
+    getCardComments(supabase, detail.card.id),
     getProjectStaff(supabase, project.id),
     getProjectTopics(supabase, project.id),
     getCardAreas(supabase, detail.card.id),
     getProjectAreas(supabase, project.id),
     getCardLinks(supabase, detail.card.id),
   ]);
-  const members = memberRows.map((m) => ({ staff_id: m.staff_id, role: m.role, staff: m.staff }));
   const topicName = topics.find((t) => t.id === detail.card.topic_id)?.name ?? "—";
+
+  // Seed the cached card query with the same payload the JSON API returns, so
+  // CardDetailClient's dynamic sections (timeline/comments/members) render from
+  // RSC on first paint and from IndexedDB on revisit.
+  const initialCard: CardPayload = { ...detail, comments, members: memberRows };
 
   return (
     <div className="bg-[var(--background)] py-4 md:py-6">
@@ -84,104 +88,67 @@ export default async function CardDetailPage({
             </div>
           </div>
 
-          <div className="grid gap-0 md:grid-cols-[1fr_280px]">
-            {/* Main column — the focused content */}
-            <div className="border-b border-[var(--border)] px-4 py-4 md:border-b-0 md:border-r md:px-6 md:py-5">
+          <CardDetailClient
+            code={project.project_code}
+            slug={cardSlug}
+            urlSlug={slug}
+            initialCard={initialCard}
+            projectId={project.id}
+            projectCode={project.project_code}
+            currentStaffId={currentStaffId}
+            attachmentsByEvent={attachmentsByEvent}
+            candidates={candidates}
+            header={
               <CardHeader
                 card={detail.card}
                 projectId={project.id}
                 projectCode={slug}
                 cardSlug={cardSlug}
+                cardCode={project.project_code}
+                cardQuerySlug={cardSlug}
               />
-              <div className="mt-5">
-                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
-                  Tambah aktivitas
-                </h2>
-                <AddEventForm
-                  cardId={detail.card.id}
-                  projectId={project.id}
-                  projectCode={slug}
-                  cardSlug={cardSlug}
-                />
-              </div>
-              <div className="mt-6 border-t border-[var(--border)] pt-4">
-                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
-                  Timeline aktivitas
-                </h2>
-                <Timeline
-                  events={detail.events}
-                  attachmentsByEvent={attachmentsByEvent}
-                  projectCode={project.project_code}
-                  cardSlug={cardSlug}
-                />
-              </div>
-              <div className="mt-6 border-t border-[var(--border)] pt-4">
-                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
-                  Diskusi
-                </h2>
-                <CommentsSection
-                  cardId={detail.card.id}
-                  projectId={project.id}
-                  projectCode={slug}
-                  cardSlug={cardSlug}
-                  currentStaffId={currentStaffId}
-                />
-              </div>
-            </div>
-
-            {/* Sidebar — Trello-style actions/members panel */}
-            <aside className="bg-[var(--surface-alt)] px-4 py-4 md:py-5">
-              <div>
-                <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sand-dark)]">
-                  Pindah kolom
-                </h2>
-                <MoveCardControl
-                  cardId={detail.card.id}
-                  projectId={project.id}
-                  projectCode={slug}
-                  cardSlug={cardSlug}
-                  currentTopicId={detail.card.topic_id}
-                  topics={topics}
-                />
-              </div>
-              <div className="mt-5 border-t border-[var(--border)] pt-4">
-                <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sand-dark)]">
-                  Anggota kartu
-                </h2>
-                <CardMembers
-                  cardId={detail.card.id}
-                  projectCode={slug}
-                  cardSlug={cardSlug}
-                  members={members}
-                  candidates={candidates}
-                />
-              </div>
-              <div className="mt-5 border-t border-[var(--border)] pt-4">
-                <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sand-dark)]">
-                  Areas terkait
-                </h2>
-                <CardAreas
-                  cardId={detail.card.id}
-                  projectCode={slug}
-                  cardSlug={cardSlug}
-                  currentAreas={cardAreas}
-                  allProjectAreas={projectAreas}
-                />
-              </div>
-              <div className="mt-5 border-t border-[var(--border)] pt-4">
-                <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sand-dark)]">
-                  Terkait
-                </h2>
-                <CardLinks
-                  cardId={detail.card.id}
-                  projectId={project.id}
-                  projectCode={slug}
-                  cardSlug={cardSlug}
-                  links={cardLinks}
-                />
-              </div>
-            </aside>
-          </div>
+            }
+            addEvent={
+              <AddEventForm
+                cardId={detail.card.id}
+                projectId={project.id}
+                projectCode={slug}
+                cardSlug={cardSlug}
+                cardCode={project.project_code}
+                cardQuerySlug={cardSlug}
+              />
+            }
+            moveControl={
+              <MoveCardControl
+                cardId={detail.card.id}
+                projectId={project.id}
+                projectCode={project.project_code}
+                cardSlug={cardSlug}
+                currentTopicId={detail.card.topic_id}
+                topics={topics}
+              />
+            }
+            areas={
+              <CardAreas
+                cardId={detail.card.id}
+                projectCode={slug}
+                cardSlug={cardSlug}
+                cardCode={project.project_code}
+                cardQuerySlug={cardSlug}
+                currentAreas={cardAreas}
+                allProjectAreas={projectAreas}
+              />
+            }
+            links={
+              <CardLinks
+                cardId={detail.card.id}
+                projectId={project.id}
+                projectCode={slug}
+                cardSlug={cardSlug}
+                links={cardLinks}
+              />
+            }
+          />
         </div>
       </div>
     </div>
