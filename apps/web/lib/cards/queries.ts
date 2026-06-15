@@ -31,16 +31,77 @@ export async function getBoardForProject(
   supabase: SupabaseClient<Database>,
   projectSlug: string,
 ): Promise<Board> {
-  // Single round-trip via the get_board_bundle RPC. Typed through a local cast so
-  // this compiles whether or not types.generated.ts has been regenerated yet.
-  const rpc = supabase.rpc as unknown as (
-    fn: "get_board_bundle",
-    args: { p_code: string },
-  ) => Promise<{ data: BoardBundle | null; error: { message: string } | null }>;
-  const { data, error } = await rpc("get_board_bundle", { p_code: projectSlug });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error(`Project not found: ${projectSlug}`);
-  return mapBoardBundle(data, new Date().toISOString().slice(0, 10));
+  // Direct per-table reads (each query applies RLS with the caller's auth — the
+  // same path getCurrentStaff and the rest of the app use). The get_board_bundle
+  // RPC was reverted: bundling every read into one function failed for
+  // authenticated users (evaluating the cards-layer RLS for all sub-selects
+  // inside one function erred, where the multi-query path tolerates a failing
+  // open-loop / areas / gate sub-select). mapBoardBundle still does all the
+  // label/deadline/grouping logic.
+  const slugUpper = projectSlug.toUpperCase();
+  const { data: project, error: projErr } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("project_code", slugUpper)
+    .maybeSingle();
+  if (projErr) throw projErr;
+  if (!project) throw new Error(`Project not found: ${projectSlug}`);
+
+  const [topicsRes, cardsRes, loopEventsRes] = await Promise.all([
+    supabase
+      .from("topics")
+      .select("id, code, name, sort_order")
+      .eq("project_id", project.id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("cards")
+      .select("id, slug, title, topic_id, status, last_event_at, current_summary, properties")
+      .eq("project_id", project.id)
+      .order("last_event_at", { ascending: false, nullsFirst: false }),
+    supabase
+      .from("card_events")
+      .select("id, card_id, event_kind, payload, occurred_at, created_at")
+      .eq("project_id", project.id)
+      .in("event_kind", ["decision", "client_request", "work"]),
+  ]);
+  if (topicsRes.error) throw topicsRes.error;
+  if (cardsRes.error) throw cardsRes.error;
+  if (loopEventsRes.error) {
+    console.warn(
+      "[getBoardForProject] open-loop events query failed — labels will be empty:",
+      loopEventsRes.error.message,
+    );
+  }
+
+  const cards = (cardsRes.data ?? []) as unknown as BoardBundle["cards"];
+  let cardAreas: BoardBundle["card_areas"] = [];
+  let gateStatus: BoardBundle["gate_status"] = [];
+  if (cards.length > 0) {
+    const cardIds = cards.map((c) => c.id);
+    const [linksRes, cellsRes] = await Promise.all([
+      supabase.from("card_areas").select("card_id, area_id").in("card_id", cardIds),
+      supabase
+        .from("area_gate_status")
+        .select("area_id, gate_code, status, target_start_date, target_end_date")
+        .eq("project_id", project.id)
+        .in("status", ["not_started", "in_progress"])
+        .not("target_start_date", "is", null),
+    ]);
+    cardAreas = (linksRes.data ?? []) as unknown as BoardBundle["card_areas"];
+    gateStatus = (cellsRes.data ?? []) as unknown as BoardBundle["gate_status"];
+  }
+
+  return mapBoardBundle(
+    {
+      project: project as Project,
+      topics: (topicsRes.data ?? []) as unknown as BoardBundle["topics"],
+      cards,
+      loop_events: (loopEventsRes.data ?? []) as unknown as BoardBundle["loop_events"],
+      card_areas: cardAreas,
+      gate_status: gateStatus,
+    },
+    new Date().toISOString().slice(0, 10),
+  );
 }
 
 /** Pure: turn a get_board_bundle payload into the Board the UI renders. Holds all
