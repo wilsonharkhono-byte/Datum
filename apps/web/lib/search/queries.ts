@@ -3,7 +3,7 @@ import type { Database } from "@datum/db";
 
 export type SearchHit = {
   id: string;
-  kind: "card" | "event" | "comment" | "project";
+  kind: "card" | "event" | "comment" | "project" | "development";
   projectCode: string;
   cardSlug: string;
   cardTitle: string;
@@ -23,12 +23,29 @@ const PER_GROUP = 25;
 export async function searchAll(
   supabase: SupabaseClient<Database>,
   q: string,
-): Promise<{ projects: SearchHit[]; cards: SearchHit[]; events: SearchHit[]; comments: SearchHit[] }> {
+): Promise<{ developments: SearchHit[]; projects: SearchHit[]; cards: SearchHit[]; events: SearchHit[]; comments: SearchHit[] }> {
   const trimmed = q.trim();
   if (trimmed.length < 2) {
-    return { projects: [], cards: [], events: [], comments: [] };
+    return { developments: [], projects: [], cards: [], events: [], comments: [] };
   }
   const pattern = `%${trimmed.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+
+  const { data: devRows } = await supabase
+    .from("developments")
+    .select("id, name, area_label")
+    .ilike("name", pattern)
+    .limit(PER_GROUP);
+
+  const developments: SearchHit[] = (devRows ?? []).map((d) => ({
+    id: `d_${d.id}`,
+    kind: "development" as const,
+    projectCode: "",
+    cardSlug: "",
+    cardTitle: d.name,
+    snippet: d.area_label ?? "",
+    href: `/?dev=${d.id}`,
+    occurredAt: "",
+  }));
 
   // Projects: name / client / site address
   const { data: projectRows } = await supabase
@@ -128,7 +145,7 @@ export async function searchAll(
     };
   });
 
-  return { projects, cards, events: eventHits, comments };
+  return { developments, projects, cards, events: eventHits, comments };
 }
 
 function highlight(text: string, q: string): string {
