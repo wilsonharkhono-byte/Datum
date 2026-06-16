@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { PromptCachingBetaMessage } from "@anthropic-ai/sdk/resources/beta/prompt-caching/messages";
+import type Anthropic from "@anthropic-ai/sdk";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { retrieveProjectContext } from "@/lib/assistant/retrieval";
 import {
@@ -8,6 +8,7 @@ import {
   getAnthropicClient,
   getModel,
   cachedSystemBlock,
+  textOf,
 } from "@/lib/assistant/anthropic";
 import { EVENT_KINDS, EventPayloadSchemas, type EventKind } from "@datum/types";
 import { isTemplateCardTitle, deriveCardLabel } from "@/lib/cards/template-card";
@@ -102,9 +103,9 @@ export async function POST(req: Request) {
   // Static system prompt is sent as a cache_control content block (prompt
   // caching beta — see lib/assistant/anthropic.ts); the card list + user input
   // change per request and stay in the user message, uncached.
-  let res: PromptCachingBetaMessage;
+  let res: Anthropic.Message;
   try {
-    res = await getAnthropicClient().beta.promptCaching.messages.create({
+    res = await getAnthropicClient().messages.create({
       model: getModel(),
       max_tokens: 1024,
       system: cachedSystemBlock(CAPTURE_SYSTEM),
@@ -124,11 +125,7 @@ export async function POST(req: Request) {
     throw e;
   }
 
-  const raw = res.content
-    .filter((c): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("")
-    .trim();
+  const raw = textOf(res.content).trim();
 
   // Be lenient: strip markdown fence if present
   const cleaned = raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();

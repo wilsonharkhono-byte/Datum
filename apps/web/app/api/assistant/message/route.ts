@@ -5,6 +5,7 @@ import {
   streamAssistant,
   extractCitations,
   AnthropicNotConfiguredError,
+  textOf,
   type AssistantStream,
 } from "@/lib/assistant/anthropic";
 import { ensureSession, recordExchange } from "@/lib/assistant/audit";
@@ -105,10 +106,7 @@ export async function POST(req: Request) {
       void (async () => {
         try {
           const final = await stream.finalMessage();
-          const answer = final.content
-            .filter((c): c is { type: "text"; text: string } => c.type === "text")
-            .map((c) => c.text)
-            .join("");
+          const answer = textOf(final.content);
           const usage = {
             input_tokens: final.usage.input_tokens,
             output_tokens: final.usage.output_tokens,
