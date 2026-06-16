@@ -100,6 +100,8 @@ const UpdateProjectInput = z.object({
   status:         z.enum(PROJECT_STATUS).optional(),
   targetHandover: z.string().nullable().optional(),
   kickoffDate:    z.string().nullable().optional(),
+  coverImagePath: z.string().nullable().optional(),
+  developmentName: z.string().max(120).nullable().optional(),
 });
 
 export type UpdateProjectResult = { ok: true } | { ok: false; error: string };
@@ -115,6 +117,8 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
       status:         formData.get("status") || undefined,
       targetHandover: formData.get("targetHandover") === null ? undefined : (formData.get("targetHandover") === "" ? null : formData.get("targetHandover")),
       kickoffDate:    formData.get("kickoffDate") === null ? undefined : (formData.get("kickoffDate") === "" ? null : formData.get("kickoffDate")),
+      coverImagePath:  formData.get("coverImagePath") === null ? undefined : (formData.get("coverImagePath") === "" ? null : formData.get("coverImagePath")),
+      developmentName: formData.get("developmentName") === null ? undefined : (formData.get("developmentName") === "" ? null : formData.get("developmentName")),
     });
   } catch {
     return { ok: false, error: "Form tidak valid" };
@@ -134,6 +138,32 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
   if (input.status !== undefined)         patch.status = input.status;
   if (input.targetHandover !== undefined) patch.target_handover = input.targetHandover;
   if (input.kickoffDate !== undefined)    patch.kickoff_date = input.kickoffDate;
+
+  if (input.coverImagePath !== undefined) patch.cover_image_path = input.coverImagePath;
+
+  if (input.developmentName !== undefined) {
+    if (input.developmentName === null) {
+      patch.development_id = null;
+    } else {
+      const name = input.developmentName.trim();
+      const { data: found } = await supabase
+        .from("developments")
+        .select("id")
+        .ilike("name", name)
+        .maybeSingle();
+      if (found) {
+        patch.development_id = found.id;
+      } else {
+        const { data: created, error: cErr } = await supabase
+          .from("developments")
+          .insert({ name })
+          .select("id")
+          .single();
+        if (cErr) return { ok: false, error: cErr.message };
+        patch.development_id = created.id;
+      }
+    }
+  }
 
   if (Object.keys(patch).length === 0) return { ok: true };
 
