@@ -35,3 +35,33 @@ describe("buildContextBlock", () => {
     expect(buildContextBlock([])).toContain("Tidak ada kartu");
   });
 });
+
+describe("buildContextBlock with attachment captions", () => {
+  it("renders Lampiran lines for an event's captions", () => {
+    const withCaptions: CardWithEvents[] = [
+      {
+        card: {
+          id: "c1", project_id: "p1", topic_id: "t1", title: "Master bath",
+          slug: "master-bath", status: "active", current_summary: null,
+          properties: {}, created_by_staff_id: "s1",
+          created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+          last_event_at: "2026-01-01T00:00:00Z",
+        },
+        topicName: "A09",
+        events: [
+          {
+            id: "e1", card_id: "c1", project_id: "p1", event_kind: "photo",
+            payload: { caption: "sample" }, occurred_at: "2026-01-01T00:00:00Z",
+            logged_by_staff_id: "s1", source_kind: "manual", source_id: null,
+            cost_visible: false, draft_id: null, created_at: "2026-01-01T00:00:00Z",
+            search_text: null,
+          },
+        ],
+        captionsByEventId: { e1: ["Marmer Statuario finish polish"] },
+      },
+    ];
+    const ctx = buildContextBlock(withCaptions);
+    expect(ctx).toContain("Lampiran:");
+    expect(ctx).toContain("Marmer Statuario");
+  });
+});

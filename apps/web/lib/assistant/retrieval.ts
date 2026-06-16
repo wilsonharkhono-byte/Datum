@@ -6,6 +6,8 @@ export type CardWithEvents = {
   card: Card;
   topicName: string;
   events: CardEvent[];
+  /** AI captions for an event's attachments, keyed by event id. */
+  captionsByEventId?: Record<string, string[]>;
 };
 
 const MAX_CARDS_IN_CONTEXT = 40;       // bumped from 30
@@ -116,12 +118,39 @@ export async function retrieveProjectContext(
     evByCard.set(e.card_id, arr);
   }
 
+  // Attachment captions for the events actually in context (RLS-scoped, so the
+  // cost-visibility gating on the parent event is inherited).
+  const contextEventIds: string[] = [];
+  for (const arr of evByCard.values()) for (const e of arr) contextEventIds.push(e.id);
+  const capByEvent = new Map<string, string[]>();
+  if (contextEventIds.length > 0) {
+    const { data: caps } = await supabase
+      .from("card_attachments")
+      .select("card_event_id, ai_caption")
+      .in("card_event_id", contextEventIds)
+      .not("ai_caption", "is", null);
+    for (const row of caps ?? []) {
+      const r = row as { card_event_id: string; ai_caption: string | null };
+      if (!r.ai_caption) continue;
+      const arr = capByEvent.get(r.card_event_id) ?? [];
+      arr.push(r.ai_caption);
+      capByEvent.set(r.card_event_id, arr);
+    }
+  }
+
   const result = cards.map((c) => {
     const { topics, ...cardRow } = c;
+    const evs = evByCard.get(c.id) ?? [];
+    const captionsByEventId: Record<string, string[]> = {};
+    for (const e of evs) {
+      const caps = capByEvent.get(e.id);
+      if (caps && caps.length > 0) captionsByEventId[e.id] = caps;
+    }
     return {
       card: cardRow as Card,
       topicName: topics?.name ?? "",
-      events: evByCard.get(c.id) ?? [],
+      events: evs,
+      captionsByEventId,
     };
   });
   advisorSectionByCards.set(result, await advisorPromise);
@@ -136,7 +165,7 @@ export function buildContextBlock(cards: CardWithEvents[]): string {
       .join("\n\n");
   }
   const lines: string[] = [];
-  for (const { card, topicName, events } of cards) {
+  for (const { card, topicName, events, captionsByEventId } of cards) {
     lines.push(`## [card:${card.id}] ${card.title} (${topicName})`);
     if (card.current_summary) lines.push(`Ringkasan: ${card.current_summary}`);
     lines.push(`Status: ${card.status}`);
@@ -145,6 +174,10 @@ export function buildContextBlock(cards: CardWithEvents[]): string {
       for (const e of events) {
         const date = new Date(e.occurred_at).toISOString().slice(0, 10);
         lines.push(`  - [event:${e.id}] ${date} · ${e.event_kind} · ${JSON.stringify(e.payload)}`);
+        const caps = captionsByEventId?.[e.id];
+        if (caps && caps.length > 0) {
+          for (const cap of caps) lines.push(`    Lampiran: ${cap}`);
+        }
       }
     }
     lines.push("");
