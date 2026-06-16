@@ -4,18 +4,12 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { updateProject } from "@/lib/projects/mutations";
 import { keys } from "@/lib/query/keys";
+import type { DevelopmentOption, ProjectListItem } from "@/lib/projects/queries";
+import { uploadProjectCover } from "@/lib/projects/cover-upload";
 
-type Project = {
-  id: string;
-  project_code: string;
-  project_name: string;
-  client_name: string | null;
-  location: string | null;
-  status: string;
-  target_handover: string | null;
-};
-
-export function ProjectEditDialog({ project }: { project: Project }) {
+export function ProjectEditDialog({
+  project, developments,
+}: { project: ProjectListItem; developments: DevelopmentOption[] }) {
   const formId = useId();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -25,6 +19,9 @@ export function ProjectEditDialog({ project }: { project: Project }) {
   const [location, setLocation] = useState(project.location ?? "");
   const [status, setStatus] = useState(project.status);
   const [target, setTarget] = useState(project.target_handover ?? "");
+  const [development, setDevelopment] = useState(project.development_name ?? "");
+  const [coverPath, setCoverPath] = useState<string | null>(project.cover_image_path);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -38,6 +35,8 @@ export function ProjectEditDialog({ project }: { project: Project }) {
     fd.set("location", location.trim());
     fd.set("status", status);
     fd.set("targetHandover", target);
+    fd.set("developmentName", development.trim());
+    fd.set("coverImagePath", coverPath ?? "");
     startTransition(async () => {
       const res = await updateProject(fd);
       if (res.ok) {
@@ -46,6 +45,17 @@ export function ProjectEditDialog({ project }: { project: Project }) {
         router.refresh();
       } else setError(res.error);
     });
+  }
+
+  async function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    const res = await uploadProjectCover({ file, projectId: project.id });
+    setUploading(false);
+    if (res.ok) setCoverPath(res.storagePath);
+    else setError(res.error);
   }
 
   return (
@@ -92,6 +102,31 @@ export function ProjectEditDialog({ project }: { project: Project }) {
             <label className="flex flex-col gap-1 sm:col-span-2">
               <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Target serah terima</span>
               <input type="date" value={target} onChange={(e) => setTarget(e.target.value)} disabled={pending} className="rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Pengembangan</span>
+              <input
+                value={development}
+                onChange={(e) => setDevelopment(e.target.value)}
+                list="datum-developments"
+                disabled={pending}
+                maxLength={120}
+                placeholder="mis. Bukit Darmo Golf"
+                className="rounded border border-[var(--border)] px-2 py-1.5 text-sm"
+              />
+              <datalist id="datum-developments">
+                {developments.map((d) => <option key={d.id} value={d.name} />)}
+              </datalist>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Sampul (cover)</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={onPickCover} disabled={pending || uploading} className="text-xs" />
+              {uploading ? <span className="text-[10px] text-[var(--text-muted)]">Mengunggah…</span> : null}
+              {coverPath ? (
+                <button type="button" onClick={() => setCoverPath(null)} className="self-start text-[10px] font-medium text-[var(--flag-critical)] hover:underline">
+                  Hapus sampul
+                </button>
+              ) : null}
             </label>
           </div>
           {error ? <div className="text-[11px] text-[var(--flag-critical)]">{error}</div> : null}
