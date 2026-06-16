@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getProjectsList } from "@/lib/projects/queries";
+import { getProjectsList, getDevelopments } from "@/lib/projects/queries";
 import { ProjectsList } from "@/components/projects/ProjectsList";
 import { BellIcon, ClipboardIcon, BookIcon, SearchIcon } from "@/components/icons/Icon";
 
@@ -35,6 +35,8 @@ export default async function HomePage() {
     );
   }
 
+  const developments = await getDevelopments(supabase);
+
   return (
     <div className="grid gap-6">
       <section>
@@ -45,7 +47,7 @@ export default async function HomePage() {
           Pilih proyek untuk membuka papan kartu dan asisten.
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-[#524E49]">
-          {projects.length} proyek aktif. Klik salah satu untuk melihat semua kartu per topik, timeline keputusan, dan bertanya pada asisten.
+          {projects.length} proyek aktif · {developments.length} pengembangan. Klik salah satu untuk melihat semua kartu per topik, timeline keputusan, dan bertanya pada asisten.
         </p>
         {pendingDraftCount && pendingDraftCount > 0 ? (
           <Link href="/review" aria-label={`${pendingDraftCount} draft menunggu review`} className="mt-2 inline-flex items-center gap-1.5 rounded bg-[var(--sand-tint)] px-3 py-1 text-xs font-semibold text-[var(--sand-dark)] hover:bg-[var(--sand)]/20">
@@ -68,7 +70,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <ProjectsList initialProjects={projects} />
+      <ProjectsList initialProjects={projects} developments={developments} />
     </div>
   );
 }

@@ -3,24 +3,21 @@ import { searchAll } from "@/lib/search/queries";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 
-function clientReturning(projects: unknown[]) {
+function clientReturning(projects: unknown[], developments: unknown[] = []) {
   const builder: any = {
-    select: () => builder,
-    or: () => builder,
-    ilike: () => builder,
-    is: () => builder,
-    contains: () => builder,
+    select: () => builder, or: () => builder, ilike: () => builder,
+    is: () => builder, contains: () => builder,
     limit: () => Promise.resolve({ data: [], error: null }),
   };
   return {
     from(table: string) {
       if (table === "projects") {
-        const pb: any = {
-          select: () => pb,
-          or: () => pb,
-          limit: () => Promise.resolve({ data: projects, error: null }),
-        };
+        const pb: any = { select: () => pb, or: () => pb, limit: () => Promise.resolve({ data: projects, error: null }) };
         return pb;
+      }
+      if (table === "developments") {
+        const db: any = { select: () => db, ilike: () => db, limit: () => Promise.resolve({ data: developments, error: null }) };
+        return db;
       }
       return builder;
     },
@@ -83,5 +80,19 @@ describe("searchAll attachments group", () => {
     expect(hit.projectCode).toBe("ARIN");
     expect(hit.href).toBe("/project/ARIN/cards/master-bath");
     expect(hit.snippet).toContain("Statuario");
+  });
+});
+
+describe("searchAll developments tier", () => {
+  it("returns matching developments as tier hits", async () => {
+    const supabase = clientReturning([], [
+      { id: "d1", name: "Citraland", area_label: "Surabaya Barat" },
+    ]);
+    const res = await searchAll(supabase, "citra");
+    expect(res.developments).toHaveLength(1);
+    const hit = res.developments[0]!;
+    expect(hit.kind).toBe("development");
+    expect(hit.href).toBe("/?dev=d1");
+    expect(hit.cardTitle).toBe("Citraland");
   });
 });

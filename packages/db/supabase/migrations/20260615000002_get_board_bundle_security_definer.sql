@@ -1,12 +1,27 @@
--- One round-trip board read: bundles project, topics, cards, open-loop events,
--- card_areas, and active gate-status rows as a single JSON object. Label and
--- deadline computation stays in TypeScript (mapBoardBundle); this function only
--- fetches. SECURITY INVOKER so the caller's RLS still applies.
+-- get_board_bundle: switch from SECURITY INVOKER to SECURITY DEFINER with an
+-- explicit access gate.
+--
+-- Why: the INVOKER version failed for authenticated users. Evaluating the
+-- cards-layer RLS policies for every sub-select inside ONE bundled query raised
+-- an error for the authenticated role (the old multi-query path tolerated a
+-- failing sub-query via `?? []`, so the board still rendered). Running the read
+-- as DEFINER avoids per-table RLS evaluation inside the function.
+--
+-- Access is still enforced:
+--   * the whole result is gated on current_can_read_project(project_id), the
+--     same rule that governs whether the caller can see the project at all
+--     (cross-project read for principal/admin/estimator, OR project assignment);
+--   * cost-restricted loop events are filtered with current_cost_visible_for(),
+--     mirroring the card_events_select policy, so non-cost-visible staff never
+--     receive cost_visible events.
+-- Net effect vs the old per-table RLS: senior cross-project roles can now read a
+-- board even on a project they aren't explicitly assigned to (consistent with
+-- their existing project-level visibility); cost protection is unchanged.
 create or replace function public.get_board_bundle(p_code text)
 returns jsonb
 language sql
 stable
-security invoker
+security definer
 set search_path = public
 as $$
   with proj as (
@@ -39,6 +54,8 @@ as $$
       from public.card_events e
       where e.project_id = (select id from proj)
         and e.event_kind in ('decision', 'client_request', 'work')
+        and (e.cost_visible = false
+             or public.current_cost_visible_for((select id from proj)))
     ), '[]'::jsonb),
     'card_areas', coalesce((
       select jsonb_agg(jsonb_build_object('card_id', ca.card_id, 'area_id', ca.area_id))
@@ -56,7 +73,10 @@ as $$
         and g.target_start_date is not null
     ), '[]'::jsonb)
   )
-  where exists (select 1 from proj);
+  where exists (select 1 from proj)
+    and public.current_can_read_project((select id from proj));
 $$;
 
-grant execute on function public.get_board_bundle(text) to anon, authenticated;
+-- anon can never satisfy the gate (no auth.uid()); keep execute to authenticated.
+revoke execute on function public.get_board_bundle(text) from anon;
+grant execute on function public.get_board_bundle(text) to authenticated;

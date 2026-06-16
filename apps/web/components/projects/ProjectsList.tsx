@@ -1,61 +1,104 @@
 "use client";
-import Link from "next/link";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useProjects } from "@/lib/query/hooks";
-import type { ProjectListItem } from "@/lib/projects/queries";
-import { ProjectEditDialog } from "@/components/projects/ProjectEditDialog";
+import type { ProjectListItem, DevelopmentOption } from "@/lib/projects/queries";
+import { filterProjects, groupProjects } from "@/lib/projects/grouping";
+import { ProjectCard } from "@/components/projects/ProjectCard";
+import { SearchIcon } from "@/components/icons/Icon";
 
-const statusLabel: Record<string, string> = {
-  design: "Desain",
-  construction: "Konstruksi",
-  finishing: "Finishing",
-  handover: "Serah terima",
-  closed: "Selesai",
-};
+const STATUS_FILTERS: { value: string; label: string }[] = [
+  { value: "all", label: "Semua" },
+  { value: "design", label: "Desain" },
+  { value: "construction", label: "Konstruksi" },
+  { value: "finishing", label: "Finishing" },
+  { value: "handover", label: "Serah terima" },
+  { value: "closed", label: "Selesai" },
+];
 
-export function ProjectsList({ initialProjects }: { initialProjects: ProjectListItem[] }) {
+export function ProjectsList({
+  initialProjects, developments,
+}: { initialProjects: ProjectListItem[]; developments: DevelopmentOption[] }) {
   const { data: projects } = useProjects(initialProjects);
   const list = projects ?? initialProjects;
 
+  const params = useSearchParams();
+  const devFilter = params.get("dev");
+
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const groups = useMemo(() => {
+    let scoped = list;
+    if (devFilter) scoped = scoped.filter((p) => p.development_id === devFilter);
+    return groupProjects(filterProjects(scoped, { query, status }));
+  }, [list, devFilter, query, status]);
+
+  const total = groups.reduce((n, g) => n + g.projects.length, 0);
+
   return (
-    <section>
-      <div className="overflow-hidden rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6]">
-        <div className="border-b border-[#B5AFA8] bg-[#141210] px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#FDFAF6]">
-          Proyek Aktif
+    <section className="grid gap-3">
+      <div className="sticky top-0 z-10 -mx-1 grid gap-2 bg-[#DAD6C9]/95 px-1 py-2 backdrop-blur">
+        <div className="flex items-center gap-2 rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6] px-3 py-2">
+          <SearchIcon size={15} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cari proyek, klien, atau lokasi…"
+            aria-label="Cari proyek"
+            className="w-full bg-transparent text-sm text-[#141210] outline-none placeholder:text-[#847E78]"
+          />
         </div>
-        <ul className="divide-y divide-[#B5AFA8]/70">
-          {list.map((p) => (
-            <li key={p.id} className="px-4 py-3">
-              <div className="flex items-start gap-2">
-                <Link
-                  href={`/project/${p.project_code}`}
-                  className="block flex-1 transition-colors hover:opacity-80"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="font-semibold text-[#141210]">
-                        {p.project_code} · {p.project_name}
-                      </div>
-                      <div className="mt-1 text-sm leading-5 text-[#524E49]">
-                        Client: {p.client_name ?? "-"}
-                        {p.location && ` · ${p.location}`}
-                      </div>
-                    </div>
-                    <span className="rounded-[5px] bg-[#B29F86]/15 px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">
-                      {statusLabel[p.status] ?? p.status}
-                    </span>
-                  </div>
-                  {p.target_handover && (
-                    <div className="mt-2 text-xs font-medium text-[#847E78]">
-                      Target serah terima: {p.target_handover}
-                    </div>
-                  )}
-                </Link>
-                <ProjectEditDialog project={p} />
-              </div>
-            </li>
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => setStatus(f.value)}
+              aria-pressed={status === f.value}
+              className={`rounded-[6px] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] ${
+                status === f.value
+                  ? "bg-[#141210] text-[#FDFAF6]"
+                  : "border border-[#B5AFA8] bg-[#FDFAF6] text-[#524E49] hover:border-[#7A6B56]"
+              }`}
+            >
+              {f.label}
+            </button>
           ))}
-        </ul>
+        </div>
       </div>
+
+      {total === 0 ? (
+        <div className="rounded-[8px] border border-dashed border-[#B5AFA8] p-6 text-sm text-[#524E49]">
+          Tidak ada proyek yang cocok dengan filter.
+        </div>
+      ) : (
+        groups.map((g) => {
+          const key = g.id ?? "__ungrouped__";
+          const isCollapsed = collapsed[key] ?? false;
+          return (
+            <div key={key} className="overflow-hidden rounded-[8px] border border-[#B5AFA8] bg-[#EFEADF]">
+              <button
+                type="button"
+                onClick={() => setCollapsed((c) => ({ ...c, [key]: !isCollapsed }))}
+                aria-expanded={!isCollapsed}
+                className="flex w-full items-center justify-between bg-[#141210] px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.12em] text-[#FDFAF6]"
+              >
+                <span>{isCollapsed ? "▸" : "▾"} {g.name} · {g.projects.length}</span>
+                {g.area_label ? <span className="font-medium text-[#B5AFA8]">{g.area_label}</span> : null}
+              </button>
+              {!isCollapsed ? (
+                <div className="grid gap-2.5 p-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
+                  {g.projects.map((p) => (
+                    <ProjectCard key={p.id} project={p} developments={developments} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })
+      )}
     </section>
   );
 }

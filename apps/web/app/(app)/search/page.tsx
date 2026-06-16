@@ -4,6 +4,7 @@ import { searchAll, type SearchHit } from "@/lib/search/queries";
 import { SearchBox } from "@/components/search/SearchBox";
 
 const KIND_LABEL: Record<SearchHit["kind"], string> = {
+  development: "Pengembangan",
   project: "Proyek",
   card: "Kartu",
   event: "Aktivitas",
@@ -12,6 +13,7 @@ const KIND_LABEL: Record<SearchHit["kind"], string> = {
 };
 
 const KIND_COLOR: Record<SearchHit["kind"], string> = {
+  development: "bg-[var(--sand)]/30 text-[var(--sand-dark)]",
   project: "bg-[var(--sand)]/20 text-[var(--sand-dark)]",
   card: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]",
   event: "bg-[var(--sand-tint)] text-[var(--sand-dark)]",
@@ -26,8 +28,8 @@ export default async function SearchPage({
 }) {
   const { q = "" } = await searchParams;
   const supabase = await createSupabaseServerClient();
-  const results = q.trim().length >= 2 ? await searchAll(supabase, q) : { projects: [], cards: [], events: [], comments: [], attachments: [] };
-  const total = results.projects.length + results.cards.length + results.events.length + results.comments.length + results.attachments.length;
+  const results = q.trim().length >= 2 ? await searchAll(supabase, q) : { developments: [], projects: [], cards: [], events: [], comments: [], attachments: [] };
+  const total = results.developments.length + results.projects.length + results.cards.length + results.events.length + results.comments.length + results.attachments.length;
 
   return (
     <div className="mx-auto max-w-3xl p-6">
@@ -55,6 +57,7 @@ export default async function SearchPage({
       )}
 
       {[
+        { label: "Pengembangan", items: results.developments },
         { label: "Proyek", items: results.projects },
         { label: "Kartu", items: results.cards },
         { label: "Aktivitas", items: results.events },
