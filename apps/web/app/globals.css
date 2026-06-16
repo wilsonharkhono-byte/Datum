@@ -252,6 +252,22 @@ body {
   }
 }
 
+/* Compact chip — the mobile column-jump tabs are navigation, not filter
+   targets, so they run shorter than the 44px filter chips to keep the strip
+   tight and let the cards own the screen. Declared after the rules above so it
+   wins the min-height cascade on phones. */
+.chip-compact {
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+@media (max-width: 767px) {
+  .chip-compact {
+    min-height: 2.25rem;
+  }
+}
+
 /* === LOADING SKELETONS (route-level loading.tsx) =========================
    One shared shape class. Tone sits on the darker-oat divider color so
    ghosts read as part of the surface system, not gray placeholders.

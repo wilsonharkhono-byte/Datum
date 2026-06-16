@@ -66,6 +66,28 @@ export function XIcon(p: IconProps) {
   );
 }
 
+/** Sliders — "filter / refine" mark */
+export function FilterIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 6h16" />
+      <path d="M7 12h10" />
+      <path d="M10 18h4" />
+    </Svg>
+  );
+}
+
+/** Vertical ellipsis — "more / overflow menu" mark */
+export function MoreIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </Svg>
+  );
+}
+
 /** Diagonal-split Trello mark — two stacked rectangles inside a frame */
 export function TrelloIcon(p: IconProps) {
   return (

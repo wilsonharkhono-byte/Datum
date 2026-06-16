@@ -50,7 +50,7 @@ export function BoardTabs({
             type="button"
             onClick={() => onSelect(tab.id)}
             aria-pressed={on}
-            className={`chip shrink-0${on ? " chip-on" : ""}`}
+            className={`chip chip-compact shrink-0${on ? " chip-on" : ""}`}
           >
             {tab.name}
             <span className="text-[10px] opacity-70">{tab.count}</span>
