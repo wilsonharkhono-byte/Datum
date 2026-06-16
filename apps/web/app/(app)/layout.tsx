@@ -18,7 +18,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-4">
               <div>
                 <DatumWordmark className="h-5 w-auto text-[#141210] sm:h-6" />
-                <div className="mt-0.5 text-[10px] font-medium text-[#524E49] sm:mt-1.5 sm:text-xs">
+                {/* The name/role line wraps to two lines on phones and isn't
+                    needed while working a board — show it from sm+ only. */}
+                <div className="mt-1.5 hidden text-xs font-medium text-[#524E49] sm:block">
                   {staff.full_name} · {staff.role}
                   {staff.cost_visible && " · cost-visible"}
                 </div>
