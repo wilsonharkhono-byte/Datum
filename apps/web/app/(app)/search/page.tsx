@@ -9,6 +9,7 @@ const KIND_LABEL: Record<SearchHit["kind"], string> = {
   card: "Kartu",
   event: "Aktivitas",
   comment: "Komentar",
+  attachment: "Lampiran",
 };
 
 const KIND_COLOR: Record<SearchHit["kind"], string> = {
@@ -17,6 +18,7 @@ const KIND_COLOR: Record<SearchHit["kind"], string> = {
   card: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]",
   event: "bg-[var(--sand-tint)] text-[var(--sand-dark)]",
   comment: "bg-[var(--surface-alt)] text-[var(--text-secondary)]",
+  attachment: "bg-[var(--sand)]/20 text-[var(--sand-dark)]",
 };
 
 export default async function SearchPage({
@@ -26,8 +28,8 @@ export default async function SearchPage({
 }) {
   const { q = "" } = await searchParams;
   const supabase = await createSupabaseServerClient();
-  const results = q.trim().length >= 2 ? await searchAll(supabase, q) : { developments: [], projects: [], cards: [], events: [], comments: [] };
-  const total = results.developments.length + results.projects.length + results.cards.length + results.events.length + results.comments.length;
+  const results = q.trim().length >= 2 ? await searchAll(supabase, q) : { developments: [], projects: [], cards: [], events: [], comments: [], attachments: [] };
+  const total = results.developments.length + results.projects.length + results.cards.length + results.events.length + results.comments.length + results.attachments.length;
 
   return (
     <div className="mx-auto max-w-3xl p-6">
@@ -60,6 +62,7 @@ export default async function SearchPage({
         { label: "Kartu", items: results.cards },
         { label: "Aktivitas", items: results.events },
         { label: "Komentar", items: results.comments },
+        { label: "Lampiran", items: results.attachments },
       ].map(({ label, items }) =>
         items.length === 0 ? null : (
           <section key={label} className="mt-6">

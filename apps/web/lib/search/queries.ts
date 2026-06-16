@@ -3,7 +3,7 @@ import type { Database } from "@datum/db";
 
 export type SearchHit = {
   id: string;
-  kind: "card" | "event" | "comment" | "project" | "development";
+  kind: "card" | "event" | "comment" | "project" | "development" | "attachment";
   projectCode: string;
   cardSlug: string;
   cardTitle: string;
@@ -23,10 +23,10 @@ const PER_GROUP = 25;
 export async function searchAll(
   supabase: SupabaseClient<Database>,
   q: string,
-): Promise<{ developments: SearchHit[]; projects: SearchHit[]; cards: SearchHit[]; events: SearchHit[]; comments: SearchHit[] }> {
+): Promise<{ developments: SearchHit[]; projects: SearchHit[]; cards: SearchHit[]; events: SearchHit[]; comments: SearchHit[]; attachments: SearchHit[] }> {
   const trimmed = q.trim();
   if (trimmed.length < 2) {
-    return { developments: [], projects: [], cards: [], events: [], comments: [] };
+    return { developments: [], projects: [], cards: [], events: [], comments: [], attachments: [] };
   }
   const pattern = `%${trimmed.replace(/[%_]/g, (m) => `\\${m}`)}%`;
 
@@ -145,7 +145,39 @@ export async function searchAll(
     };
   });
 
-  return { developments, projects, cards, events: eventHits, comments };
+  // Attachments: AI caption ilike. Joined event→card→project; RLS-scoped so
+  // cost-sensitive captions never reach non-cost roles.
+  const { data: attachmentRows } = await supabase
+    .from("card_attachments")
+    .select(
+      `id, ai_caption, mime_type, card_events:card_event_id ( cards:card_id ( slug, title, projects:project_id ( project_code ) ) )`,
+    )
+    .ilike("ai_caption", pattern)
+    .limit(PER_GROUP);
+
+  const attachments: SearchHit[] = [];
+  for (const a of attachmentRows ?? []) {
+    const row = a as {
+      id: string;
+      ai_caption: string | null;
+      card_events: { cards: CardJoin | null } | null;
+    };
+    const c = row.card_events?.cards;
+    const code = c?.projects?.project_code;
+    if (!c || !code || !row.ai_caption) continue;
+    attachments.push({
+      id: `a_${row.id}`,
+      kind: "attachment",
+      projectCode: code,
+      cardSlug: c.slug,
+      cardTitle: c.title,
+      snippet: highlight(row.ai_caption, trimmed),
+      href: `/project/${code}/cards/${c.slug}`,
+      occurredAt: "",
+    });
+  }
+
+  return { developments, projects, cards, events: eventHits, comments, attachments };
 }
 
 function highlight(text: string, q: string): string {

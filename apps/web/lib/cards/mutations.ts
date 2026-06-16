@@ -581,6 +581,46 @@ export async function signAttachment(formData: FormData): Promise<SignAttachment
   return { ok: true, url: data.signedUrl };
 }
 
+// ─── reanalyzeAttachment ──────────────────────────────────────────────────────
+// Reset a failed/skipped attachment back to the work queue. The cron runner
+// picks it up on the next tick; ai_attempts resets so the 3-try guard restarts.
+
+const ReanalyzeInput = z.object({
+  attachmentId: z.string().uuid(),
+  projectCode:  z.string().min(1),
+  cardSlug:     z.string().min(1),
+});
+
+export type ReanalyzeResult = { ok: true } | { ok: false; error: string };
+
+export async function reanalyzeAttachment(formData: FormData): Promise<ReanalyzeResult> {
+  let input;
+  try {
+    input = ReanalyzeInput.parse({
+      attachmentId: formData.get("attachmentId"),
+      projectCode:  formData.get("projectCode"),
+      cardSlug:     formData.get("cardSlug"),
+    });
+  } catch {
+    return { ok: false, error: "Permintaan tidak valid" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+
+  // RLS gates this update to attachments whose parent event is in an accessible
+  // project, so a user can only re-queue attachments they may write.
+  const { error } = await supabase
+    .from("card_attachments")
+    .update({ ai_status: "pending", ai_attempts: 0, ai_error: null })
+    .eq("id", input.attachmentId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
+  return { ok: true };
+}
+
 // ─── Slice 1.2a — card members ────────────────────────────────────────────────
 
 const AddMemberInput = z.object({

@@ -625,8 +625,13 @@ export type Database = {
       }
       card_attachments: {
         Row: {
+          ai_attempts: number
           ai_caption: string | null
+          ai_error: string | null
           ai_extracted: Json | null
+          ai_model: string | null
+          ai_processed_at: string | null
+          ai_status: Database["public"]["Enums"]["attachment_ai_status"]
           card_event_id: string
           created_at: string
           id: string
@@ -634,8 +639,13 @@ export type Database = {
           storage_path: string
         }
         Insert: {
+          ai_attempts?: number
           ai_caption?: string | null
+          ai_error?: string | null
           ai_extracted?: Json | null
+          ai_model?: string | null
+          ai_processed_at?: string | null
+          ai_status?: Database["public"]["Enums"]["attachment_ai_status"]
           card_event_id: string
           created_at?: string
           id?: string
@@ -643,8 +653,13 @@ export type Database = {
           storage_path: string
         }
         Update: {
+          ai_attempts?: number
           ai_caption?: string | null
+          ai_error?: string | null
           ai_extracted?: Json | null
+          ai_model?: string | null
+          ai_processed_at?: string | null
+          ai_status?: Database["public"]["Enums"]["attachment_ai_status"]
           card_event_id?: string
           created_at?: string
           id?: string
@@ -2405,6 +2420,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_attachments_for_analysis: {
+        Args: { p_limit?: number }
+        Returns: Database["public"]["Tables"]["card_attachments"]["Row"][]
+      }
       compute_project_schedule: {
         Args: { p_project_id: string }
         Returns: undefined
@@ -2453,6 +2472,7 @@ export type Database = {
         | "utility"
         | "general"
       assistant_message_role: "user" | "assistant" | "system"
+      attachment_ai_status: "pending" | "processing" | "done" | "failed" | "skipped"
       attachment_kind: "photo" | "drawing" | "document" | "other"
       blocker_status: "open" | "resolved" | "cancelled"
       blocker_type:

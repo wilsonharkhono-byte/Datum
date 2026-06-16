@@ -14,6 +14,7 @@ import {
   getAnthropicClient,
   getModel,
   cachedSystemBlock,
+  textOf,
 } from "@/lib/assistant/anthropic";
 
 // area_type enum mirrors packages/db/src/types.generated.ts ("area_type").
@@ -278,17 +279,13 @@ export type ModelRunner = (args: {
 }) => Promise<string>;
 
 const defaultRunModel: ModelRunner = async ({ system, userContent }) => {
-  const res = await getAnthropicClient().beta.promptCaching.messages.create({
+  const res = await getAnthropicClient().messages.create({
     model: getModel(),
     max_tokens: 2048,
     system: cachedSystemBlock(system),
     messages: [{ role: "user", content: userContent }],
   });
-  return res.content
-    .filter((c): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("")
-    .trim();
+  return textOf(res.content).trim();
 };
 
 /** Strip an accidental ```json fence and parse to a plain object. */

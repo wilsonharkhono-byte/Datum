@@ -132,7 +132,7 @@ export function Board({ initialBoard }: { initialBoard: BoardData }) {
       />
       <div
         ref={scrollerRef}
-        className="flex flex-1 snap-x snap-mandatory flex-row gap-3 overflow-x-auto overflow-y-hidden bg-[var(--surface-alt)] p-3 md:snap-none md:flex-row md:gap-2 md:overflow-x-auto md:overflow-y-hidden"
+        className="flex flex-1 snap-x snap-mandatory flex-row gap-3 overflow-x-auto overflow-y-hidden bg-[var(--surface-alt)] p-2 md:snap-none md:flex-row md:gap-2 md:overflow-x-auto md:overflow-y-hidden md:p-3"
       >
         {filteredColumns.length === 0 ? (
           <div className="m-auto text-sm italic text-[var(--text-muted)]">

@@ -34,11 +34,10 @@ export function getAnthropicClient(): Anthropic {
 
 /**
  * Static system prompt sent as a content-block array with cache_control so the
- * Anthropic API caches it as a prefix. SDK 0.30.x only exposes cache_control
- * via the prompt-caching beta namespace (client.beta.promptCaching.messages),
- * which auto-sends the `anthropic-beta: prompt-caching-2024-07-31` header.
- * The per-request KONTEKS block stays in the user message — it changes every
- * request and must NOT be cached.
+ * Anthropic API caches it as a prefix. Prompt caching is GA on the stable
+ * Messages API (no beta namespace / header needed); cache_control lives on the
+ * system text block. The per-request KONTEKS block stays in the user message —
+ * it changes every request and must NOT be cached.
  */
 export function cachedSystemBlock(text: string) {
   return [
@@ -60,7 +59,7 @@ function buildUserContent(args: { question: string; contextBlock: string }): str
  * Use `.on("text", ...)` for deltas and `await .finalMessage()` for usage.
  */
 export function streamAssistant(args: { question: string; contextBlock: string }) {
-  return getAnthropicClient().beta.promptCaching.messages.stream({
+  return getAnthropicClient().messages.stream({
     model: getModel(),
     max_tokens: 1024,
     system: cachedSystemBlock(SYSTEM),
@@ -70,21 +69,29 @@ export function streamAssistant(args: { question: string; contextBlock: string }
 
 export type AssistantStream = ReturnType<typeof streamAssistant>;
 
+/**
+ * Concatenate the text blocks of a model response into one string. Modern SDK
+ * `content` is a union (text, thinking, tool_use, …); we keep only text blocks.
+ */
+export function textOf(content: Anthropic.ContentBlock[]): string {
+  return content
+    .filter((c): c is Anthropic.TextBlock => c.type === "text")
+    .map((c) => c.text)
+    .join("");
+}
+
 /** Non-streaming variant, kept for callers that need the full answer at once. */
 export async function askAssistant(args: {
   question: string;
   contextBlock: string;
 }): Promise<{ answer: string; usage: { input_tokens: number; output_tokens: number } }> {
-  const res = await getAnthropicClient().beta.promptCaching.messages.create({
+  const res = await getAnthropicClient().messages.create({
     model: getModel(),
     max_tokens: 1024,
     system: cachedSystemBlock(SYSTEM),
     messages: [{ role: "user", content: buildUserContent(args) }],
   });
-  const text = res.content
-    .filter((c): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("");
+  const text = textOf(res.content);
   return {
     answer: text,
     usage: { input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens },

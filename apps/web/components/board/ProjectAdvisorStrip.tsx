@@ -11,7 +11,7 @@ export function ProjectAdvisorStrip({ items }: { items: AdvisorItem[] }) {
 
   return (
     <div
-      className="flex gap-2 overflow-x-auto border-b border-[var(--border)] bg-[var(--surface-alt)] px-4 py-2"
+      className="flex gap-2 overflow-x-auto border-b border-[var(--border)] bg-[var(--surface-alt)] px-3 py-1 sm:px-4 sm:py-2"
       aria-label="Prioritas proyek hari ini"
     >
       {items.map((it, i) => {
@@ -25,7 +25,7 @@ export function ProjectAdvisorStrip({ items }: { items: AdvisorItem[] }) {
           <Link
             key={`${it.type}-${it.href}-${i}`}
             href={it.href}
-            className={`flex min-h-11 shrink-0 max-w-[280px] flex-col justify-center rounded border px-3 py-1.5 ${tone}`}
+            className={`flex min-h-0 shrink-0 max-w-[280px] flex-col justify-center rounded border px-3 py-1 sm:min-h-11 sm:py-1.5 ${tone}`}
           >
             <span className="truncate text-xs font-semibold">{it.title}</span>
             <span className="truncate text-[10px] text-[var(--text-secondary)]">

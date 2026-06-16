@@ -131,7 +131,7 @@ export function EventRow({
           ))}
         </div>
       ) : null}
-      <EventAttachments attachments={attachments} />
+      <EventAttachments attachments={attachments} projectCode={projectCode} cardSlug={cardSlug} />
     </li>
   );
 }
