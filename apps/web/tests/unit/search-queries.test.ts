@@ -40,3 +40,48 @@ describe("searchAll projects group", () => {
     expect(hit.href).toBe("/project/ARIN-KARAWANG");
   });
 });
+
+function clientReturningAttachments(rows: unknown[]) {
+  const passthru: any = {
+    select: () => passthru,
+    or: () => passthru,
+    ilike: () => passthru,
+    is: () => passthru,
+    limit: () => Promise.resolve({ data: [], error: null }),
+  };
+  return {
+    from(table: string) {
+      if (table === "card_attachments") {
+        const ab: any = {
+          select: () => ab,
+          ilike: () => ab,
+          limit: () => Promise.resolve({ data: rows, error: null }),
+        };
+        return ab;
+      }
+      return passthru;
+    },
+  } as unknown as SupabaseClient<Database>;
+}
+
+describe("searchAll attachments group", () => {
+  it("returns attachment caption hits", async () => {
+    const supabase = clientReturningAttachments([
+      {
+        id: "a1",
+        ai_caption: "Marmer Statuario, urat abu-abu, finish polish",
+        mime_type: "image/jpeg",
+        card_events: {
+          cards: { slug: "master-bath", title: "Master bath", projects: { project_code: "ARIN" } },
+        },
+      },
+    ]);
+    const res = await searchAll(supabase, "statuario");
+    expect(res.attachments).toHaveLength(1);
+    const hit = res.attachments[0]!;
+    expect(hit.kind).toBe("attachment");
+    expect(hit.projectCode).toBe("ARIN");
+    expect(hit.href).toBe("/project/ARIN/cards/master-bath");
+    expect(hit.snippet).toContain("Statuario");
+  });
+});
