@@ -1178,6 +1178,30 @@ export type Database = {
           },
         ]
       }
+      developments: {
+        Row: {
+          area_label: string | null
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          area_label?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          area_label?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       drawing_revisions: {
         Row: {
           drawing_id: string
@@ -1862,7 +1886,9 @@ export type Database = {
       projects: {
         Row: {
           client_name: string | null
+          cover_image_path: string | null
           created_at: string
+          development_id: string | null
           id: string
           kickoff_date: string | null
           location: string | null
@@ -1879,7 +1905,9 @@ export type Database = {
         }
         Insert: {
           client_name?: string | null
+          cover_image_path?: string | null
           created_at?: string
+          development_id?: string | null
           id?: string
           kickoff_date?: string | null
           location?: string | null
@@ -1896,7 +1924,9 @@ export type Database = {
         }
         Update: {
           client_name?: string | null
+          cover_image_path?: string | null
           created_at?: string
+          development_id?: string | null
           id?: string
           kickoff_date?: string | null
           location?: string | null
@@ -1912,6 +1942,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_development_id_fkey"
+            columns: ["development_id"]
+            isOneToOne: false
+            referencedRelation: "developments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_pic_id_fkey"
             columns: ["pic_id"]
