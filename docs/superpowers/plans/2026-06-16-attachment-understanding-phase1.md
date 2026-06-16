@@ -12,6 +12,8 @@
 
 **Page-cap note:** The spec mentions a 20-page PDF cap. Counting PDF pages needs a parser dependency; Phase 1 relies on the bucket's existing 20 MB size cap instead and defers the page cap to a later refinement. This is the one intentional deviation from the spec.
 
+**SDK-upgrade note (added during execution):** The pinned `@anthropic-ai/sdk@0.30.1` had no PDF/document content-block support, so Phase 1 begins by upgrading to `^0.104.2` and refactoring the three `beta.promptCaching.messages` call sites (`anthropic.ts`, `capture/route.ts`, `areas/extract.ts`) to the stable `messages` API — prompt caching is GA so `cachedSystemBlock`'s shape is unchanged; a shared `textOf()` helper handles the richer `ContentBlock` union. This appears as the first commit ("Task 0"). PDFs (floor plans, quotes) are fully supported as a result. Image media types are limited to jpeg/png/gif/webp (HEIC/HEIF are skipped, not failed).
+
 ---
 
 ## File Structure
