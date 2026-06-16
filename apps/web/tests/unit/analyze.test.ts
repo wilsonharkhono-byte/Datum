@@ -5,6 +5,7 @@ import {
   buildDescribeMessages,
   MAX_ATTACHMENT_BYTES,
 } from "@/lib/attachments/analyze";
+import { isCronAuthorized } from "@/app/api/cron/analyze-attachments/route";
 
 describe("attachmentKind", () => {
   it("maps SDK-supported images to image and pdf to pdf", () => {
@@ -51,5 +52,20 @@ describe("buildDescribeMessages", () => {
     expect(block.source.type).toBe("base64");
     expect(block.source.media_type).toBe("application/pdf");
     expect(block.source.data).toBe("BBB");
+  });
+});
+
+describe("isCronAuthorized", () => {
+  it("rejects when no secret is configured", () => {
+    const req = new Request("http://x", { headers: { authorization: "Bearer s" } });
+    expect(isCronAuthorized(req, undefined)).toBe(false);
+  });
+  it("rejects a wrong bearer", () => {
+    const req = new Request("http://x", { headers: { authorization: "Bearer nope" } });
+    expect(isCronAuthorized(req, "s")).toBe(false);
+  });
+  it("accepts the matching bearer", () => {
+    const req = new Request("http://x", { headers: { authorization: "Bearer s" } });
+    expect(isCronAuthorized(req, "s")).toBe(true);
   });
 });
