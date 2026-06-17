@@ -11,6 +11,16 @@ export function isCronAuthorized(req: Request, secret: string | undefined): bool
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
+/** True when the claim RPC isn't in the schema yet (migration not applied). */
+export function isMissingFunctionError(
+  error: { code?: string | null; message?: string | null } | null,
+): boolean {
+  if (!error) return false;
+  if (error.code === "PGRST202") return true; // PostgREST: function not found
+  const msg = (error.message ?? "").toLowerCase();
+  return msg.includes("could not find the function") || msg.includes("does not exist");
+}
+
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
@@ -24,7 +34,16 @@ export async function GET(req: Request) {
   const { data: claimed, error } = await supabase.rpc("claim_attachments_for_analysis", {
     p_limit: BATCH,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // Before `supabase db push`, the claim RPC doesn't exist yet. Treat that as
+    // an idle tick (200) so the cron isn't flagged failing every minute; any
+    // other error is a genuine 500.
+    if (isMissingFunctionError(error)) {
+      console.warn("[cron/analyze-attachments] claim RPC missing — migration not applied yet");
+      return NextResponse.json({ skipped: "migration_pending" });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   const now = () => new Date().toISOString();
   let done = 0;
