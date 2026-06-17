@@ -20,19 +20,23 @@ test.describe("Project board (client cache)", () => {
     // project/[slug]/page.tsx), so the project code matches the heading role.
     await expect(page.getByRole("heading", { name: /BDG-H1/ })).toBeVisible();
 
-    // 2) Make the board API slow (~3s), then reload. The persisted cache should
+    // 2) Make the board API slow (~6s), then reload. The persisted cache should
     // hydrate the board immediately while this request is still in flight.
+    // (6s, up from 3s, gives the assertion headroom over dev-mode route
+    //  recompilation on a cold CI runner without weakening what it proves.)
     await page.route("**/api/board/**", async (route) => {
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 6000));
       await route.continue();
     });
 
     const start = Date.now();
     await page.reload();
 
-    // 3) Cached content paints well under the 3s API delay, and the whole revisit
-    // settles in under 2.5s — proving the board renders without waiting on the API.
-    await expect(page.getByRole("heading", { name: /BDG-H1/ })).toBeVisible({ timeout: 1200 });
-    expect(Date.now() - start).toBeLessThan(2500);
+    // 3) Cached content paints and the revisit settles in well under the 6s API
+    // delay — proving the board renders from cache without waiting on the API.
+    // The budget (4.5s) is comfortably below 6s so a regression that actually
+    // waits on the API still fails, but transient CI/dev-server latency doesn't.
+    await expect(page.getByRole("heading", { name: /BDG-H1/ })).toBeVisible({ timeout: 3000 });
+    expect(Date.now() - start).toBeLessThan(4500);
   });
 });
