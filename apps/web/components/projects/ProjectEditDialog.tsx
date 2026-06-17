@@ -74,24 +74,24 @@ export function ProjectEditDialog({
         <form
           id={formId}
           onSubmit={submit}
-          className="mt-3 grid gap-2 rounded border border-[var(--border)] bg-[var(--surface)] p-3 text-xs w-[min(420px,80vw)]"
+          className="mt-3 grid w-full gap-2 rounded border border-[var(--border)] bg-[var(--surface)] p-3 text-xs"
         >
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Nama proyek</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} disabled={pending} maxLength={120} required className="rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
+              <input value={name} onChange={(e) => setName(e.target.value)} disabled={pending} maxLength={120} required className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Klien</span>
-              <input value={client} onChange={(e) => setClient(e.target.value)} disabled={pending} maxLength={120} className="rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
+              <input value={client} onChange={(e) => setClient(e.target.value)} disabled={pending} maxLength={120} className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Lokasi</span>
-              <input value={location} onChange={(e) => setLocation(e.target.value)} disabled={pending} maxLength={200} className="rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
+              <input value={location} onChange={(e) => setLocation(e.target.value)} disabled={pending} maxLength={200} className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Status</span>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={pending} className="select-brand-sm">
+              <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={pending} className="w-full min-w-0 select-brand-sm">
                 <option value="design">Desain</option>
                 <option value="construction">Konstruksi</option>
                 <option value="finishing">Finishing</option>
@@ -101,7 +101,7 @@ export function ProjectEditDialog({
             </label>
             <label className="flex flex-col gap-1 sm:col-span-2">
               <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Target serah terima</span>
-              <input type="date" value={target} onChange={(e) => setTarget(e.target.value)} disabled={pending} className="rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
+              <input type="date" value={target} onChange={(e) => setTarget(e.target.value)} disabled={pending} className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Pengembangan</span>
@@ -112,7 +112,7 @@ export function ProjectEditDialog({
                 disabled={pending}
                 maxLength={120}
                 placeholder="mis. Bukit Darmo Golf"
-                className="rounded border border-[var(--border)] px-2 py-1.5 text-sm"
+                className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm"
               />
               <datalist id="datum-developments">
                 {developments.map((d) => <option key={d.id} value={d.name} />)}
@@ -120,7 +120,7 @@ export function ProjectEditDialog({
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Sampul (cover)</span>
-              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={onPickCover} disabled={pending || uploading} className="text-xs" />
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={onPickCover} disabled={pending || uploading} className="w-full min-w-0 text-xs" />
               {uploading ? <span className="text-[10px] text-[var(--text-muted)]">Mengunggah…</span> : null}
               {coverPath ? (
                 <button type="button" onClick={() => setCoverPath(null)} className="self-start text-[10px] font-medium text-[var(--flag-critical)] hover:underline">
