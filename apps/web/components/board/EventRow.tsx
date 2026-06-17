@@ -97,14 +97,20 @@ export function EventRow({
   const isHighRisk = HIGH_RISK_KINDS.has(event.event_kind as EventKind);
   return (
     <li className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-      <div className="flex gap-3">
-        <span className="w-24 flex-shrink-0 text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">
-          {KIND_LABEL[event.event_kind] ?? event.event_kind}
-        </span>
-        <span className="w-24 flex-shrink-0 text-[11px] text-[var(--text-secondary)]">
-          {new Date(event.occurred_at).toLocaleDateString("id-ID", { year: "2-digit", month: "short", day: "numeric" })}
-        </span>
-        <span className="flex-1 text-[var(--foreground)]">{summarize(event)}</span>
+      {/* Mobile: stacks — a meta line (kind + date) above a full-width summary,
+          with the badge/action wrapping below. md+: restores the columnar row
+          via `md:contents`, which dissolves the meta wrapper so the kind and
+          date spans flow as fixed columns again. */}
+      <div className="flex flex-col gap-1 md:flex-row md:gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 md:contents">
+          <span className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)] md:w-24 md:flex-shrink-0">
+            {KIND_LABEL[event.event_kind] ?? event.event_kind}
+          </span>
+          <span className="text-[11px] text-[var(--text-secondary)] md:w-24 md:flex-shrink-0">
+            {new Date(event.occurred_at).toLocaleDateString("id-ID", { year: "2-digit", month: "short", day: "numeric" })}
+          </span>
+        </div>
+        <span className="min-w-0 flex-1 break-words text-[var(--foreground)]">{summarize(event)}</span>
         {isHighRisk ? (
           <span
             className="inline-flex flex-shrink-0 items-center gap-1 self-start rounded-full bg-[var(--flag-high-bg)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--flag-high)]"
@@ -116,7 +122,7 @@ export function EventRow({
         <ResolveAction event={event} projectCode={projectCode} cardSlug={cardSlug} />
       </div>
       {urls.length > 0 ? (
-        <div className="ml-[12.5rem] mt-1 flex flex-wrap gap-1.5">
+        <div className="mt-1 flex flex-wrap gap-1.5 md:ml-[12.5rem]">
           {urls.map((u) => (
             <a
               key={u}

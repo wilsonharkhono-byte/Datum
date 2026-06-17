@@ -147,10 +147,10 @@ export function RulesViewer() {
           <section>
             <h3 className="mb-2 text-sm font-semibold">Status & warnanya</h3>
             <div
-              className="overflow-hidden rounded border"
+              className="overflow-x-auto rounded border"
               style={{ borderColor: "var(--border)" }}
             >
-              <table className="w-full border-collapse text-left text-xs">
+              <table className="w-full min-w-[22rem] border-collapse text-left text-xs">
                 <thead style={{ backgroundColor: "var(--surface-alt)" }}>
                   <tr>
                     <th className="px-3 py-2 font-medium" style={{ color: "var(--sand-dark)" }}>
@@ -228,10 +228,10 @@ export function RulesViewer() {
           <section>
             <h3 className="mb-2 text-sm font-semibold">Event yang relevan per gate</h3>
             <div
-              className="overflow-hidden rounded border"
+              className="overflow-x-auto rounded border"
               style={{ borderColor: "var(--border)" }}
             >
-              <table className="w-full border-collapse text-left text-xs">
+              <table className="w-full min-w-[22rem] border-collapse text-left text-xs">
                 <thead style={{ backgroundColor: "var(--surface-alt)" }}>
                   <tr>
                     <th className="px-3 py-2 font-medium" style={{ color: "var(--sand-dark)" }}>

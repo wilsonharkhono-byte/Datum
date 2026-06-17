@@ -39,12 +39,12 @@ export function InlineCardSnippet({ cardId, eventIds }: { cardId: string; eventI
             .map((k) => typeof p[k] === "string" ? p[k] as string : null)
             .filter((s): s is string => s != null && s.length > 0)[0] ?? JSON.stringify(p);
           return (
-            <li key={e.id} className="flex gap-2">
-              <span className="w-20 text-[10px] uppercase text-[var(--sand-dark)]">{e.event_kind}</span>
-              <span className="w-16 text-[10px] text-[var(--text-muted)]">
+            <li key={e.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="shrink-0 text-[10px] uppercase text-[var(--sand-dark)]">{e.event_kind}</span>
+              <span className="shrink-0 text-[10px] text-[var(--text-muted)]">
                 {new Date(e.occurred_at).toLocaleDateString("id-ID", { month: "short", day: "numeric" })}
               </span>
-              <span className="flex-1 text-[var(--foreground)]">{firstText.slice(0, 80)}</span>
+              <span className="min-w-0 flex-1 break-words text-[var(--foreground)]">{firstText.slice(0, 80)}</span>
               {urls.length > 0 ? (
                 <a
                   href={urls[0]}

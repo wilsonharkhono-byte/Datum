@@ -139,8 +139,8 @@ export function AreasManager({
           Belum ada area. Tambah area pertama di bawah untuk mengaktifkan matrix area × gate.
         </div>
       ) : (
-        <div className="overflow-hidden rounded border border-[var(--border)]">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded border border-[var(--border)]">
+          <table className="w-full min-w-[44rem] text-sm">
             <thead className="bg-[var(--foreground)] text-[var(--text-inverse)]">
               <tr>
                 <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide">Kode</th>

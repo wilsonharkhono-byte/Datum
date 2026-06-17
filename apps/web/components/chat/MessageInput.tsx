@@ -35,12 +35,12 @@ export function MessageInput({
           onChange={(e) => setValue(e.target.value)}
           disabled={disabled}
           placeholder={placeholder}
-          className="input-strong flex-1"
+          className="input-strong min-h-11 flex-1 md:min-h-0"
         />
         {acceptFiles ? (
           <label
             aria-label="Lampirkan foto atau PDF"
-            className="flex cursor-pointer items-center rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--sand-dark)] hover:text-[var(--sand-dark)]"
+            className="flex min-h-11 cursor-pointer items-center justify-center rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--sand-dark)] hover:text-[var(--sand-dark)] md:min-h-0"
           >
             <PaperclipIcon size={14} />
             <input
@@ -56,18 +56,20 @@ export function MessageInput({
         <button
           type="submit"
           disabled={disabled || (value.trim().length === 0 && !file)}
-          className="rounded bg-foreground px-4 py-1.5 text-xs font-semibold text-white disabled:bg-[var(--text-muted)]"
+          className="inline-flex min-h-11 items-center justify-center rounded bg-foreground px-4 py-1.5 text-xs font-semibold text-white disabled:bg-[var(--text-muted)] md:min-h-0"
         >
           Kirim
         </button>
       </div>
       {file ? (
         <div className="flex items-center gap-1.5 border-t border-[var(--border)] bg-[var(--surface-alt)] px-4 py-1 text-[10px] text-[var(--text-secondary)]">
-          <PaperclipIcon size={11} /> {file.name} ({Math.round(file.size / 1024)} KB) · <button
+          <PaperclipIcon size={11} />
+          <span className="min-w-0 truncate">{file.name} ({Math.round(file.size / 1024)} KB)</span>
+          <button
             type="button"
             onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
             aria-label="Hapus lampiran yang dipilih"
-            className="text-red-700 hover:underline"
+            className="shrink-0 text-red-700 hover:underline"
           >hapus</button>
         </div>
       ) : null}

@@ -74,7 +74,7 @@ export function CardMembers({
   }
 
   return (
-    <div className="mt-2 flex items-center gap-2">
+    <div className="mt-2 flex flex-wrap items-center gap-2">
       <span className="text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">Anggota:</span>
       <div className="flex flex-wrap gap-1">
         {members.length === 0 ? (

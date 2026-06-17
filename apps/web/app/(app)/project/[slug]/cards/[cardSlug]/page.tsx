@@ -71,18 +71,18 @@ export default async function CardDetailPage({
           <div className="flex items-center justify-between gap-3 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2.5 text-[var(--text-inverse)] md:px-6">
             <Link
               href={`/project/${slug}`}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
             >
               ← {project.project_code}
             </Link>
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <Link
                 href={`/project/${slug}/cards/${cardSlug}/print`}
-                className="text-xs font-semibold uppercase tracking-wide text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
+                className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
               >
                 Cetak →
               </Link>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-inverse-secondary)]">
+              <span className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-inverse-secondary)]">
                 {topicName} · Detail Kartu
               </span>
             </div>

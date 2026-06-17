@@ -61,8 +61,8 @@ export function ProjectMembersList({
   }
 
   return (
-    <div className="overflow-hidden rounded border border-[var(--border)]">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto rounded border border-[var(--border)]">
+      <table className="w-full min-w-[34rem] text-sm">
         <thead className="bg-[var(--foreground)] text-[var(--text-inverse)]">
           <tr>
             <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide">Nama</th>

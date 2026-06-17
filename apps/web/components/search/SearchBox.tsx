@@ -20,12 +20,12 @@ export function SearchBox({ initialQ = "" }: { initialQ?: string }) {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Cari kartu, aktivitas, komentar…"
-        className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none"
+        className="min-h-11 flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none md:min-h-0"
         minLength={2}
       />
       <button
         type="submit"
-        className="rounded bg-[#141210] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#FDFAF6] hover:bg-[#3a3527]"
+        className="inline-flex min-h-11 items-center justify-center rounded bg-[#141210] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#FDFAF6] hover:bg-[#3a3527] md:min-h-0"
       >
         Cari
       </button>

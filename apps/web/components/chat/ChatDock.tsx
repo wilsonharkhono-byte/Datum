@@ -429,8 +429,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         {/* Layer 1 — signature dark header bar.
             Carries the assistant label, segmented mode control, and helper text.
             On mobile (when onClose is provided), shows a close button instead. */}
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[var(--text-inverse)]">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[var(--text-inverse)]">
+          <div className="flex min-w-0 items-center gap-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)]">
               <SparkIcon size={12} /> Asisten
             </span>
@@ -457,7 +457,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {queueCount > 0 ? (
               <span
                 className="rounded border border-[var(--flag-warning)]/40 bg-[var(--flag-warning-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--flag-warning)]"
@@ -547,9 +547,12 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         </button>
       ) : null}
 
-      {/* Mobile full-screen sheet */}
+      {/* Mobile full-screen sheet. Safe-area insets keep the dark header clear
+          of the notch/status bar and the input clear of the home indicator. */}
       {mobileOpen ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-[var(--surface)] md:hidden">
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] md:hidden"
+        >
           {renderDock(() => setMobileOpen(false))}
         </div>
       ) : null}
