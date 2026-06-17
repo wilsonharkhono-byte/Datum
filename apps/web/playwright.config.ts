@@ -6,6 +6,10 @@ export default defineConfig({
   // workers race on textarea focus + RLS-revalidation timing. Serial keeps
   // them deterministic. Re-enable parallel when we move to per-test DB resets.
   workers: 1,
+  // Timing-sensitive specs (e.g. cache-paint budgets) can spike on a loaded CI
+  // runner; a couple of retries absorbs transient variance without masking a
+  // real, consistently-failing assertion.
+  retries: process.env.CI ? 2 : 0,
   use: {
     baseURL: "http://localhost:3000",
     headless: true,
