@@ -43,6 +43,8 @@ export default async function ProjectBoardPage({
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 md:px-4 md:py-2">
+        {/* Two header variants: a tight one-row Trello-style bar on mobile and
+            the original two-row layout at md+ (see the hidden/md:block split). */}
         {/* Mobile: one tight Trello-style row — back, title, overflow menu. */}
         <div className="flex items-center gap-2 md:hidden">
           <Link href="/" aria-label="Kembali ke daftar proyek" className="shrink-0 text-base leading-none text-[var(--text-muted)] hover:text-[var(--foreground)]">
