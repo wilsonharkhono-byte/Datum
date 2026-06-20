@@ -39,6 +39,7 @@ export function subscribeToProjectChanges(
     )
     .subscribe();
   return () => {
+    if (pending) clearTimeout(pending);
     void supabase.removeChannel(channel);
   };
 }

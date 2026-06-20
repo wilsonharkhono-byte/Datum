@@ -53,4 +53,14 @@ describe("subscribeToProjectChanges", () => {
     stop();
     expect(removeChannel).toHaveBeenCalledTimes(1);
   });
+
+  it("does not fire onChange if unsubscribed before the debounce elapses", () => {
+    const { client, handlers } = mockClient();
+    const onChange = vi.fn();
+    const stop = subscribeToProjectChanges(client, "P1", onChange);
+    handlers[0]!();            // a change is now pending (debounced)
+    stop();                    // unsubscribe before 250ms
+    vi.advanceTimersByTime(250);
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
