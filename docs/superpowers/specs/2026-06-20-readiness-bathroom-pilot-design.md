@@ -257,6 +257,25 @@ heavy lifting by turning *expected-but-silent* into a signal.
   cross-project per-trade calendar is one query away. Built later as a read-only view; the
   schema supports it now. (Relevant because the same subcontractors recur across projects.)
 
+## 8a. Duration learning loop (editable estimates + actuals → revised timeline)
+
+The expected timeline must *improve* as more projects run (Wilson). The model is built for this:
+
+- **Editable estimates.** `trade_steps.typical_duration_days` and `lead_time_days` are plain
+  table rows, revisable by a principal/admin (an `updateTradeStepDuration` mutation gated by
+  `canManageAccess`; needs an admin-write RLS policy on the template tables, which currently
+  expose read-only). Editing a template never rewrites history — existing `area_steps` keep
+  their own planned/actual dates; re-running `writePlannedDates` re-bases *future* planning.
+- **Actuals captured per run.** `area_steps.actual_start` (first `in_progress`) and `actual_end`
+  (on `accepted`) record how long each step actually took, per area, per project. The
+  work-event→area_step projection populates these (it needs a step reference on the logging form).
+  **Phase 1 captures the data via the schema; the projection + step picker land in the next slice.**
+- **Revision analytics (follow-up slice).** A read-only aggregate over `area_steps`
+  (median/mean actual duration per `step_code`, with sample count) surfaces a *suggested*
+  `typical_duration_days` against the current template; an admin accepts to update it. That is the
+  learning loop — estimates converge to real site cadence as data accumulates. Built once enough
+  actuals exist.
+
 ## 9. Builds on (reuse, do not reinvent)
 
 - `lib/gates/readiness-rules.ts` — append-only "latest event wins" pattern for step status.
