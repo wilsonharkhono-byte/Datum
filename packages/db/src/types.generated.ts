@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -327,6 +322,140 @@ export type Database = {
           },
         ]
       }
+      area_step_checkpoints: {
+        Row: {
+          area_step_id: string
+          checked_at: string | null
+          checked_by: string | null
+          id: string
+          item_text: string
+          project_id: string
+          required: boolean
+          result: string
+          severity: string
+          sort_order: number
+        }
+        Insert: {
+          area_step_id: string
+          checked_at?: string | null
+          checked_by?: string | null
+          id?: string
+          item_text: string
+          project_id: string
+          required?: boolean
+          result?: string
+          severity: string
+          sort_order?: number
+        }
+        Update: {
+          area_step_id?: string
+          checked_at?: string | null
+          checked_by?: string | null
+          id?: string
+          item_text?: string
+          project_id?: string
+          required?: boolean
+          result?: string
+          severity?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "area_step_checkpoints_area_step_id_fkey"
+            columns: ["area_step_id"]
+            isOneToOne: false
+            referencedRelation: "area_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "area_step_checkpoints_checked_by_fkey"
+            columns: ["checked_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "area_step_checkpoints_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      area_steps: {
+        Row: {
+          actual_end: string | null
+          actual_start: string | null
+          area_id: string
+          assigned_trade: string | null
+          blocking_reason: string | null
+          created_at: string
+          id: string
+          last_progress_at: string | null
+          planned_end: string | null
+          planned_start: string | null
+          project_id: string
+          status: string
+          step_code: string
+          updated_at: string
+        }
+        Insert: {
+          actual_end?: string | null
+          actual_start?: string | null
+          area_id: string
+          assigned_trade?: string | null
+          blocking_reason?: string | null
+          created_at?: string
+          id?: string
+          last_progress_at?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          project_id: string
+          status?: string
+          step_code: string
+          updated_at?: string
+        }
+        Update: {
+          actual_end?: string | null
+          actual_start?: string | null
+          area_id?: string
+          assigned_trade?: string | null
+          blocking_reason?: string | null
+          created_at?: string
+          id?: string
+          last_progress_at?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          project_id?: string
+          status?: string
+          step_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "area_steps_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "area_steps_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "area_steps_step_code_fkey"
+            columns: ["step_code"]
+            isOneToOne: false
+            referencedRelation: "trade_steps"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       areas: {
         Row: {
           area_code: string
@@ -334,6 +463,7 @@ export type Database = {
           area_sqm: number | null
           area_type: Database["public"]["Enums"]["area_type"]
           created_at: string
+          finish_profile: Json
           floor: string | null
           id: string
           project_id: string
@@ -347,6 +477,7 @@ export type Database = {
           area_sqm?: number | null
           area_type?: Database["public"]["Enums"]["area_type"]
           created_at?: string
+          finish_profile?: Json
           floor?: string | null
           id?: string
           project_id: string
@@ -360,6 +491,7 @@ export type Database = {
           area_sqm?: number | null
           area_type?: Database["public"]["Enums"]["area_type"]
           created_at?: string
+          finish_profile?: Json
           floor?: string | null
           id?: string
           project_id?: string
@@ -1980,6 +2112,63 @@ export type Database = {
           },
         ]
       }
+      punch_items: {
+        Row: {
+          area_step_id: string
+          caused_by_trade: string | null
+          closed_at: string | null
+          created_at: string
+          description: string
+          fix_owner_trade: string | null
+          id: string
+          project_id: string
+          sano_work_item_ref: string | null
+          severity: string
+          status: string
+        }
+        Insert: {
+          area_step_id: string
+          caused_by_trade?: string | null
+          closed_at?: string | null
+          created_at?: string
+          description: string
+          fix_owner_trade?: string | null
+          id?: string
+          project_id: string
+          sano_work_item_ref?: string | null
+          severity: string
+          status?: string
+        }
+        Update: {
+          area_step_id?: string
+          caused_by_trade?: string | null
+          closed_at?: string | null
+          created_at?: string
+          description?: string
+          fix_owner_trade?: string | null
+          id?: string
+          project_id?: string
+          sano_work_item_ref?: string | null
+          severity?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "punch_items_area_step_id_fkey"
+            columns: ["area_step_id"]
+            isOneToOne: false
+            referencedRelation: "area_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "punch_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       record_revisions: {
         Row: {
           actor_staff_id: string | null
@@ -2289,6 +2478,118 @@ export type Database = {
           },
         ]
       }
+      trade_step_checkpoints: {
+        Row: {
+          default_severity: string
+          id: string
+          item_text: string
+          required: boolean
+          sort_order: number
+          step_code: string
+        }
+        Insert: {
+          default_severity: string
+          id?: string
+          item_text: string
+          required?: boolean
+          sort_order?: number
+          step_code: string
+        }
+        Update: {
+          default_severity?: string
+          id?: string
+          item_text?: string
+          required?: boolean
+          sort_order?: number
+          step_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_step_checkpoints_step_code_fkey"
+            columns: ["step_code"]
+            isOneToOne: false
+            referencedRelation: "trade_steps"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      trade_step_deps: {
+        Row: {
+          predecessor_code: string
+          step_code: string
+        }
+        Insert: {
+          predecessor_code: string
+          step_code: string
+        }
+        Update: {
+          predecessor_code?: string
+          step_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_step_deps_predecessor_code_fkey"
+            columns: ["predecessor_code"]
+            isOneToOne: false
+            referencedRelation: "trade_steps"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "trade_step_deps_step_code_fkey"
+            columns: ["step_code"]
+            isOneToOne: false
+            referencedRelation: "trade_steps"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      trade_steps: {
+        Row: {
+          active: boolean
+          applicability: Json
+          code: string
+          gate_code: Database["public"]["Enums"]["gate_code"]
+          lead_time_days: number
+          name: string
+          sort_order: number
+          step_type: string
+          trade_role: string | null
+          typical_duration_days: number
+        }
+        Insert: {
+          active?: boolean
+          applicability?: Json
+          code: string
+          gate_code: Database["public"]["Enums"]["gate_code"]
+          lead_time_days?: number
+          name: string
+          sort_order?: number
+          step_type: string
+          trade_role?: string | null
+          typical_duration_days?: number
+        }
+        Update: {
+          active?: boolean
+          applicability?: Json
+          code?: string
+          gate_code?: Database["public"]["Enums"]["gate_code"]
+          lead_time_days?: number
+          name?: string
+          sort_order?: number
+          step_type?: string
+          trade_role?: string | null
+          typical_duration_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_steps_gate_code_fkey"
+            columns: ["gate_code"]
+            isOneToOne: false
+            referencedRelation: "gates"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       vendor_quotes: {
         Row: {
           amount: number
@@ -2422,7 +2723,26 @@ export type Database = {
     Functions: {
       claim_attachments_for_analysis: {
         Args: { p_limit?: number }
-        Returns: Database["public"]["Tables"]["card_attachments"]["Row"][]
+        Returns: {
+          ai_attempts: number
+          ai_caption: string | null
+          ai_error: string | null
+          ai_extracted: Json | null
+          ai_model: string | null
+          ai_processed_at: string | null
+          ai_status: Database["public"]["Enums"]["attachment_ai_status"]
+          card_event_id: string
+          created_at: string
+          id: string
+          mime_type: string
+          storage_path: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "card_attachments"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       compute_project_schedule: {
         Args: { p_project_id: string }
@@ -2453,6 +2773,7 @@ export type Database = {
         Args: { p_event_id: string; p_new_status: string; p_reason?: string }
         Returns: undefined
       }
+      seed_area_steps: { Args: { p_area_id: string }; Returns: undefined }
       seed_default_topics: {
         Args: { p_project_id: string }
         Returns: undefined
@@ -2472,7 +2793,12 @@ export type Database = {
         | "utility"
         | "general"
       assistant_message_role: "user" | "assistant" | "system"
-      attachment_ai_status: "pending" | "processing" | "done" | "failed" | "skipped"
+      attachment_ai_status:
+        | "pending"
+        | "processing"
+        | "done"
+        | "failed"
+        | "skipped"
       attachment_kind: "photo" | "drawing" | "document" | "other"
       blocker_status: "open" | "resolved" | "cancelled"
       blocker_type:
@@ -2792,6 +3118,13 @@ export const Constants = {
         "general",
       ],
       assistant_message_role: ["user", "assistant", "system"],
+      attachment_ai_status: [
+        "pending",
+        "processing",
+        "done",
+        "failed",
+        "skipped",
+      ],
       attachment_kind: ["photo", "drawing", "document", "other"],
       blocker_status: ["open", "resolved", "cancelled"],
       blocker_type: [
@@ -2990,3 +3323,4 @@ export const Constants = {
     },
   },
 } as const
+
