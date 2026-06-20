@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { getCurrentStaff, canManageAccess, type CurrentStaff } from "./current-staff";
+import { getCurrentStaff, getCurrentStaffRow, canManageAccess, type CurrentStaff } from "./current-staff";
 import type { DatumClient } from "../client";
 
 function clientWith(user: { id: string } | null, staffRow: Record<string, unknown> | null) {
@@ -28,6 +28,16 @@ describe("getCurrentStaff", () => {
       clientWith({ id: "u1" }, { id: "u1", full_name: "Wilson", role: "principal", email: "w@x.co" }),
     );
     expect(staff).toEqual({ id: "u1", full_name: "Wilson", role: "principal", email: "w@x.co" });
+  });
+});
+
+describe("getCurrentStaffRow", () => {
+  it("returns null when unauthenticated", async () => {
+    expect(await getCurrentStaffRow(clientWith(null, null))).toBeNull();
+  });
+  it("returns the full staff row for the signed-in user", async () => {
+    const row = { id: "u1", full_name: "Wilson", role: "principal", email: "w@x.co", cost_visible: true };
+    expect(await getCurrentStaffRow(clientWith({ id: "u1" }, row))).toEqual(row);
   });
 });
 
