@@ -7,5 +7,6 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   msgpackr-extract: true
+  '@sentry/cli': true
 minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk@0.104.2'
