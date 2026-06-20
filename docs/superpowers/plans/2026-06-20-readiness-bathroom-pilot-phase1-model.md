@@ -957,46 +957,90 @@ git commit -m "feat(steps): instantiate + write planned dates mutations"
 
 ---
 
-## Task 10: Wire instantiation into area creation
+## Task 10: Wire instantiation into area creation/update
 
-Find where areas are created (`apps/web/lib/areas/area-mutations.ts`) and call `instantiateAreaSteps` + `writePlannedDates` after a bathroom area with a finish profile is created/updated. Non-blocking (best-effort), so a failure never breaks area creation.
+`createArea`/`updateArea` live in `apps/web/lib/projects/area-mutations.ts`. `createArea`
+currently inserts the area **without returning its id**; change the insert to return the id,
+then — for `bathroom` areas — best-effort instantiate steps + write planned dates. Mirror the
+hook in `updateArea` so setting `area_type`/`finish_profile` later re-instantiates and
+re-schedules. Best-effort: a failure must never break area creation.
+
+> Note: capturing `finish_profile` from the area form UI is a separate follow-up. Until it is
+> set, an area's `finish_profile` is `{}`, so finish-dependent steps (e.g. B3) are simply absent
+> until staff set the finish and the area is updated — `seed_area_steps` is idempotent and
+> `writePlannedDates` re-runs safely.
 
 **Files:**
-- Modify: `apps/web/lib/areas/area-mutations.ts`
+- Modify: `apps/web/lib/projects/area-mutations.ts`
 
-- [ ] **Step 1: Locate the area create/update path**
+- [ ] **Step 1: Locate the insert/update**
 
-Run: `grep -n "from(\"areas\")\|insert\|update" apps/web/lib/areas/area-mutations.ts | head`
-Expected: the function(s) that insert/update an `areas` row.
+Run: `grep -n 'from("areas").insert\|from("areas").update\|export async function createArea\|export async function updateArea' apps/web/lib/projects/area-mutations.ts`
+Expected: `createArea` (insert ~line 83) and `updateArea` (update further down).
 
-- [ ] **Step 2: Add a best-effort hook after a bathroom area is persisted**
+- [ ] **Step 2: Return the inserted id and add the best-effort hook in `createArea`**
+
+Replace the existing `.insert({...})` (which has no `.select()`) so it returns the id, then add the hook after the error check:
 
 ```typescript
-// at top of file, with the other imports
+// at top of file, with the other imports:
 import { instantiateAreaSteps, writePlannedDates } from "@/lib/steps/mutations";
 
-// after the area row is successfully inserted/updated, where `area` is the row
-// and `supabase` is the client in scope:
-if (area.area_type === "bathroom") {
+// the insert now returns the new id:
+const { data: created, error } = await supabase
+  .from("areas")
+  .insert({
+    project_id: input.projectId,
+    area_code:  input.areaCode,
+    area_name:  input.areaName,
+    floor:      input.floor ?? null,
+    area_type:  input.areaType,
+    area_sqm:   input.areaSqm ?? null,
+    sort_order: nextSort,
+  })
+  .select("id")
+  .single();
+if (error) {
+  if (error.code === "23505") {
+    return { ok: false, error: `Kode area "${input.areaCode}" sudah ada di proyek ini` };
+  }
+  return { ok: false, error: error.message };
+}
+
+// best-effort: instantiate Gate B steps for bathrooms (never blocks area creation)
+if (created && input.areaType === "bathroom") {
   try {
-    await instantiateAreaSteps(supabase, area.id);
-    await writePlannedDates(supabase, area.id);
+    await instantiateAreaSteps(supabase, created.id);
+    await writePlannedDates(supabase, created.id);
   } catch (e) {
     console.warn("[steps] instantiation failed:", (e as Error).message);
   }
 }
 ```
 
-- [ ] **Step 3: Typecheck**
+- [ ] **Step 3: Mirror the hook in `updateArea`** (after the update succeeds; the id is `input.areaId`)
+
+```typescript
+if (input.areaType === "bathroom") {
+  try {
+    await instantiateAreaSteps(supabase, input.areaId);
+    await writePlannedDates(supabase, input.areaId);
+  } catch (e) {
+    console.warn("[steps] re-instantiation failed:", (e as Error).message);
+  }
+}
+```
+
+- [ ] **Step 4: Typecheck**
 
 Run (from `apps/web/`): `pnpm typecheck`
-Expected: PASS.
+Expected: PASS after Task 11.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add apps/web/lib/areas/area-mutations.ts
-git commit -m "feat(steps): instantiate Gate B steps when a bathroom area is created"
+git add apps/web/lib/projects/area-mutations.ts
+git commit -m "feat(steps): instantiate Gate B steps when a bathroom area is created/updated"
 ```
 
 ---
