@@ -272,17 +272,24 @@ heavy lifting by turning *expected-but-silent* into a signal.
 This is the v1 knowledge to author into `trade_steps` / `trade_step_deps` /
 `trade_step_checkpoints`. Refine with Wilson during implementation.
 
-| # | Step | Type | Trade / owner | Depends on | Lead/dur | Checkpoint(s) |
+Durations and lead times are **v2** (Wilson, 2026-06-20): site-work durations ×3 over the v1
+estimates; flood test 3–5 days; and explicit lead-time + reminder steps for *securing* the
+marble (B3), the sanitair (B10), and the **waterproofing applicator** (B11 — book the trade
+ahead so it actually shows up).
+
+| # | Step | Type | Trade / owner | Depends on | Lead/dur (days) | Checkpoint(s) |
 | --- | --- | --- | --- | --- | --- | --- |
-| B1 | Pilih material dinding/lantai + shop drawing | `decision` | desainer + klien | (brief) | close ~6 wk before B6 | klien sign-off shop drawing |
-| B2 | Pilih sanitair & fixtures | `decision` | desainer + klien | (brief) | before MEP point final | spesifikasi terkunci |
-| B3 | Order marmer/batu | `procurement` | purchasing | B1 | 3–4 wk impor | PO approved, tgl kirim fix |
-| B4 | Waterproofing | `site_work` | aplikator WP | Gate A (MEP rough-in) | 2–3 d + cure | flood test 24–48 jam, no rembesan |
-| B5 | Screeding + slope | `site_work` | tukang | B4 | 1–2 d | slope ≥ 1% ke floor drain |
-| B6 | Pasang dinding marmer | `site_work` | tukang marmer | B3 (material), B4 | 3–5 d | lippage ≤ 1mm; pola per shop drawing |
-| B7 | Pasang lantai marmer | `site_work` | tukang marmer | B5, B3 | 2–3 d | slope terjaga; lippage ≤ 1mm |
-| B8 | Grouting | `site_work` | tukang | B6, B7 + cure | 1 d | rapi; tidak ada void |
-| B9 | Verifikasi titik sanitair | `inspection` | site manager | B2, MEP | — | outlet/drain presisi ke sanitair terpilih |
+| B1 | Pilih material dinding/lantai + shop drawing | `decision` | desainer + klien | — | lead **7** | klien sign-off shop drawing |
+| B2 | Pilih sanitair & fixtures | `decision` | desainer + klien | — | lead **7** | spesifikasi terkunci |
+| B3 | Order marmer/batu | `procurement` | purchasing | B1 | lead **21** (impor) | PO marmer, tgl kirim fix |
+| B10 | Order sanitair & fixtures | `procurement` | purchasing | B2 | lead **14** | PO sanitair, tgl kirim fix |
+| B11 | Booking aplikator waterproofing | `procurement` | aplikator WP | — | lead **7** | aplikator dikonfirmasi & dijadwalkan |
+| B4 | Waterproofing | `site_work` | aplikator WP | B11, Gate A | dur **9** (incl. cure + flood test) | flood test **3–5 hari**, no rembesan (kritis) |
+| B5 | Screeding + slope | `site_work` | tukang | B4 | dur **6** | slope ≥ 1% ke floor drain |
+| B6 | Pasang dinding marmer | `site_work` | tukang marmer | B3, B4 | dur **15** | lippage ≤ 1mm; pola per shop drawing |
+| B7 | Pasang lantai marmer | `site_work` | tukang marmer | B5, B3 | dur **9** | slope terjaga; lippage ≤ 1mm |
+| B8 | Grouting | `site_work` | tukang | B6, B7 | dur **3** | rapi; tidak ada void |
+| B9 | Verifikasi titik sanitair | `inspection` | site manager | B2, B10 | dur **3** | outlet/drain presisi ke sanitair terpilih |
 
 Unlocks **Gate C** (plafon KM boleh ditutup) once B4 + MEP-above verified.
 `applicability` example: B3 applies only when `lantai ∈ {marmer, batu}`; a ceramic bathroom
@@ -293,8 +300,8 @@ gets a local-stock variant with no import lead time.
 - **Data-entry dependency.** The whole reality layer needs cadence (b). If supervisors neither
   log nor answer nudges, Tier-2 warnings carry the load (by design). *Mitigation:* logging must
   be one-tap on mobile (the responsive work just landed); the step reference is a single picker.
-- **Knowledge capture.** The Gate B template (§10) is a v1 draft and must be validated with
-  Wilson before seeding.
+- **Knowledge capture.** The Gate B template (§10) is **v2** (durations/lead-times validated with
+  Wilson 2026-06-20); `item_text` wording may still be refined per project.
 - **Over-notification.** Tune thresholds; the digest dedupes; consider quiet hours.
 - **RLS.** New tables need policies consistent with project-scoped read
   (`current_can_read_project`) and staff write where appropriate (mirror `areas_staff_write`).
