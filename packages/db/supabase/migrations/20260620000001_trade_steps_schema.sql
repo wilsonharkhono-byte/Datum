@@ -10,7 +10,7 @@ alter table public.areas
 ------------------------------------------------------------------------
 create table public.trade_steps (
   code                  text primary key,
-  gate_code             text not null references public.gates(code),
+  gate_code             public.gate_code not null references public.gates(code),
   name                  text not null,
   step_type             text not null check (step_type in ('decision','procurement','site_work','inspection')),
   trade_role            text,
