@@ -11,7 +11,9 @@
       "@datum/types": ["../../packages/types/src"],
       "@datum/types/*": ["../../packages/types/src/*"],
       "@datum/db": ["../../packages/db/src"],
-      "@datum/db/*": ["../../packages/db/src/*"]
+      "@datum/db/*": ["../../packages/db/src/*"],
+      "@datum/core": ["../../packages/core/src"],
+      "@datum/core/*": ["../../packages/core/src/*"]
     },
     "types": ["react-native", "jest"]
   },
