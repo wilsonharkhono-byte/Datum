@@ -182,9 +182,15 @@ logging, but the signal is too fuzzy for silence detection and per-trade schedul
 
 ### 4.4 Instantiation & scheduling (mirror existing patterns)
 
-- **`seed_area_steps(area_id)`** — when an area is typed `kamar mandi` with its finishes set,
-  insert `area_steps` + `area_step_checkpoints` from templates filtered by `applicability`.
-  Mirrors `seed_default_topics`. Idempotent (re-runnable).
+**Applicability profile source.** A step's `applicability` is matched against the area's
+profile = `area_type` (existing enum: `bathroom`, `kitchen`, …) **plus a new
+`areas.finish_profile jsonb`** (e.g. `{ "lantai": "marmer", "dinding": "cat", "kusen": "aluminium" }`)
+that staff set per area. `area_type = bathroom` selects the Gate B step set; `finish_profile`
+selects finish-dependent steps (B3 import-order only when `lantai ∈ {marmer, batu}`).
+
+- **`seed_area_steps(area_id)`** — when an area is `area_type = bathroom` with its
+  `finish_profile` set, insert `area_steps` + `area_step_checkpoints` from templates filtered by
+  `applicability`. Mirrors `seed_default_topics`. Idempotent (re-runnable).
 - **`compute_area_step_schedule(area_id)`** — derive `planned_start`/`planned_end` per step
   from the area's Gate B target window + step `typical_duration_days` + `trade_step_deps` +
   `lead_time_days`, back-scheduling decisions/procurement so their deadlines fall *before* the
