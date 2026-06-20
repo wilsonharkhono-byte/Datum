@@ -1,0 +1,38 @@
+{
+  "name": "@datum/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'lint via guard test'",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@datum/db": "workspace:*",
+    "@datum/types": "workspace:*",
+    "@supabase/supabase-js": "^2.106.2"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": ">=5",
+    "@tanstack/react-query-persist-client": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-query": { "optional": true },
+    "@tanstack/react-query-persist-client": { "optional": true }
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query-persist-client": "^5.101.0",
+    "@types/node": "^22",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.7"
+  }
+}
