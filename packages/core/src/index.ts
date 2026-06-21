@@ -21,6 +21,8 @@ export {
   type ProjectListItem,
   type DevelopmentOption,
 } from "./projects/list";
+export { filterProjects, groupProjects, UNGROUPED_LABEL, type ProjectGroup } from "./projects/grouping";
+export { developmentTint, TINTS, type Tint } from "./projects/tint";
 
 export { COLORS, FONT_FAMILY, TYPE, SPACE, RADIUS, TOUCH_TARGET } from "./tokens";
 
