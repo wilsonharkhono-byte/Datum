@@ -1,9 +1,7 @@
-import type { Card, Project, Topic } from "@datum/db";
+import type { Card } from "@datum/db";
 import type { CardWithLabels } from "./labels";
-
-/** Minimal board shape used for pure optimistic mutations. */
-export type BoardColumn = { topic: Topic; cards: CardWithLabels[] };
-export type Board = { project: Project; columns: BoardColumn[] };
+import type { Board, BoardColumn } from "./board";
+export type { Board, BoardColumn } from "./board";
 
 /** A board card as rendered on the client: real card data plus an optional
     flag marking a still-saving optimistic (ghost) card. */

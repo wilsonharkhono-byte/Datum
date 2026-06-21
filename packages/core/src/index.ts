@@ -26,7 +26,8 @@ export { developmentTint, TINTS, type Tint } from "./projects/tint";
 
 export { COLORS, FONT_FAMILY, TYPE, SPACE, RADIUS, TOUCH_TARGET } from "./tokens";
 
-export { makeOptimisticCard, applyAddCard, applyMoveCard, type BoardCardView, type Board, type BoardColumn } from "./cards/optimisticBoard";
+export { getBoardForProject, mapBoardBundle, getProjectTopics, type Board, type BoardColumn, type BoardBundle } from "./cards/board";
+export { makeOptimisticCard, applyAddCard, applyMoveCard, type BoardCardView } from "./cards/optimisticBoard";
 export { compareEventTime, type OrderableEvent } from "./cards/event-order";
 export { computeCardLabels, LABEL_STYLE, ACTOR_LABELS, type CardLabel, type CardLabelKind, type CardWithLabels, type LabelEvent } from "./cards/labels";
 export { computeCardDeadlines, type DeadlineCell, type CardDeadline } from "./gates/board-deadlines";
