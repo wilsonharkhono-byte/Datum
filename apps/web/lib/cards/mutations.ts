@@ -4,6 +4,14 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  CreateCardInput as CoreCreateCardInput,
+  createCard as coreCreateCard,
+  CreateTopicInput as CoreCreateTopicInput,
+  createTopic as coreCreateTopic,
+  MoveCardInput as CoreMoveCardInput,
+  moveCard as coreMoveCard,
+} from "@datum/core";
+import {
   EVENT_KINDS,
   EventPayloadSchemas,
   COST_VISIBLE_KINDS,
@@ -29,31 +37,23 @@ const GATE_RELEVANT_KINDS: ReadonlySet<EventKind> = new Set([
   "work", "material", "decision", "vendor", "drawing", "client_request", "document",
 ]);
 
-const CreateCardInput = z.object({
+// Re-export core type so web callers that import CreateCardResult from here still work.
+export type CreateCardResult =
+  | { ok: true; slug: string; id: string }
+  | { ok: false; error: string };
+
+// Web-only schema includes projectCode (needed for revalidatePath only).
+const WebCreateCardInput = z.object({
   projectId:   z.string().uuid(),
   topicId:     z.string().uuid(),
   projectCode: z.string().min(1),
   title:       z.string().min(1).max(120),
 });
 
-function toSlug(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "kartu"
-  );
-}
-
-export type CreateCardResult =
-  | { ok: true; slug: string; id: string }
-  | { ok: false; error: string };
-
 export async function createCard(formData: FormData): Promise<CreateCardResult> {
   let input;
   try {
-    input = CreateCardInput.parse({
+    input = WebCreateCardInput.parse({
       projectId:   formData.get("projectId"),
       topicId:     formData.get("topicId"),
       projectCode: formData.get("projectCode"),
@@ -64,71 +64,34 @@ export async function createCard(formData: FormData): Promise<CreateCardResult> 
   }
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
-
-  const base = toSlug(input.title);
-  let slug = base;
-  for (let i = 2; i < 100; i++) {
-    const { data: existing } = await supabase
-      .from("cards")
-      .select("id")
-      .eq("project_id", input.projectId)
-      .eq("slug", slug)
-      .maybeSingle();
-    if (!existing) break;
-    slug = `${base}-${i}`;
-  }
-
-  const { data: inserted, error } = await supabase.from("cards").insert({
-    project_id:          input.projectId,
-    topic_id:            input.topicId,
-    title:               input.title,
-    slug,
-    created_by_staff_id: user.id,
-  }).select("id").single();
-  if (error || !inserted) return { ok: false, error: error?.message ?? "Gagal membuat kartu" };
+  const result = await coreCreateCard(supabase, {
+    projectId: input.projectId,
+    topicId:   input.topicId,
+    title:     input.title,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}`);
-  return { ok: true, slug, id: inserted.id };
+  return result;
 }
 
 // ─── createTopic ──────────────────────────────────────────────────────────────
-
-const CreateTopicInput = z.object({
-  projectId:   z.string().uuid(),
-  projectCode: z.string().min(1),
-  name:        z.string().min(1).max(120),
-});
-
-// Derive a project-unique topic code from the column name. topics.code is
-// `not null` + `unique(project_id, code)`, but the board UI only asks for a
-// human name — so we slug the name into an uppercase code and disambiguate
-// with a numeric suffix the same way createCard does for slugs.
-function toTopicCode(name: string): string {
-  return (
-    name
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 36) || "KOLOM"
-  );
-}
 
 export type CreateTopicResult =
   | { ok: true; topicId: string }
   | { ok: false; error: string };
 
-// Any project member may add a column — the topics_insert RLS policy gates on
-// project membership, not role. We only need a signed-in staff row to stamp
-// created_by_staff_id.
+// Web-only schema includes projectCode (needed for revalidatePath only).
+const WebCreateTopicInput = z.object({
+  projectId:   z.string().uuid(),
+  projectCode: z.string().min(1),
+  name:        z.string().min(1).max(120),
+});
+
 export async function createTopic(formData: FormData): Promise<CreateTopicResult> {
   let input;
   try {
-    input = CreateTopicInput.parse({
+    input = WebCreateTopicInput.parse({
       projectId:   formData.get("projectId"),
       projectCode: formData.get("projectCode"),
       name:        formData.get("name"),
@@ -138,56 +101,14 @@ export async function createTopic(formData: FormData): Promise<CreateTopicResult
   }
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
-
-  const base = toTopicCode(input.name);
-  let code = base;
-  for (let i = 2; i < 100; i++) {
-    const { data: existing } = await supabase
-      .from("topics")
-      .select("id")
-      .eq("project_id", input.projectId)
-      .eq("code", code)
-      .maybeSingle();
-    if (!existing) break;
-    code = `${base}-${i}`.slice(0, 40);
-  }
-
-  // Append to the end of the board.
-  const { data: maxRow } = await supabase
-    .from("topics")
-    .select("sort_order")
-    .eq("project_id", input.projectId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const nextSort = (maxRow?.sort_order ?? -1) + 1;
-
-  const { data: inserted, error } = await supabase
-    .from("topics")
-    .insert({
-      project_id:          input.projectId,
-      code,
-      name:                input.name,
-      topic_type:          "general",
-      sort_order:          nextSort,
-      created_by_staff_id: user.id,
-    })
-    .select("id")
-    .single();
-  if (error) {
-    if (error.code === "23505") {
-      return { ok: false, error: `Kode kolom "${code}" sudah ada di proyek ini` };
-    }
-    return { ok: false, error: error.message };
-  }
+  const result = await coreCreateTopic(supabase, {
+    projectId: input.projectId,
+    name:      input.name,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}`);
-  return { ok: true, topicId: inserted.id };
+  return result;
 }
 
 // ─── createCardEvent ──────────────────────────────────────────────────────────
@@ -779,20 +700,21 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
 
 // ─── moveCard — Slice 1.2b ────────────────────────────────────────────────────
 
-const MoveCardInput = z.object({
-  cardId:       z.string().uuid(),
-  newTopicId:   z.string().uuid(),
-  projectId:    z.string().uuid(),
-  projectCode:  z.string().min(1),
-  cardSlug:     z.string().min(1),
-});
-
 export type MoveCardResult = { ok: true } | { ok: false; error: string };
+
+// Web-only schema includes projectCode + cardSlug for revalidatePath.
+const WebMoveCardInput = z.object({
+  cardId:      z.string().uuid(),
+  newTopicId:  z.string().uuid(),
+  projectId:   z.string().uuid(),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+});
 
 export async function moveCard(formData: FormData): Promise<MoveCardResult> {
   let input;
   try {
-    input = MoveCardInput.parse({
+    input = WebMoveCardInput.parse({
       cardId:      formData.get("cardId"),
       newTopicId:  formData.get("newTopicId"),
       projectId:   formData.get("projectId"),
@@ -804,26 +726,16 @@ export async function moveCard(formData: FormData): Promise<MoveCardResult> {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
-
-  // Sanity: the target topic must belong to the same project
-  const { data: topic } = await supabase
-    .from("topics").select("id, project_id")
-    .eq("id", input.newTopicId).maybeSingle();
-  if (!topic) return { ok: false, error: "Kolom tujuan tidak ditemukan" };
-  if (topic.project_id !== input.projectId) {
-    return { ok: false, error: "Kolom tujuan ada di proyek lain" };
-  }
-
-  const { error } = await supabase.from("cards")
-    .update({ topic_id: input.newTopicId })
-    .eq("id", input.cardId);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreMoveCard(supabase, {
+    cardId:     input.cardId,
+    newTopicId: input.newTopicId,
+    projectId:  input.projectId,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   revalidatePath(`/project/${input.projectCode}`);
-  return { ok: true };
+  return result;
 }
 
 // ─── Slice 1.2d — draft/approval flow for high-risk chat captures ─────────────

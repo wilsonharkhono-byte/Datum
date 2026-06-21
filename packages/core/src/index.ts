@@ -31,3 +31,24 @@ export { makeOptimisticCard, applyAddCard, applyMoveCard, type BoardCardView } f
 export { compareEventTime, type OrderableEvent } from "./cards/event-order";
 export { computeCardLabels, LABEL_STYLE, ACTOR_LABELS, type CardLabel, type CardLabelKind, type CardWithLabels, type LabelEvent } from "./cards/labels";
 export { computeCardDeadlines, type DeadlineCell, type CardDeadline } from "./gates/board-deadlines";
+
+export {
+  CreateCardInput,
+  type CreateCardInputType,
+  type CreateCardResult,
+  toSlug,
+  createCard,
+} from "./cards/create";
+export {
+  CreateTopicInput,
+  type CreateTopicInputType,
+  type CreateTopicResult,
+  toTopicCode,
+  createTopic,
+} from "./cards/createTopic";
+export {
+  MoveCardInput,
+  type MoveCardInputType,
+  type MoveCardResult,
+  moveCard,
+} from "./cards/move";
