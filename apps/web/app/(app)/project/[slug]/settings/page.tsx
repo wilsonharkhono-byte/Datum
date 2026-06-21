@@ -33,7 +33,7 @@ export default async function ProjectSettingsPage({
   const project = await getProjectBySlug(supabase, slug);
   if (!project) {
     return (
-      <div className="mx-auto max-w-3xl p-6 text-[var(--flag-critical)]">
+      <div className="mx-auto w-full max-w-3xl p-4 text-[var(--flag-critical)] sm:p-6">
         Proyek tidak ditemukan: {slug}
       </div>
     );
@@ -59,7 +59,7 @@ export default async function ProjectSettingsPage({
 
   return (
     <div className="bg-[var(--background)] py-4 md:py-6">
-      <div className="mx-auto max-w-5xl px-3 md:px-4">
+      <div className="mx-auto w-full max-w-5xl px-3 md:px-4">
         <div className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_8px_24px_-12px_rgba(122,107,86,0.35)]">
           {/* Modal-style header */}
           <div className="flex items-center justify-between gap-3 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2.5 text-[var(--text-inverse)] md:px-6">
@@ -133,8 +133,8 @@ function AksesTab({
   callerRole: "principal" | "admin" | "designer" | "pic" | "site_supervisor" | "estimator";
 }) {
   return (
-    <div className="grid gap-6">
-      <section>
+    <div className="grid grid-cols-1 gap-6">
+      <section className="min-w-0">
         <div className="flex items-baseline justify-between">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand-dark)]">
             Anggota aktif

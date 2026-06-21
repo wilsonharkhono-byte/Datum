@@ -20,7 +20,7 @@ export default async function ReviewPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-4xl p-6 text-[var(--flag-critical)]">
+      <div className="mx-auto w-full max-w-4xl p-4 text-[var(--flag-critical)] sm:p-6">
         Gagal memuat: {error.message}
       </div>
     );
@@ -30,7 +30,7 @@ export default async function ReviewPage() {
 
   return (
     <div className="bg-[var(--background)] py-4 md:py-6">
-      <div className="mx-auto max-w-4xl px-3 md:px-4">
+      <div className="mx-auto w-full max-w-4xl px-3 md:px-4">
         <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">
           ← Beranda
         </Link>

@@ -13,7 +13,7 @@ export default async function BriefPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
+    <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
       <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
       <header className="mt-2 mb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">Morning brief</p>
