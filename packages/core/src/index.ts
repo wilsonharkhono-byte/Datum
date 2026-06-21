@@ -10,6 +10,7 @@ export {
   getCurrentStaff,
   getCurrentStaffRow,
   canManageAccess,
+  canManageRole,
   type StaffRole,
   type CurrentStaff,
 } from "./auth/current-staff";
@@ -52,3 +53,10 @@ export {
   type MoveCardResult,
   moveCard,
 } from "./cards/move";
+
+export {
+  CreateProjectInput,
+  type CreateProjectInputType,
+  type CreateProjectResult,
+  createProject,
+} from "./projects/create";

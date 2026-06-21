@@ -48,3 +48,9 @@ export function canManageAccess(staff: CurrentStaff | null): staff is CurrentSta
   if (!staff) return false;
   return staff.role === "principal" || staff.role === "admin";
 }
+
+/** Pure role-only predicate — no full staff object needed.
+    Used by createProject (caller-injected pattern) so core stays server-free. */
+export function canManageRole(role: StaffRole): boolean {
+  return role === "principal" || role === "admin";
+}
