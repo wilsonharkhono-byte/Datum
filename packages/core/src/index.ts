@@ -82,3 +82,44 @@ export {
   safeHostname,
   valueLabel,
 } from "./cards/event-render";
+
+// ─── Card event mutations ─────────────────────────────────────────────────────
+export {
+  CreateCardEventInput,
+  type CreateCardEventInputType,
+  type CreateCardEventResult,
+  createCardEvent,
+} from "./cards/events/create";
+
+export {
+  ResolveEventInput,
+  RESOLVE_STATUSES,
+  type ResolveStatus,
+  type ResolveEventInputType,
+  type ResolveEventResult,
+  resolveCardEvent,
+} from "./cards/events/resolve";
+
+export {
+  collectPayload,
+  collectPayloadFromEntries,
+} from "./cards/events/collect-payload";
+
+// ─── Card attachment mutations ────────────────────────────────────────────────
+export {
+  attachmentStoragePath,
+  attachToEvent,
+  type AttachToEventResult,
+  signAttachment,
+  type SignAttachmentResult,
+  reanalyzeAttachment,
+  type ReanalyzeResult,
+} from "./cards/attachments";
+
+// ─── Attachment kind helpers (pure, no server deps) ───────────────────────────
+export {
+  attachmentKind,
+  attachmentSkipReason,
+  MAX_ATTACHMENT_BYTES,
+  type AttachmentKind,
+} from "./attachments/kinds";

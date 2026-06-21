@@ -1,0 +1,101 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@datum/db";
+
+// ─── Storage path helper ──────────────────────────────────────────────────────
+
+/**
+ * Build the storage path for a card attachment in the "card-attachments" bucket.
+ *
+ * Matches the scheme used in apps/web/lib/cards/upload.ts so web-uploaded files
+ * and mobile-uploaded files live under the same layout.
+ *
+ * Callers supply a UUID (crypto.randomUUID()) for uniqueness.
+ */
+export function attachmentStoragePath(args: {
+  projectId:   string;
+  cardId:      string;
+  cardEventId: string;
+  fileName:    string;
+  uuid?:       string;
+}): string {
+  const safeName = args.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const uid = args.uuid ?? crypto.randomUUID();
+  return `${args.projectId}/${args.cardId}/${args.cardEventId}/${uid}-${safeName}`;
+}
+
+// ─── attachToEvent ────────────────────────────────────────────────────────────
+
+export type AttachToEventResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Insert a card_attachments row after a file has been uploaded to storage.
+ *
+ * New rows default to ai_status:"pending" (set by DB default); the existing
+ * Vercel cron runner captions them server-side regardless of which client created them.
+ */
+export async function attachToEvent(
+  supabase: SupabaseClient<Database>,
+  args: {
+    cardEventId: string;
+    storagePath: string;
+    mimeType:    string;
+  },
+): Promise<AttachToEventResult> {
+  const { error } = await supabase.from("card_attachments").insert({
+    card_event_id: args.cardEventId,
+    storage_path:  args.storagePath,
+    mime_type:     args.mimeType,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// ─── signAttachment ───────────────────────────────────────────────────────────
+
+export type SignAttachmentResult =
+  | { ok: true; url: string }
+  | { ok: false; error: string };
+
+/**
+ * Create a signed URL (10-minute TTL) for a storage path in the
+ * "card-attachments" bucket. Safe on the anon client per RLS.
+ */
+export async function signAttachment(
+  supabase: SupabaseClient<Database>,
+  storagePath: string,
+): Promise<SignAttachmentResult> {
+  const { data, error } = await supabase.storage
+    .from("card-attachments")
+    .createSignedUrl(storagePath, 60 * 10); // 10 minutes
+  if (error || !data) return { ok: false, error: error?.message ?? "Gagal membuat URL" };
+  return { ok: true, url: data.signedUrl };
+}
+
+// ─── reanalyzeAttachment ──────────────────────────────────────────────────────
+
+export type ReanalyzeResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Reset a failed/skipped attachment back to the work queue.
+ *
+ * Resets ai_status to "pending" and ai_attempts to 0 so the 3-try guard
+ * restarts. The cron runner picks it up on the next tick.
+ *
+ * RLS gates this update to attachments whose parent event is in an accessible
+ * project — a user can only re-queue attachments they may write.
+ */
+export async function reanalyzeAttachment(
+  supabase: SupabaseClient<Database>,
+  attachmentId: string,
+): Promise<ReanalyzeResult> {
+  const { error } = await supabase
+    .from("card_attachments")
+    .update({ ai_status: "pending", ai_attempts: 0, ai_error: null })
+    .eq("id", attachmentId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

@@ -10,6 +10,12 @@ import {
   createTopic as coreCreateTopic,
   MoveCardInput as CoreMoveCardInput,
   moveCard as coreMoveCard,
+  createCardEvent as coreCreateCardEvent,
+  collectPayload,
+  resolveCardEvent as coreResolveCardEvent,
+  attachToEvent as coreAttachToEvent,
+  signAttachment as coreSignAttachment,
+  reanalyzeAttachment as coreReanalyzeAttachment,
 } from "@datum/core";
 import {
   EVENT_KINDS,
@@ -126,25 +132,8 @@ export type CreateCardEventResult =
   | { ok: true; eventId: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-function collectPayload(formData: FormData): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-  for (const [key, value] of formData.entries()) {
-    if (!key.startsWith("payload_")) continue;
-    const field = key.slice("payload_".length);
-    const raw = typeof value === "string" ? value : "";
-    if (raw.trim() === "") continue;
-    // Heuristic: amount/percent_complete/quantity → number; attendees → string[]
-    if (field === "amount" || field === "percent_complete" || field === "quantity") {
-      const n = Number(raw);
-      if (!Number.isNaN(n)) payload[field] = n;
-    } else if (field === "attendees") {
-      payload[field] = raw.split(",").map((s) => s.trim()).filter(Boolean);
-    } else {
-      payload[field] = raw;
-    }
-  }
-  return payload;
-}
+// collectPayload is now exported from @datum/core; re-exported above.
+// The local function has been removed — callers in this file use the imported one.
 
 export async function createCardEvent(formData: FormData): Promise<CreateCardEventResult> {
   let input;
@@ -161,52 +150,40 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
     return { ok: false, error: "Form tidak valid" };
   }
 
-  const rawPayload = collectPayload(formData);
-  const schema = EventPayloadSchemas[input.eventKind as EventKind];
-  const parsed = schema.safeParse(rawPayload);
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      if (issue.path[0] && typeof issue.path[0] === "string") {
-        fieldErrors[issue.path[0]] = issue.message;
-      }
-    }
-    return { ok: false, error: "Isi data wajib", fieldErrors };
-  }
-
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
 
-  const occurred = input.occurredAt
-    ? new Date(input.occurredAt).toISOString()
-    : new Date().toISOString();
+  // Delegate the DB insert + payload validation to core.
+  const rawPayload = collectPayload(formData);
+  const result = await coreCreateCardEvent(supabase, {
+    cardId:          input.cardId,
+    projectId:       input.projectId,
+    eventKind:       input.eventKind,
+    payload:         rawPayload,
+    occurredAt:      input.occurredAt,
+    loggedByStaffId: user.id,
+  });
+  if (!result.ok) return result;
 
-  const { data, error } = await supabase.from("card_events").insert({
-    card_id:            input.cardId,
-    project_id:         input.projectId,
-    event_kind:         input.eventKind,
-    payload:            parsed.data as unknown as Database["public"]["Tables"]["card_events"]["Insert"]["payload"],
-    occurred_at:        occurred,
-    logged_by_staff_id: user.id,
-    source_kind:        "manual",
-    cost_visible:       COST_VISIBLE_KINDS.has(input.eventKind),
-  }).select("id").single();
-  if (error) return { ok: false, error: error.message };
-
+  // ── Web-only side effects ─────────────────────────────────────────────────
   // Gate matrix cells depend on this event — recompute best-effort,
   // fire-and-forget so the save never waits on it.
   if (GATE_RELEVANT_KINDS.has(input.eventKind)) {
     void recomputeProjectGates(input.projectId, input.projectCode).catch(console.warn);
   }
 
+  // Re-parse the payload so notification helpers have a typed value.
+  const schema = EventPayloadSchemas[input.eventKind as EventKind];
+  const parsedPayload = schema.parse(rawPayload) as Record<string, unknown>;
+
   const { data: cardRow } = await supabase
     .from("cards").select("title, slug").eq("id", input.cardId).maybeSingle();
   if (cardRow) {
     await notifyWatchersOfEvent(supabase, {
-      eventId: data.id,
+      eventId: result.eventId,
       eventKind: input.eventKind,
-      payload: parsed.data as Record<string, unknown>,
+      payload: parsedPayload,
       actorId: user.id,
       projectId: input.projectId,
       projectCode: input.projectCode,
@@ -215,10 +192,11 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
       cardTitle: cardRow.title,
     });
     if (HIGH_RISK_KINDS.has(input.eventKind)) {
-      const p = parsed.data as Record<string, unknown>;
-      const preview = pickPreview(p);
+      const preview = pickPreview(parsedPayload);
+      // notifyPrincipalsOfHighRiskEvent uses the service-role admin client —
+      // kept here (web-only, NOT in @datum/core).
       await notifyPrincipalsOfHighRiskEvent(supabase, {
-        eventId: data.id,
+        eventId: result.eventId,
         eventKind: input.eventKind,
         actorId: user.id,
         projectId: input.projectId,
@@ -232,7 +210,7 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
-  return { ok: true, eventId: data.id };
+  return { ok: true, eventId: result.eventId };
 }
 
 function pickPreview(payload: Record<string, unknown>): string | null {
@@ -462,12 +440,12 @@ export async function attachToEvent(formData: FormData): Promise<AttachToEventRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  const { error } = await supabase.from("card_attachments").insert({
-    card_event_id: input.cardEventId,
-    storage_path:  input.storagePath,
-    mime_type:     input.mimeType,
+  const result = await coreAttachToEvent(supabase, {
+    cardEventId: input.cardEventId,
+    storagePath: input.storagePath,
+    mimeType:    input.mimeType,
   });
-  if (error) return { ok: false, error: error.message };
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -494,12 +472,7 @@ export async function signAttachment(formData: FormData): Promise<SignAttachment
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.storage
-    .from("card-attachments")
-    .createSignedUrl(input.storagePath, 60 * 10); // 10 minutes
-  if (error || !data) return { ok: false, error: error?.message ?? "Gagal membuat URL" };
-
-  return { ok: true, url: data.signedUrl };
+  return coreSignAttachment(supabase, input.storagePath);
 }
 
 // ─── reanalyzeAttachment ──────────────────────────────────────────────────────
@@ -532,11 +505,8 @@ export async function reanalyzeAttachment(formData: FormData): Promise<Reanalyze
 
   // RLS gates this update to attachments whose parent event is in an accessible
   // project, so a user can only re-queue attachments they may write.
-  const { error } = await supabase
-    .from("card_attachments")
-    .update({ ai_status: "pending", ai_attempts: 0, ai_error: null })
-    .eq("id", input.attachmentId);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreReanalyzeAttachment(supabase, input.attachmentId);
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -990,12 +960,12 @@ export async function resolveCardEvent(formData: FormData): Promise<ResolveEvent
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
 
-  const { error } = await supabase.rpc("resolve_card_event", {
-    p_event_id:   input.eventId,
-    p_new_status: input.newStatus,
-    p_reason:     input.reason ?? undefined,
+  const result = await coreResolveCardEvent(supabase, {
+    eventId:   input.eventId,
+    newStatus: input.newStatus,
+    reason:    input.reason,
   });
-  if (error) return { ok: false, error: error.message };
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };

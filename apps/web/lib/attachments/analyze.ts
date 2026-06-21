@@ -1,28 +1,22 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, getModel, textOf } from "@/lib/assistant/anthropic";
+import {
+  attachmentKind as _attachmentKind,
+  attachmentSkipReason as _attachmentSkipReason,
+  MAX_ATTACHMENT_BYTES as _MAX_ATTACHMENT_BYTES,
+  type AttachmentKind as _AttachmentKind,
+} from "@datum/core";
 
-// The bucket caps files at 20 MB; mirror that so the runner skips anything larger.
-export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+// Re-export the pure helpers from core so all callers importing from here
+// (including the web analyze.test.ts) keep working unchanged.
+export const MAX_ATTACHMENT_BYTES = _MAX_ATTACHMENT_BYTES;
+export type AttachmentKind = _AttachmentKind;
+export const attachmentKind = _attachmentKind;
+export const attachmentSkipReason = _attachmentSkipReason;
 
-// Image media types the Anthropic image block accepts. The bucket also allows
-// HEIC/HEIF, but the vision API cannot take those — they get skipped, not failed.
+// Image media types — kept here for the document block type narrowing below.
 const VISION_IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 type VisionImageMediaType = (typeof VISION_IMAGE_MEDIA_TYPES)[number];
-
-export type AttachmentKind = "image" | "pdf";
-
-export function attachmentKind(mimeType: string): AttachmentKind | null {
-  if ((VISION_IMAGE_MEDIA_TYPES as readonly string[]).includes(mimeType)) return "image";
-  if (mimeType === "application/pdf") return "pdf";
-  return null;
-}
-
-/** Returns a skip reason string, or null if the file is processable. */
-export function attachmentSkipReason(mimeType: string, sizeBytes: number): string | null {
-  if (!attachmentKind(mimeType)) return "unsupported";
-  if (sizeBytes > MAX_ATTACHMENT_BYTES) return "oversize";
-  return null;
-}
 
 const DESCRIBE_INSTRUCTION = `Anda asisten internal DATUM (studio interior/konstruksi).
 Deskripsikan lampiran ini dalam Bahasa Indonesia, 1–3 kalimat ringkas, agar mudah dicari kembali nanti.
