@@ -72,13 +72,13 @@ export function CardHeader({
   if (!editing) {
     return (
       <header className="mt-2 border-b border-[var(--border)] pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-semibold text-foreground">{card.title}</h1>
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
+          <h1 className="min-w-0 break-words text-base font-semibold text-foreground sm:text-xl">{card.title}</h1>
           <button
             type="button"
             onClick={() => setEditing(true)}
             aria-label="Edit kartu"
-            className="rounded border border-[#B5AFA8] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:bg-[#FDFAF6]"
+            className="shrink-0 rounded border border-[#B5AFA8] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:bg-[#FDFAF6]"
           >
             edit
           </button>
@@ -130,7 +130,7 @@ export function CardHeader({
           onChange={(e) => setTitle(e.target.value)}
           disabled={pending}
           maxLength={120}
-          className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xl font-semibold text-foreground focus:border-[var(--sand-dark)] focus:outline-none"
+          className="min-w-0 flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-base font-semibold text-foreground focus:border-[var(--sand-dark)] focus:outline-none sm:text-xl"
         />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
