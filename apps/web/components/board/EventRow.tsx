@@ -1,26 +1,8 @@
 import type { CardEvent, CardAttachment } from "@datum/db";
 import { HIGH_RISK_KINDS, isDecisionOpen, isClientRequestOpen, type EventKind } from "@datum/types";
 import { resolveCardEvent } from "@/lib/cards/mutations";
-import { valueLabel } from "@/lib/cards/payload-render";
+import { summarize, extractUrls, looksLikeImage, safeHostname } from "@datum/core";
 import { EventAttachments } from "./EventAttachments";
-
-function extractUrls(payload: Record<string, unknown>): string[] {
-  const urls: string[] = [];
-  const urlRe = /(https?:\/\/[^\s"'<>)]+)/g;
-  for (const v of Object.values(payload)) {
-    if (typeof v !== "string") continue;
-    for (const m of v.matchAll(urlRe)) urls.push(m[1]!);
-  }
-  return [...new Set(urls)]; // dedup
-}
-
-function looksLikeImage(url: string): boolean {
-  return /\.(jpg|jpeg|png|gif|webp|heic|heif)(\?|$)/i.test(url);
-}
-
-function safeHostname(u: string): string {
-  try { return new URL(u).hostname; } catch { return u.slice(0, 30) + "…"; }
-}
 
 const KIND_LABEL: Record<string, string> = {
   decision: "keputusan",
@@ -41,46 +23,6 @@ const KIND_LABEL: Record<string, string> = {
   defect: "defect (lama)",
   pending: "menunggu (lama)",
 };
-
-function summarize(ev: CardEvent): string {
-  const p = ev.payload as Record<string, unknown>;
-  switch (ev.event_kind) {
-    case "decision":        return `${String(p.topic)} — ${String(p.proposed_spec ?? p.current_spec ?? "")}`;
-    case "drawing":         return String(p.description ?? p.drawing_code ?? "");
-    case "vendor": {
-      const verb = p.interaction === "quote" ? "Quote dari"
-                 : p.interaction === "pick" ? "Pilih"
-                 : p.interaction === "survey" ? "Survei oleh"
-                 : p.interaction === "contract" ? "Kontrak dengan"
-                 : "Interaksi";
-      const amount = typeof p.amount === "number" ? ` · Rp ${p.amount.toLocaleString("id-ID")}` : "";
-      return `${verb} ${p.vendor_name ?? ""}${amount}`;
-    }
-    case "material":        return `${String(p.item)} — ${valueLabel(String(p.status))}`;
-    case "work": {
-      const status = valueLabel((p.status as string) ?? "?");
-      const who = typeof p.worker_name === "string" && p.worker_name.length > 0 ? `${p.worker_name} · ` : "";
-      const desc = typeof p.description === "string" ? p.description
-                 : typeof p.scope === "string" ? p.scope
-                 : "";
-      const pct = typeof p.percent_complete === "number" ? ` (${p.percent_complete}%)` : "";
-      return `${who}${status}${pct}${desc ? " — " + desc : ""}`;
-    }
-    case "photo":           return String(p.caption ?? "(foto)");
-    case "document":        return String(p.title);
-    case "client_request":  return String(p.request_text);
-    case "note":            return String(p.body);
-    // Retired kinds — kept for historical event display
-    case "survey":          return [p.vendor_name, p.location].filter(Boolean).map(String).join(" · ");
-    case "vendor_quote":    return `${String(p.vendor_name)} · Rp ${(p.amount as number).toLocaleString("id-ID")}`;
-    case "vendor_pick":     return String(p.vendor_name);
-    case "worker_assigned": return `${String(p.worker_name)}${p.scope ? ` — ${String(p.scope)}` : ""}`;
-    case "progress":        return `${String(p.status)}${p.percent_complete != null ? ` (${String(p.percent_complete)}%)` : ""}`;
-    case "defect":          return `${String(p.severity)} · ${String(p.description)}`;
-    case "pending":         return String(p.what);
-    default:                return JSON.stringify(p);
-  }
-}
 
 export function EventRow({
   event,

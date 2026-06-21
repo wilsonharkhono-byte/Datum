@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCardWithTimelineByProjectCode, getCardComments, getCardMembers } from "@/lib/cards/queries";
-
-export type CardPayload = Awaited<ReturnType<typeof getCardWithTimelineByProjectCode>> & {
-  comments: Awaited<ReturnType<typeof getCardComments>>;
-  members: Awaited<ReturnType<typeof getCardMembers>>;
-};
+import type { CardPayload } from "@datum/core";
+export type { CardPayload } from "@datum/core";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ code: string; slug: string }> }) {
   const { code, slug } = await params;

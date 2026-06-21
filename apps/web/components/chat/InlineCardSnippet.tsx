@@ -1,15 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-
-function extractUrls(payload: Record<string, unknown>): string[] {
-  const urls: string[] = [];
-  const urlRe = /(https?:\/\/[^\s"'<>)]+)/g;
-  for (const v of Object.values(payload)) {
-    if (typeof v !== "string") continue;
-    for (const m of v.matchAll(urlRe)) urls.push(m[1]!);
-  }
-  return [...new Set(urls)]; // dedup
-}
+import { extractUrls } from "@datum/core";
 
 type Snippet = {
   card: { id: string; title: string; slug: string; current_summary: string | null };
