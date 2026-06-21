@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentStaff, canManageAccess } from "@/lib/auth/require-role";
+import { instantiateAreaSteps, writePlannedDates } from "@/lib/steps/mutations";
 
 const AREA_TYPES = [
   "bathroom",
@@ -80,20 +81,34 @@ export async function createArea(formData: FormData): Promise<AreaMutationResult
     .maybeSingle();
   const nextSort = (maxRow?.sort_order ?? -1) + 1;
 
-  const { error } = await supabase.from("areas").insert({
-    project_id: input.projectId,
-    area_code:  input.areaCode,
-    area_name:  input.areaName,
-    floor:      input.floor ?? null,
-    area_type:  input.areaType,
-    area_sqm:   input.areaSqm ?? null,
-    sort_order: nextSort,
-  });
+  const { data: created, error } = await supabase
+    .from("areas")
+    .insert({
+      project_id: input.projectId,
+      area_code:  input.areaCode,
+      area_name:  input.areaName,
+      floor:      input.floor ?? null,
+      area_type:  input.areaType,
+      area_sqm:   input.areaSqm ?? null,
+      sort_order: nextSort,
+    })
+    .select("id")
+    .single();
   if (error) {
     if (error.code === "23505") {
       return { ok: false, error: `Kode area "${input.areaCode}" sudah ada di proyek ini` };
     }
     return { ok: false, error: error.message };
+  }
+
+  // best-effort: instantiate Gate B steps for bathrooms (never blocks area creation)
+  if (created && input.areaType === "bathroom") {
+    try {
+      await instantiateAreaSteps(supabase, created.id);
+      await writePlannedDates(supabase, created.id);
+    } catch (e) {
+      console.warn("[steps] instantiation failed:", (e as Error).message);
+    }
   }
 
   revalidatePath(`/project/${input.projectCode}/settings`);
@@ -165,6 +180,16 @@ export async function updateArea(formData: FormData): Promise<AreaMutationResult
       return { ok: false, error: `Kode area "${input.areaCode}" sudah ada di proyek ini` };
     }
     return { ok: false, error: error.message };
+  }
+
+  // best-effort: (re)instantiate Gate B steps for bathrooms when area_type/finish set
+  if (input.areaType === "bathroom") {
+    try {
+      await instantiateAreaSteps(supabase, input.areaId);
+      await writePlannedDates(supabase, input.areaId);
+    } catch (e) {
+      console.warn("[steps] re-instantiation failed:", (e as Error).message);
+    }
   }
 
   revalidatePath(`/project/${input.projectCode}/settings`);
