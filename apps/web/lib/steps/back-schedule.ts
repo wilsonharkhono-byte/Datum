@@ -74,6 +74,9 @@ export function backScheduleSteps(
     for (const s of upstream) {
       if (placed.has(s.code)) continue;
       const dependents = depsOf.get(s.code)!;
+      // An upstream step that gates nothing has no anchor to back-schedule from;
+      // leave it without a planned window rather than reduce() an empty array.
+      if (dependents.length === 0) { placed.add(s.code); continue; }
       if (!dependents.every((d) => planned.has(d))) continue; // wait until dependents placed
       const earliestDependentStart = dependents
         .map((d) => planned.get(d)!.planned_start)

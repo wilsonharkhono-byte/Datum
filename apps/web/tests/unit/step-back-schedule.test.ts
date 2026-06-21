@@ -53,4 +53,14 @@ describe("backScheduleSteps", () => {
     // B1 gates B3 (start 06-13): end = 06-12; start = 06-12 - (7+1) = 06-04
     expect(plan.get("B1")).toEqual({ planned_start: "2026-06-04", planned_end: "2026-06-12" });
   });
+
+  it("leaves an upstream step that gates nothing without a window (no empty-reduce throw)", () => {
+    const p = backScheduleSteps(
+      [step("X1", "decision", 1, 5), step("X2", "site_work", 2)],
+      [], // X1 has no dependents — must not throw
+      { start: "2026-07-01", end: "2026-07-31" },
+    );
+    expect(p.get("X2")).toEqual({ planned_start: "2026-07-01", planned_end: "2026-07-03" });
+    expect(p.has("X1")).toBe(false);
+  });
 });
