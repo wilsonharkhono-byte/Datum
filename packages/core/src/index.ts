@@ -23,3 +23,8 @@ export {
 } from "./projects/list";
 
 export { COLORS, FONT_FAMILY, TYPE, SPACE, RADIUS, TOUCH_TARGET } from "./tokens";
+
+export { makeOptimisticCard, applyAddCard, applyMoveCard, type BoardCardView, type Board, type BoardColumn } from "./cards/optimisticBoard";
+export { compareEventTime, type OrderableEvent } from "./cards/event-order";
+export { computeCardLabels, LABEL_STYLE, ACTOR_LABELS, type CardLabel, type CardLabelKind, type CardWithLabels, type LabelEvent } from "./cards/labels";
+export { computeCardDeadlines, type DeadlineCell, type CardDeadline } from "./gates/board-deadlines";
