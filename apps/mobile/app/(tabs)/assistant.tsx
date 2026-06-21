@@ -1,8 +1,5 @@
-import { View, Text } from "react-native";
+import { Screen } from "@/components/ui/Screen";
+import { Text } from "@/components/ui/Text";
 export default function AssistantTab() {
-  return (
-    <View style={{ padding: 16 }}>
-      <Text>Asisten (Slice 2)</Text>
-    </View>
-  );
+  return <Screen><Text variant="heading">Asisten</Text><Text variant="muted">Slice: assistant</Text></Screen>;
 }

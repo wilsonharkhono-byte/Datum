@@ -1,34 +1,34 @@
+import "../global.css";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
-import type { Session } from "@supabase/supabase-js";
+import { useEffect } from "react";
+import { SessionProvider, useSession } from "@/lib/session/session";
+import { QueryProvider } from "@/lib/query/provider";
 
-export default function RootLayout() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [ready, setReady] = useState(false);
+function Gate({ children }: { children: React.ReactNode }) {
+  const { status, staff } = useSession();
   const router = useRouter();
   const segments = useSegments();
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setReady(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
+    if (status === "loading") return;
     const inAuth = segments[0] === "(auth)";
-    if (!session && !inAuth) router.replace("/(auth)/login");
-    if (session && inAuth) router.replace("/(tabs)/matrix");
-  }, [ready, session, segments, router]);
+    if (status === "unauthenticated" && !inAuth) router.replace("/(auth)/login");
+    if (status === "authenticated" && inAuth) router.replace("/(tabs)/(matrix)");
+  }, [status, segments, router]);
+  if (status === "authenticated" && staff) {
+    return <QueryProvider userId={staff.id}>{children}</QueryProvider>;
+  }
+  return <>{children}</>;
+}
 
+export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <SessionProvider>
+      <Gate>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </Gate>
+    </SessionProvider>
   );
 }

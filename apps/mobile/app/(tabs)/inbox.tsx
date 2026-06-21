@@ -1,8 +1,5 @@
-import { View, Text } from "react-native";
+import { Screen } from "@/components/ui/Screen";
+import { Text } from "@/components/ui/Text";
 export default function InboxTab() {
-  return (
-    <View style={{ padding: 16 }}>
-      <Text>Inbox (Slice 4)</Text>
-    </View>
-  );
+  return <Screen><Text variant="heading">Inbox</Text><Text variant="muted">Slice: inbox</Text></Screen>;
 }
