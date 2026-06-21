@@ -16,6 +16,11 @@ import {
   attachToEvent as coreAttachToEvent,
   signAttachment as coreSignAttachment,
   reanalyzeAttachment as coreReanalyzeAttachment,
+  createComment as coreCreateComment,
+  editComment as coreEditComment,
+  deleteComment as coreDeleteComment,
+  addCardMember as coreAddCardMember,
+  removeCardMember as coreRemoveCardMember,
 } from "@datum/core";
 import {
   EVENT_KINDS,
@@ -269,44 +274,23 @@ export async function createComment(formData: FormData): Promise<CreateCommentRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
 
-  // Parse @mentions — extract @<first-name-token>, resolve to active staff by case-insensitive first-name match
-  const mentionTokens = Array.from(new Set(
-    (input.body.match(/@([a-zA-Z][a-zA-Z0-9_-]{1,30})/g) ?? [])
-      .map((m) => m.slice(1).toLowerCase())
-  ));
+  const result = await coreCreateComment(supabase, {
+    cardId:           input.cardId,
+    projectId:        input.projectId,
+    body:             input.body,
+    createdByStaffId: user.id,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
 
-  let mentionedStaffIds: string[] = [];
-  if (mentionTokens.length > 0) {
-    const { data: candidates } = await supabase
-      .from("staff").select("id, full_name").eq("active", true);
-    const ids = new Set<string>();
-    for (const cand of candidates ?? []) {
-      const first = (cand.full_name ?? "").split(/\s+/)[0]?.toLowerCase();
-      if (first && mentionTokens.includes(first)) ids.add(cand.id);
-    }
-    mentionedStaffIds = Array.from(ids);
-  }
-
-  const { data: inserted, error } = await supabase.from("card_comments").insert({
-    card_id:             input.cardId,
-    project_id:          input.projectId,
-    body:                input.body,
-    mentions:            mentionedStaffIds,
-    created_by_staff_id: user.id,
-  }).select("id").single();
-  if (error) return { ok: false, error: error.message };
-
-  if (inserted?.id) {
-    await notifyMentions(supabase, {
-      mentionedStaffIds,
-      actorId: user.id,
-      projectId: input.projectId,
-      cardId: input.cardId,
-      cardSlug: input.cardSlug,
-      cardComment: { id: inserted.id, body: input.body },
-      projectCode: input.projectCode,
-    });
-  }
+  await notifyMentions(supabase, {
+    mentionedStaffIds: result.mentions,
+    actorId:           user.id,
+    projectId:         input.projectId,
+    cardId:            input.cardId,
+    cardSlug:          input.cardSlug,
+    cardComment:       { id: result.commentId, body: input.body },
+    projectCode:       input.projectCode,
+  });
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -337,41 +321,21 @@ export async function editComment(formData: FormData): Promise<CreateCommentResu
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  // Re-extract mentions from the edited body
-  const mentionTokens = Array.from(new Set(
-    (input.body.match(/@([a-zA-Z][a-zA-Z0-9_-]{1,30})/g) ?? [])
-      .map((m) => m.slice(1).toLowerCase())
-  ));
-  let mentionedStaffIds: string[] = [];
-  if (mentionTokens.length > 0) {
-    const { data: candidates } = await supabase
-      .from("staff").select("id, full_name").eq("active", true);
-    const ids = new Set<string>();
-    for (const cand of candidates ?? []) {
-      const first = (cand.full_name ?? "").split(/\s+/)[0]?.toLowerCase();
-      if (first && mentionTokens.includes(first)) ids.add(cand.id);
-    }
-    mentionedStaffIds = Array.from(ids);
-  }
+  const result = await coreEditComment(supabase, {
+    commentId: input.commentId,
+    body:      input.body,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
 
-  const { data: updatedComment, error } = await supabase.from("card_comments")
-    .update({ body: input.body, edited_at: new Date().toISOString(), mentions: mentionedStaffIds })
-    .eq("id", input.commentId)
-    .select("id, card_id, project_id")
-    .single();
-  if (error) return { ok: false, error: error.message };
-
-  if (updatedComment?.id && updatedComment.card_id && updatedComment.project_id) {
-    await notifyMentions(supabase, {
-      mentionedStaffIds,
-      actorId: user.id,
-      projectId: updatedComment.project_id,
-      cardId: updatedComment.card_id,
-      cardSlug: input.cardSlug,
-      cardComment: { id: updatedComment.id, body: input.body },
-      projectCode: input.projectCode,
-    });
-  }
+  await notifyMentions(supabase, {
+    mentionedStaffIds: result.mentions,
+    actorId:           user.id,
+    projectId:         result.projectId,
+    cardId:            result.cardId,
+    cardSlug:          input.cardSlug,
+    cardComment:       { id: input.commentId, body: input.body },
+    projectCode:       input.projectCode,
+  });
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -400,10 +364,8 @@ export async function deleteComment(formData: FormData): Promise<CreateCommentRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  const { error } = await supabase.from("card_comments")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", input.commentId);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreDeleteComment(supabase, input.commentId);
+  if (!result.ok) return { ok: false, error: result.error };
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
 }
@@ -541,28 +503,13 @@ export async function addCardMember(formData: FormData): Promise<MemberResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  // Upsert pattern: if a soft-removed row exists, un-remove it; otherwise insert.
-  const { data: existing } = await supabase.from("card_members")
-    .select("removed_at")
-    .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role)
-    .maybeSingle();
-
-  let dbErr;
-  if (existing) {
-    const { error } = await supabase.from("card_members")
-      .update({ removed_at: null, added_at: new Date().toISOString(), added_by_staff_id: user.id })
-      .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role);
-    dbErr = error;
-  } else {
-    const { error } = await supabase.from("card_members").insert({
-      card_id:           input.cardId,
-      staff_id:          input.staffId,
-      role:              input.role,
-      added_by_staff_id: user.id,
-    });
-    dbErr = error;
-  }
-  if (dbErr) return { ok: false, error: dbErr.message };
+  const result = await coreAddCardMember(supabase, {
+    cardId:         input.cardId,
+    staffId:        input.staffId,
+    role:           input.role,
+    addedByStaffId: user.id,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -590,11 +537,12 @@ export async function removeCardMember(formData: FormData): Promise<MemberResult
     return { ok: false, error: "Form tidak valid" };
   }
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("card_members")
-    .update({ removed_at: new Date().toISOString() })
-    .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role)
-    .is("removed_at", null);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreRemoveCardMember(supabase, {
+    cardId:  input.cardId,
+    staffId: input.staffId,
+    role:    input.role,
+  });
+  if (!result.ok) return result;
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
 }

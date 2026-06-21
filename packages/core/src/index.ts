@@ -123,3 +123,45 @@ export {
   MAX_ATTACHMENT_BYTES,
   type AttachmentKind,
 } from "./attachments/kinds";
+
+// ─── Card comment mutations ───────────────────────────────────────────────────
+export {
+  CreateCommentInput,
+  type CreateCommentInputType,
+  EditCommentInput,
+  type EditCommentInputType,
+  type CreateCommentResult,
+  type EditCommentResult,
+  type DeleteCommentResult,
+  extractMentionTokens,
+  resolveMentionStaffIds,
+  createComment,
+  editComment,
+  deleteComment,
+} from "./cards/comments";
+
+// ─── Card member mutations ────────────────────────────────────────────────────
+export {
+  CardMemberRoleSchema,
+  type CardMemberRole,
+  AddCardMemberInput,
+  type AddCardMemberInputType,
+  RemoveCardMemberInput,
+  type RemoveCardMemberInputType,
+  type MemberResult,
+  addCardMember,
+  removeCardMember,
+} from "./cards/members";
+
+// ─── Anon-safe notification producers ────────────────────────────────────────
+// notifyPrincipalsOfHighRiskEvent is NOT here — it needs the service-role admin
+// client and stays in apps/web/lib/notifications/producers.ts.
+export {
+  notifyMentions,
+  shouldNotifyWatchers,
+  notifyWatchersOfEvent,
+  notifyCardStatusChange,
+  notifyDraftApproved,
+  notifyDraftRejected,
+  notifyDraftPending,
+} from "./notifications/producers";
