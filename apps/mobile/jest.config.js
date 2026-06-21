@@ -7,6 +7,8 @@ module.exports = {
     "**/lib/**/*.test.tsx",
     "**/components/**/*.test.ts",
     "**/components/**/*.test.tsx",
+    "**/app/**/*.test.ts",
+    "**/app/**/*.test.tsx",
   ],
   transformIgnorePatterns: [
     "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|nativewind|react-native-css-interop))",
