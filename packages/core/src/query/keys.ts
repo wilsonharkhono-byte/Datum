@@ -17,6 +17,13 @@ export const keys = {
   matrix: (projectId: string) => ["matrix", projectId] as const,
   /** Lampiran-A checkpoint templates for one gate (static reference, staleTime=Infinity). */
   gateCheckpoints: (gateCode: string) => ["gateCheckpoints", gateCode] as const,
+  // ─── Rooms / areas ────────────────────────────────────────────────────────
+  /** ProjectRooms (sorted Room[] + metadata) for a project slug. */
+  rooms: (slug: string) => ["rooms", slug] as const,
+  /** Area[] for a project. */
+  areas: (projectId: string) => ["areas", projectId] as const,
+  /** Transient AI area-extraction proposal — NOT persisted (session-only). */
+  areaProposal: (projectId: string) => ["areaProposal", projectId] as const,
 };
 
-export const PERSISTED_KEY_ROOTS = ["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints"] as const;
+export const PERSISTED_KEY_ROOTS = ["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints", "rooms", "areas"] as const;

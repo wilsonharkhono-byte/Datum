@@ -19,7 +19,15 @@ describe("query keys", () => {
     expect(keys.matrix("proj-uuid")).toEqual(["matrix", "proj-uuid"]);
     expect(keys.gateCheckpoints("A")).toEqual(["gateCheckpoints", "A"]);
   });
+  it("builds rooms/areas tuples", () => {
+    expect(keys.rooms("ARIN-1")).toEqual(["rooms", "ARIN-1"]);
+    expect(keys.areas("proj-uuid")).toEqual(["areas", "proj-uuid"]);
+    expect(keys.areaProposal("proj-uuid")).toEqual(["areaProposal", "proj-uuid"]);
+  });
   it("declares the persisted roots", () => {
-    expect(PERSISTED_KEY_ROOTS).toEqual(["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints"]);
+    expect(PERSISTED_KEY_ROOTS).toEqual(["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints", "rooms", "areas"]);
+  });
+  it("areaProposal is NOT in PERSISTED_KEY_ROOTS", () => {
+    expect((PERSISTED_KEY_ROOTS as readonly string[]).includes("areaProposal")).toBe(false);
   });
 });

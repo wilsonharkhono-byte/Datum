@@ -1,16 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Area } from "@datum/db";
-
-export async function getProjectAreas(
-  supabase: SupabaseClient<Database>,
-  projectId: string,
-): Promise<Area[]> {
-  const { data, error } = await supabase
-    .from("areas")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("sort_order", { ascending: true })
-    .order("area_code", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Area[];
-}
+// Thin re-export — source of truth moved to @datum/core.
+// The two-argument signature (supabase, projectId) is preserved so existing
+// page callers that inject their own server client continue to work unchanged.
+export { getProjectAreas } from "@datum/core";
+export type { Area } from "@datum/db";

@@ -331,3 +331,68 @@ export {
   type ActivityItem,
   type ActivityKind,
 } from "./activity/queries";
+
+// ─── Rooms: pure derive ───────────────────────────────────────────────────────
+export {
+  deriveStage,
+  blockerCount,
+  stageProgress,
+  isHandoverReady,
+  nextAction,
+  sortRoomsByUrgency,
+  relativeTimeId,
+  type CellStatus,
+  type RoomGateCell,
+  type RoomStage,
+  type NextAction,
+  type Room,
+} from "./rooms/derive";
+
+// ─── Rooms: get-rooms (client-injected) ──────────────────────────────────────
+export {
+  getProjectRooms,
+  type ProjectRooms,
+} from "./rooms/get-rooms";
+
+// ─── Areas: queries (client-injected) ────────────────────────────────────────
+export { getProjectAreas } from "./areas/queries";
+
+// ─── Areas: mutations (client-injected; no revalidate/admin) ─────────────────
+export {
+  CreateAreaInput,
+  type CreateAreaInputType,
+  UpdateAreaInput,
+  type UpdateAreaInputType,
+  DeleteAreaInput,
+  type DeleteAreaInputType,
+  ReorderAreasInput,
+  type ReorderAreasInputType,
+  type AreaMutationResult,
+  createArea,
+  updateArea,
+  deleteArea,
+  reorderAreas,
+} from "./areas/mutations";
+
+// ─── Areas: AI extract helpers (pure) ────────────────────────────────────────
+export {
+  AREA_TYPES,
+  type AreaType,
+  type ExtractCard,
+  type ExistingArea,
+  type ProposedArea,
+  type ProposedAssignment,
+  type AreaProposal,
+  type RawAreaProposal,
+  normalizeAreaCode,
+  normalizeProposal,
+  parseModelJson,
+} from "./areas/extract";
+
+// ─── Areas: apply-proposal (DB mutation, anon client) ────────────────────────
+export {
+  ApplyAreaProposalInput,
+  type ApplyAreaProposalInputType,
+  type ApplyAreaProposalResult,
+  applyAreaProposal,
+} from "./areas/apply-proposal";
