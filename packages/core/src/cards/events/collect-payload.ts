@@ -1,21 +1,20 @@
 /**
- * collectPayload — coerce flat FormData payload_* fields into a typed record.
+ * collectPayloadFromEntries — coerce flat payload_* entries into a typed record.
  *
  * Moved from apps/web/lib/cards/mutations.ts into core so mobile can share it.
- * Pure function; no supabase, no FormData import (takes the raw entries).
+ * Pure function; no supabase; isomorphic (no DOM globals).
  *
  * Usage (web):
- *   import { collectPayload } from "@datum/core";
- *   const payload = collectPayload(formData);
+ *   import { collectPayloadFromEntries } from "@datum/core";
+ *   const payload = collectPayloadFromEntries(formData.entries());
  *
  * Usage (mobile):
- *   build the same object from your form state:
  *   const payload = collectPayloadFromEntries([["payload_amount","500000"], ...]);
  */
 
 /** Coerce an iterable of [key, value] pairs where key starts with "payload_". */
 export function collectPayloadFromEntries(
-  entries: Iterable<[string, string | File]>,
+  entries: Iterable<readonly [string, unknown]>,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   for (const [key, value] of entries) {
@@ -34,12 +33,4 @@ export function collectPayloadFromEntries(
     }
   }
   return payload;
-}
-
-/**
- * Convenience wrapper for web FormData. The mobile call site builds the
- * entries directly from its form state using collectPayloadFromEntries.
- */
-export function collectPayload(formData: FormData): Record<string, unknown> {
-  return collectPayloadFromEntries(formData.entries() as Iterable<[string, string | File]>);
 }

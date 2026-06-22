@@ -20,7 +20,7 @@ export type CardDeadline = {
 /**
  * For each card: among the unfinished (not_started/in_progress) scheduled
  * cells of its linked areas, pick the soonest window starting today or
- * later; if none upcoming, the earliest (i.e. overdue) window.
+ * later; if none upcoming, the earliest overdue cell.
  * `todayIso` is a YYYY-MM-DD string.
  */
 export function computeCardDeadlines(

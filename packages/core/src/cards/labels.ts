@@ -1,6 +1,6 @@
 /**
  * Card labels v2 — derived from OPEN LOOPS in the event stream, not from
- * kind-presence in a time window. Each chip answers a coordination
+ * kind-presence in a time range. Each chip answers a coordination
  * question: is this blocked, does it need a decision, whose ball is it.
  *
  * Labels are derived, not stored — computed from card.status + the card's

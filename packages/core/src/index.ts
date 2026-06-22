@@ -101,7 +101,6 @@ export {
 } from "./cards/events/resolve";
 
 export {
-  collectPayload,
   collectPayloadFromEntries,
 } from "./cards/events/collect-payload";
 

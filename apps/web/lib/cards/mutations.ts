@@ -11,7 +11,7 @@ import {
   MoveCardInput as CoreMoveCardInput,
   moveCard as coreMoveCard,
   createCardEvent as coreCreateCardEvent,
-  collectPayload,
+  collectPayloadFromEntries,
   resolveCardEvent as coreResolveCardEvent,
   attachToEvent as coreAttachToEvent,
   signAttachment as coreSignAttachment,
@@ -137,8 +137,8 @@ export type CreateCardEventResult =
   | { ok: true; eventId: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-// collectPayload is now exported from @datum/core; re-exported above.
-// The local function has been removed — callers in this file use the imported one.
+// collectPayloadFromEntries is imported from @datum/core above.
+// Web callers pass formData.entries() — DOM FormData stays in web layer only.
 
 export async function createCardEvent(formData: FormData): Promise<CreateCardEventResult> {
   let input;
@@ -160,7 +160,7 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
 
   // Delegate the DB insert + payload validation to core.
-  const rawPayload = collectPayload(formData);
+  const rawPayload = collectPayloadFromEntries(formData.entries());
   const result = await coreCreateCardEvent(supabase, {
     cardId:          input.cardId,
     projectId:       input.projectId,
@@ -690,7 +690,7 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
     return { ok: false, error: "Form tidak valid" };
   }
 
-  const rawPayload = collectPayload(formData);
+  const rawPayload = collectPayloadFromEntries(formData.entries());
   const schema = EventPayloadSchemas[input.eventKind];
   const parsed = schema.safeParse(rawPayload);
   if (!parsed.success) {

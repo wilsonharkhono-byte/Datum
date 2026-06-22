@@ -13,6 +13,16 @@ const BANNED = [
   /import\s+["']server-only["']/,
 ];
 
+// RN-incompatible globals — core must not use these so it stays isomorphic.
+const FORBIDDEN_GLOBALS = [
+  /\bcrypto\./,
+  /\bnew FormData\b/,
+  /[:<]\s*FormData\b/,
+  /\bFormDataEntryValue\b/,
+  /\bwindow\./,
+  /\bdocument\./,
+];
+
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
@@ -29,6 +39,17 @@ describe("@datum/core import hygiene", () => {
     for (const file of tsFiles(SRC)) {
       const text = readFileSync(file, "utf8");
       for (const re of BANNED) {
+        if (re.test(text)) offenders.push(`${file} matched ${re}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("never uses RN-incompatible globals (crypto./FormData/window./document.)", () => {
+    const offenders: string[] = [];
+    for (const file of tsFiles(SRC)) {
+      const text = readFileSync(file, "utf8");
+      for (const re of FORBIDDEN_GLOBALS) {
         if (re.test(text)) offenders.push(`${file} matched ${re}`);
       }
     }

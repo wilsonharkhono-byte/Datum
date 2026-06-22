@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectPayloadFromEntries, collectPayload } from "./collect-payload";
+import { collectPayloadFromEntries } from "./collect-payload";
 
 // ─── collectPayloadFromEntries ────────────────────────────────────────────────
 
@@ -61,15 +61,16 @@ describe("collectPayloadFromEntries", () => {
   });
 });
 
-// ─── collectPayload (FormData wrapper) ───────────────────────────────────────
+// ─── collectPayloadFromEntries with plain array (simulates mobile / server call) ─
 
-describe("collectPayload (FormData)", () => {
-  it("extracts payload fields from FormData", () => {
-    const fd = new FormData();
-    fd.set("payload_body", "test");
-    fd.set("payload_amount", "100");
-    fd.set("eventKind", "note");
-    const result = collectPayload(fd);
+describe("collectPayloadFromEntries via plain entries array", () => {
+  it("extracts payload fields from a plain entries array", () => {
+    const entries: [string, string][] = [
+      ["payload_body", "test"],
+      ["payload_amount", "100"],
+      ["eventKind", "note"],
+    ];
+    const result = collectPayloadFromEntries(entries);
     expect(result.body).toBe("test");
     expect(result.amount).toBe(100);
     expect("eventKind" in result).toBe(false);
