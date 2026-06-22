@@ -8,8 +8,11 @@ import {
   getCardComments,
   getCardMembers,
   getCardAttachments,
+  getBriefData,
+  getAdvisorData,
   keys,
 } from "@datum/core";
+import type { GetAdvisorOpts } from "@datum/core";
 import { supabase } from "@/lib/supabase/client";
 import { SUPABASE_URL } from "@/lib/env";
 
@@ -76,5 +79,29 @@ export function useCardAttachments(cardId: string | undefined) {
     queryKey: ["card-attachments", cardId],
     enabled: !!cardId,
     queryFn: () => getCardAttachments(supabase, cardId!),
+  });
+}
+
+// ─── Brief + Advisor ──────────────────────────────────────────────────────────
+
+/** Morning brief: all 6 sections + gateRisks + staleByProject. */
+export function useBrief() {
+  return useQuery({
+    queryKey: keys.brief(),
+    queryFn: () => getBriefData(supabase),
+  });
+}
+
+/**
+ * Hari Ini advisor feed — ranked next-action items.
+ * Pass `{ projectId }` to scope to a single project; omit for cross-project.
+ */
+export function useAdvisor(scope?: { projectId: string }) {
+  const opts: GetAdvisorOpts = { now: new Date(), limit: 10, projectId: scope?.projectId };
+  return useQuery({
+    queryKey: keys.advisor(scope ? { projectId: scope.projectId } : "all"),
+    queryFn: () => getAdvisorData(supabase, opts),
+    // Re-fetch `now` on each call so the score reflects the real current time.
+    staleTime: 60_000,
   });
 }
