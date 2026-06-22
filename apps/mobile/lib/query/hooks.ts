@@ -19,6 +19,9 @@ import {
   getGateCheckpoints,
   getProjectRooms,
   getProjectAreas,
+  getProjectMembers,
+  getAvailableStaff,
+  getProjectBySlug,
   keys,
 } from "@datum/core";
 import type { GetAdvisorOpts } from "@datum/core";
@@ -225,5 +228,43 @@ export function useAreas(projectId: string | undefined) {
     queryKey: projectId ? keys.areas(projectId) : ["areas", "none"],
     enabled: !!projectId,
     queryFn: () => getProjectAreas(supabase, projectId!),
+  });
+}
+
+// ─── Members + Settings ───────────────────────────────────────────────────────
+
+/**
+ * project_staff rows for a project (active + inactive).
+ * Filter by !active_until on the client to get currently-active members.
+ * Disabled until projectId is known.
+ */
+export function useProjectMembers(projectId: string | undefined) {
+  return useQuery({
+    queryKey: projectId ? keys.projectMembers(projectId) : ["project-members", "none"],
+    enabled: !!projectId,
+    queryFn: () => getProjectMembers(supabase, projectId!),
+  });
+}
+
+/**
+ * All active staff rows — used as the "add member" picker source.
+ * Filter out already-active members client-side.
+ */
+export function useAvailableStaff() {
+  return useQuery({
+    queryKey: keys.availableStaff(),
+    queryFn: () => getAvailableStaff(supabase),
+  });
+}
+
+/**
+ * Project settings row (id, code, name, client, location, status, dates) by slug.
+ * Disabled when slug is empty.
+ */
+export function useProjectSettings(slug: string) {
+  return useQuery({
+    queryKey: keys.projectSettings(slug),
+    enabled: !!slug,
+    queryFn: () => getProjectBySlug(supabase, slug),
   });
 }

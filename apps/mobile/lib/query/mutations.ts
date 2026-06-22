@@ -414,6 +414,72 @@ import {
   type ApplyAreaProposalInputType,
 } from "@datum/core";
 
+// ─── Project member mutations ─────────────────────────────────────────────────
+
+import {
+  addProjectMember,
+  removeProjectMember,
+  updateProject,
+  type AddProjectMemberInputType,
+  type RemoveProjectMemberInputType,
+  type UpdateProjectInputType,
+} from "@datum/core";
+
+/**
+ * Add an existing staff member to a project.
+ * Invalidates projectMembers on settle.
+ */
+export function useAddProjectMember(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Omit<AddProjectMemberInputType, "projectId">) => {
+      const res = await addProjectMember(supabase, { ...input, projectId });
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.projectMembers(projectId) });
+    },
+  });
+}
+
+/**
+ * Soft-remove a staff member from a project (sets active_until = today).
+ * Invalidates projectMembers on settle.
+ */
+export function useRemoveProjectMember(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Omit<RemoveProjectMemberInputType, "projectId">) => {
+      const res = await removeProjectMember(supabase, { ...input, projectId });
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.projectMembers(projectId) });
+    },
+  });
+}
+
+/**
+ * Patch a project's editable fields (name, client, location, status, dates).
+ * Invalidates projectSettings (slug) + projects list on settle.
+ */
+export function useUpdateProject(slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateProjectInputType) => {
+      const res = await updateProject(supabase, input);
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.projectSettings(slug) });
+      void qc.invalidateQueries({ queryKey: keys.projects() });
+    },
+  });
+}
+
 /**
  * Create a new area. Invalidates areas + rooms + matrix on settle.
  */
