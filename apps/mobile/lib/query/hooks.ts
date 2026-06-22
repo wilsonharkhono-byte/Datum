@@ -14,6 +14,9 @@ import {
   getRecentNotifications,
   getUnreadCount,
   getRecentActivity,
+  fetchMatrix,
+  getProjectScheduleCells,
+  getGateCheckpoints,
   keys,
 } from "@datum/core";
 import type { GetAdvisorOpts } from "@datum/core";
@@ -147,5 +150,52 @@ export function useActivity() {
     queryKey: keys.activity(),
     queryFn: () => getRecentActivity(supabase),
     staleTime: 60_000,
+  });
+}
+
+// ─── Schedule / gates / matrix ────────────────────────────────────────────────
+
+/**
+ * Full area × gate readiness matrix for a project.
+ *
+ * REALTIME GAP: gate-status live updates require a DB publication on
+ * `area_gate_status` that is not yet enabled. Until that migration lands,
+ * the matrix is kept fresh via refetchOnWindowFocus + pull-to-refresh on the
+ * schedule screen. The cron-triggered recompute will reflect within 1–2 min.
+ */
+export function useMatrix(projectId: string | undefined) {
+  return useQuery({
+    queryKey: projectId ? keys.matrix(projectId) : ["matrix", "none"],
+    enabled: !!projectId,
+    queryFn: () => fetchMatrix(supabase, projectId!),
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * Overlaid ScheduledCell[] (per-area target windows) for a project.
+ * Used alongside useMatrix to show target start/end dates per gate per area.
+ *
+ * Same realtime gap as useMatrix — pull-to-refresh on the schedule screen.
+ */
+export function useScheduleCells(projectId: string | undefined) {
+  return useQuery({
+    queryKey: projectId ? keys.schedule(projectId) : ["schedule", "none"],
+    enabled: !!projectId,
+    queryFn: () => getProjectScheduleCells(supabase, projectId!),
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * Lampiran-A checkpoint templates for a gate — static reference data, cached
+ * indefinitely (never changes unless seeded again).
+ */
+export function useGateCheckpoints(gateCode: string | undefined) {
+  return useQuery({
+    queryKey: gateCode ? keys.gateCheckpoints(gateCode) : ["gateCheckpoints", "none"],
+    enabled: !!gateCode,
+    queryFn: () => getGateCheckpoints(supabase, gateCode!),
+    staleTime: Infinity,
   });
 }

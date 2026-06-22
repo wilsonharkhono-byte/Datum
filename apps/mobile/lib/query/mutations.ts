@@ -27,6 +27,11 @@ import {
   // Notifications
   markNotificationRead,
   markAllNotificationsRead,
+  // Gates
+  markGatePassed,
+  setAreaTargetDate,
+  type MarkGatePassedInput,
+  type TargetInput,
 } from "@datum/core";
 import { supabase } from "@/lib/supabase/client";
 import { useSession } from "@/lib/session/session";
@@ -338,6 +343,58 @@ export function useMarkAllRead(staffId: string) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.notifications(staffId) });
       void qc.invalidateQueries({ queryKey: keys.unreadCount(staffId) });
+    },
+  });
+}
+
+// ─── Gates: advance + area target ────────────────────────────────────────────
+
+/**
+ * Mark a gate as passed for an area.
+ *
+ * Invalidates matrix + schedule on success. recomputeProjectGates is web-only
+ * (runs via cron/realtime on the server); mobile callers do NOT block on it —
+ * the server-side cron will reconcile within ~1 min.
+ *
+ * REALTIME GAP: gate-status publication is not yet live; the matrix query
+ * will pick up the change on next window focus or pull-to-refresh.
+ */
+export function useAdvanceGate(projectId: string) {
+  const qc = useQueryClient();
+  const { staff } = useSession();
+  return useMutation({
+    mutationFn: async (raw: Omit<MarkGatePassedInput, "projectId">) => {
+      const staffId = staff?.id;
+      if (!staffId) throw new Error("Tidak ada sesi — silakan masuk kembali");
+      const res = await markGatePassed(supabase, staffId, { ...raw, projectId });
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.matrix(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.schedule(projectId) });
+    },
+  });
+}
+
+/**
+ * Set (or clear) the PM handover target date for an area.
+ * Invalidates matrix + schedule so the accordion re-renders with fresh windows.
+ */
+export function useSetAreaTarget(projectId: string) {
+  const qc = useQueryClient();
+  const { staff } = useSession();
+  return useMutation({
+    mutationFn: async (input: Pick<TargetInput, "areaId" | "targetDate">) => {
+      const staffId = staff?.id;
+      if (!staffId) throw new Error("Tidak ada sesi — silakan masuk kembali");
+      const res = await setAreaTargetDate(supabase, staffId, { ...input, projectId });
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.matrix(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.schedule(projectId) });
     },
   });
 }
