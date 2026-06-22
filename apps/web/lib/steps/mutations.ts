@@ -66,11 +66,17 @@ export async function projectAreaStep(
   supabase: SupabaseClient<Database>,
   areaStepId: string,
 ): Promise<void> {
-  const [{ data: events }, { data: cps }, { data: punch }] = await Promise.all([
+  const [evRes, cpRes, punchRes] = await Promise.all([
     supabase.from("area_step_events").select("occurred_at, created_at, status, note, percent_complete").eq("area_step_id", areaStepId),
     supabase.from("area_step_checkpoints").select("required, result").eq("area_step_id", areaStepId),
     supabase.from("punch_items").select("severity, status").eq("area_step_id", areaStepId),
   ]);
+  if (evRes.error || cpRes.error || punchRes.error) {
+    throw evRes.error ?? cpRes.error ?? punchRes.error;
+  }
+  const events = evRes.data;
+  const cps = cpRes.data;
+  const punch = punchRes.data;
 
   const r = projectStepStatus({
     workEvents: (events ?? []).map((e) => ({
@@ -86,7 +92,7 @@ export async function projectAreaStep(
     punchItems: (punch ?? []) as { severity: "kritis" | "mayor" | "minor"; status: "open" | "fixing" | "closed" }[],
   });
 
-  await supabase
+  const { error: upErr } = await supabase
     .from("area_steps")
     .update({
       status: r.status,
@@ -96,6 +102,7 @@ export async function projectAreaStep(
       blocking_reason: r.blockingReason,
     })
     .eq("id", areaStepId);
+  if (upErr) throw upErr;
 }
 
 export type UpdateAreaStepArgs = {
