@@ -45,6 +45,15 @@ jest.mock("@/lib/realtime/useRealtimeInvalidation", () => ({
   useProjectRealtime: jest.fn(),
 }));
 
+// session: staff is authenticated for all card-detail tests
+jest.mock("@/lib/session/session", () => ({
+  useSession: jest.fn(() => ({
+    status: "authenticated",
+    staff: { id: "staff-uuid-self", full_name: "Wilson", role: "principal", email: null },
+    signOut: jest.fn(),
+  })),
+}));
+
 // Mock @datum/core query fns — actual implementations would call Supabase
 const mockGetCardWithTimelineByProjectCode = jest.fn();
 const mockGetCardComments = jest.fn();

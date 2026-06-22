@@ -1,9 +1,5 @@
 /**
- * CardDetailScreen — read-only rendering of a card's header, timeline,
- * comments, members, and attachments.
- *
- * Write actions (add-event, add-comment, add-member) are the next task;
- * placeholders are left disabled here.
+ * CardDetailScreen — card header, timeline, comments, members, and write actions.
  *
  * Read approach: SEPARATE queries
  *  - useCard(code, slug)           → card header + timeline events
@@ -11,8 +7,17 @@
  *  - useCardMembers(cardId)        → members (with staff)
  *  - useCardAttachments(cardId)    → attachments keyed by event id
  *
- * `CardDetail` from core returns { card, events } only; comments/members/
- * attachments are separate reads (see @datum/core queries.ts).
+ * Write actions (this task):
+ *  - MobileAddEventForm            → useAddEvent (collapsed "+ Catat aktivitas")
+ *  - CommentInput / DeletableCommentItem → useAddComment / useDeleteComment / useEditComment
+ *  - MemberPicker / RemovableMemberRow  → useAddMember / useRemoveMember
+ *  - ResolveButton                 → useResolveEvent (shown on open-loop events)
+ *
+ * Attachment upload is scoped to "view + caption" (existing read screen).
+ * Native file picker is a TODO noted in MobileAddEventForm.
+ *
+ * NOTE: Gate recompute + high-risk principal notifications are web-only side
+ * effects. Mobile-created events won't fire those — acceptable per spec.
  */
 
 import { View, ScrollView } from "react-native";
@@ -27,10 +32,11 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { MobileEventRow } from "@/components/card/EventRow";
-import { CommentItem } from "@/components/card/CommentItem";
-import { MemberRow } from "@/components/card/MemberRow";
+import { MobileAddEventForm } from "@/components/card/AddEventForm";
+import { CommentInput, DeletableCommentItem } from "@/components/card/CommentInput";
+import { MemberPicker, RemovableMemberRow } from "@/components/card/MemberPicker";
+import { ResolveButton } from "@/components/card/ResolveButton";
 import {
   useCard,
   useCardComments,
@@ -38,6 +44,7 @@ import {
   useCardAttachments,
 } from "@/lib/query/hooks";
 import { useProjectRealtime } from "@/lib/realtime/useRealtimeInvalidation";
+import { useSession } from "@/lib/session/session";
 
 // ─── Status display ───────────────────────────────────────────────────────────
 
@@ -86,6 +93,7 @@ function SectionHeader({ title }: { title: string }) {
 export default function CardDetailScreen() {
   const { slug: code, cardSlug } = useLocalSearchParams<{ slug: string; cardSlug: string }>();
   const qc = useQueryClient();
+  const { staff } = useSession();
 
   // Primary read: card header + timeline
   const cardQuery = useCard(code, cardSlug);
@@ -103,6 +111,9 @@ export default function CardDetailScreen() {
 
   // Attachments keyed by event id
   const attachmentsByEvent: Map<string, CardAttachment[]> = attachmentsQuery.data ?? new Map();
+
+  // Member staff ids for MemberPicker deduplication
+  const existingMemberIds = (membersQuery.data ?? []).map((m) => m.staff_id);
 
   // ── Loading ──
   if (cardQuery.isPending) {
@@ -179,18 +190,29 @@ export default function CardDetailScreen() {
           </Text>
         ) : (
           events.map((ev) => (
-            <MobileEventRow
-              key={ev.id}
-              event={ev}
-              attachments={attachmentsByEvent.get(ev.id) ?? []}
-            />
+            <View key={ev.id}>
+              <MobileEventRow
+                event={ev}
+                attachments={attachmentsByEvent.get(ev.id) ?? []}
+              />
+              {/* Resolve affordance — only for open-loop events */}
+              {staff ? (
+                <ResolveButton event={ev} code={code} slug={cardSlug} />
+              ) : null}
+            </View>
           ))
         )}
 
-        {/* Placeholder for add-event action (next task) */}
-        <View className="mt-2">
-          <Button label="+ Catat aktivitas" onPress={() => {}} disabled />
-        </View>
+        {/* Add event form */}
+        {staff && cardId ? (
+          <MobileAddEventForm
+            cardId={cardId}
+            projectId={card.project_id}
+            code={code}
+            slug={cardSlug}
+            loggedByStaffId={staff.id}
+          />
+        ) : null}
 
         {/* ── Diskusi (comments) ── */}
         <SectionHeader title="Diskusi" />
@@ -206,13 +228,24 @@ export default function CardDetailScreen() {
             Belum ada komentar.
           </Text>
         ) : (
-          (commentsQuery.data ?? []).map((c) => <CommentItem key={c.id} comment={c} />)
+          (commentsQuery.data ?? []).map((c) => (
+            <DeletableCommentItem
+              key={c.id}
+              comment={c}
+              cardId={cardId ?? ""}
+              ownStaffId={staff?.id}
+            />
+          ))
         )}
 
-        {/* Placeholder for add-comment action (next task) */}
-        <View className="mt-2">
-          <Button label="+ Tambah komentar" onPress={() => {}} disabled />
-        </View>
+        {/* Add comment */}
+        {staff && cardId ? (
+          <CommentInput
+            cardId={cardId}
+            projectId={card.project_id}
+            loggedByStaffId={staff.id}
+          />
+        ) : null}
 
         {/* ── Anggota (members) ── */}
         <SectionHeader title="Anggota" />
@@ -229,14 +262,24 @@ export default function CardDetailScreen() {
           </Text>
         ) : (
           (membersQuery.data ?? []).map((m) => (
-            <MemberRow key={`${m.card_id}-${m.staff_id}`} member={m} />
+            <RemovableMemberRow
+              key={`${m.card_id}-${m.staff_id}-${m.role}`}
+              member={m}
+              cardId={cardId ?? ""}
+              canRemove={!!staff}
+            />
           ))
         )}
 
-        {/* Placeholder for add-member action (next task) */}
-        <View className="mt-2">
-          <Button label="+ Tambah anggota" onPress={() => {}} disabled />
-        </View>
+        {/* Add member */}
+        {staff && cardId ? (
+          <MemberPicker
+            cardId={cardId}
+            projectId={card.project_id}
+            addedByStaffId={staff.id}
+            existingMemberIds={existingMemberIds}
+          />
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
