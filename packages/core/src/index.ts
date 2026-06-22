@@ -167,3 +167,79 @@ export {
 
 // ─── Global search ────────────────────────────────────────────────────────────
 export { searchAll, type SearchHit, type SearchResults } from "./search/queries";
+
+// ─── Brief dashboard reads ────────────────────────────────────────────────────
+export {
+  getBriefData,
+  type BriefItem,
+  type BriefData,
+} from "./brief/get-brief-data";
+
+export {
+  findCascadeRisks,
+  findExpiringQuotes,
+  type ScheduleCell,
+  type GateRisk,
+  type QuoteEvent,
+} from "./brief/bottlenecks";
+
+// ─── Advisor reads + ranking ──────────────────────────────────────────────────
+export {
+  getAdvisorData,
+  getAdvisorItems,
+  type GetAdvisorOpts,
+  type AdvisorData,
+} from "./advisor/get-advisor";
+
+export {
+  scoreItem,
+  rankAdvisorItems,
+  dueLabelFor,
+  ageLabelFor,
+} from "./advisor/rank";
+
+export {
+  type AdvisorItem,
+  type AdvisorSignal,
+  type AdvisorItemType,
+  type GateReadyTarget,
+  type AdvisorGateCell,
+} from "./advisor/types";
+
+// ─── Cards: template helpers + payload render ─────────────────────────────────
+export {
+  isTemplateCardTitle,
+  deriveCardLabel,
+} from "./cards/template-card";
+
+export {
+  renderPayload,
+  eventKindLabel,
+  EVENT_KIND_LABELS,
+  type RenderedField,
+} from "./cards/payload-render";
+
+// ─── Gates: labels ────────────────────────────────────────────────────────────
+export { gateLabel, gateShortName, GATE_SHORT_NAME } from "./gates/labels";
+
+// ─── Draft reads + mutations ──────────────────────────────────────────────────
+export {
+  listPendingCardEventDrafts,
+  type PendingDraft,
+  type ProposedCardEvent,
+} from "./drafts/list-pending";
+
+export {
+  approveCardEventDraft,
+  ApproveDraftInput,
+  GATE_RELEVANT_KINDS,
+  type ApproveDraftInputType,
+  type ApproveDraftResult,
+} from "./drafts/approve";
+
+export {
+  rejectCardEventDraft,
+  RejectDraftInput,
+  type RejectDraftInputType,
+  type RejectDraftResult,
+} from "./drafts/reject";

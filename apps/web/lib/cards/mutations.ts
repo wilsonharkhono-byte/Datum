@@ -21,6 +21,8 @@ import {
   deleteComment as coreDeleteComment,
   addCardMember as coreAddCardMember,
   removeCardMember as coreRemoveCardMember,
+  approveCardEventDraft as coreApproveCardEventDraft,
+  rejectCardEventDraft as coreRejectCardEventDraft,
 } from "@datum/core";
 import {
   EVENT_KINDS,
@@ -744,7 +746,10 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
   return { ok: true, draftId: data.id };
 }
 
-const ApproveDraftInput = z.object({
+// ApproveDraftInput / RejectDraftInput now live in @datum/core (imported above
+// via coreApproveCardEventDraft / coreRejectCardEventDraft).
+// Web schemas remain local for FormData → args adaption only.
+const WebApproveDraftInput = z.object({
   draftId: z.string().uuid(),
 });
 
@@ -755,7 +760,7 @@ export type ApproveDraftResult =
 export async function approveCardEventDraft(formData: FormData): Promise<ApproveDraftResult> {
   let input;
   try {
-    input = ApproveDraftInput.parse({ draftId: formData.get("draftId") });
+    input = WebApproveDraftInput.parse({ draftId: formData.get("draftId") });
   } catch {
     return { ok: false, error: "Form tidak valid" };
   }
@@ -763,74 +768,35 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  // Load the draft
-  const { data: draft, error: dErr } = await supabase
-    .from("data_drafts").select("*").eq("id", input.draftId).maybeSingle();
-  if (dErr || !draft) return { ok: false, error: "Draft tidak ditemukan" };
-  if (draft.status !== "draft") return { ok: false, error: `Draft sudah ${draft.status}` };
-  if (draft.draft_type !== "card_event") return { ok: false, error: "Draft bukan card_event" };
+  // Delegate DB logic + validation to @datum/core
+  const result = await coreApproveCardEventDraft(supabase, {
+    draftId: input.draftId,
+    approverId: user.id,
+  });
+  if (!result.ok) return result;
 
-  const proposed = draft.proposed_payload as {
-    kind: string;
-    payload: Record<string, unknown>;
-    card_id: string;
-    occurred_at: string;
-  };
-
-  // Re-validate the payload defensively
-  const schema = EventPayloadSchemas[proposed.kind as keyof typeof EventPayloadSchemas];
-  if (!schema) return { ok: false, error: `Kind tidak valid: ${proposed.kind}` };
-  const recheck = schema.safeParse(proposed.payload);
-  if (!recheck.success) return { ok: false, error: "Payload tidak lolos validasi ulang" };
-
-  // Insert the card_event
-  const { data: ev, error: evErr } = await supabase.from("card_events").insert({
-    card_id:            proposed.card_id,
-    project_id:         draft.project_id,
-    event_kind:         proposed.kind as Database["public"]["Enums"]["card_event_kind"],
-    payload:            proposed.payload as unknown as Database["public"]["Tables"]["card_events"]["Insert"]["payload"],
-    occurred_at:        proposed.occurred_at,
-    logged_by_staff_id: draft.created_by_staff_id,
-    source_kind:        "chat",
-    cost_visible:       COST_VISIBLE_KINDS.has(proposed.kind as EventKind),
-    draft_id:           draft.id,
-  }).select("id").single();
-  if (evErr) return { ok: false, error: evErr.message };
-
-  // Mark the draft approved + record promotion
-  await supabase.from("data_drafts").update({
-    status:               "approved",
-    approved_by_staff_id: user.id,
-    approved_at:          new Date().toISOString(),
-    promoted_record_type: "card_events",
-    promoted_record_id:   ev.id,
-  }).eq("id", draft.id);
-
-  const { data: cardRow } = await supabase
-    .from("cards").select("slug").eq("id", proposed.card_id).maybeSingle();
-  const { data: projRow } = await supabase
-    .from("projects").select("project_code").eq("id", draft.project_id).maybeSingle();
-  if (projRow && GATE_RELEVANT_KINDS.has(proposed.kind as EventKind)) {
-    void recomputeProjectGates(draft.project_id, projRow.project_code).catch(console.warn);
+  // Web-only side effects using metadata returned by core
+  if (result.gateRelevant && result.projectCode) {
+    void recomputeProjectGates(result.projectId, result.projectCode).catch(console.warn);
   }
-  if (cardRow && projRow && draft.created_by_staff_id) {
+  if (result.cardSlug && result.projectCode && result.draftAuthorId) {
     await notifyDraftApproved(supabase, {
-      draftId: draft.id,
-      draftAuthorId: draft.created_by_staff_id,
+      draftId: input.draftId,
+      draftAuthorId: result.draftAuthorId,
       approverActorId: user.id,
-      projectId: draft.project_id,
-      projectCode: projRow.project_code,
-      cardId: proposed.card_id,
-      cardSlug: cardRow.slug,
-      eventKind: proposed.kind,
+      projectId: result.projectId,
+      projectCode: result.projectCode,
+      cardId: "", // not needed by notifyDraftApproved — it only needs slug
+      cardSlug: result.cardSlug,
+      eventKind: result.eventKind,
     });
   }
 
   revalidatePath("/review");
-  return { ok: true, eventId: ev.id };
+  return { ok: true, eventId: result.eventId };
 }
 
-const RejectDraftInput = z.object({
+const WebRejectDraftInput = z.object({
   draftId: z.string().uuid(),
   reason:  z.string().max(500).optional(),
 });
@@ -838,7 +804,7 @@ const RejectDraftInput = z.object({
 export async function rejectCardEventDraft(formData: FormData): Promise<MemberResult> {
   let input;
   try {
-    input = RejectDraftInput.parse({
+    input = WebRejectDraftInput.parse({
       draftId: formData.get("draftId"),
       reason:  formData.get("reason") || undefined,
     });
@@ -849,25 +815,23 @@ export async function rejectCardEventDraft(formData: FormData): Promise<MemberRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  const { error } = await supabase.from("data_drafts").update({
-    status:               "rejected",
-    rejected_by_staff_id: user.id,
-    rejected_at:          new Date().toISOString(),
-    rejection_reason:     input.reason ?? null,
-  }).eq("id", input.draftId).eq("status", "draft");
-  if (error) return { ok: false, error: error.message };
+  // Delegate DB logic to @datum/core
+  const result = await coreRejectCardEventDraft(supabase, {
+    draftId: input.draftId,
+    rejectorId: user.id,
+    reason: input.reason,
+  });
+  if (!result.ok) return result;
 
-  const { data: draft } = await supabase
-    .from("data_drafts").select("project_id, created_by_staff_id, proposed_payload").eq("id", input.draftId).maybeSingle();
-  if (draft && draft.created_by_staff_id) {
-    const kind = (draft.proposed_payload as { kind?: string })?.kind ?? "card_event";
+  // Web-only side effect: notify draft author
+  if (result.draftAuthorId) {
     await notifyDraftRejected(supabase, {
       draftId: input.draftId,
-      draftAuthorId: draft.created_by_staff_id,
+      draftAuthorId: result.draftAuthorId,
       rejectorActorId: user.id,
-      projectId: draft.project_id ?? "",
+      projectId: result.projectId,
       reason: input.reason ?? null,
-      eventKind: kind,
+      eventKind: result.eventKind,
     });
   }
 
