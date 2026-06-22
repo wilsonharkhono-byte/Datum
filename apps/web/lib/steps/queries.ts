@@ -43,7 +43,7 @@ export async function getAreaSteps(
   return (data ?? [])
     .map((r) => {
       const tmpl = r.trade_steps as { sort_order: number; step_type: string } | null;
-      const cps = (r.area_step_checkpoints as AreaStepCheckpoint[] & { sort_order: number }[] | null) ?? [];
+      const cps = (r.area_step_checkpoints as Array<AreaStepCheckpoint & { sort_order: number }> | null) ?? [];
       return {
         _sort: tmpl?.sort_order ?? 0,
         id: r.id,
@@ -69,9 +69,14 @@ export async function getAreaStepView(
   areaId: string,
 ): Promise<{ steps: AreaStepRow[]; flags: AreaFlags }> {
   const steps = await getAreaSteps(supabase, areaId);
-  const { data: deps } = await supabase
+  // Deps are fetched unscoped: trade_step_deps has no gate column (PK is
+  // (step_code, predecessor_code)), so there is nothing to filter on here.
+  // computeAreaFlags intersects deps against this area's own step_codes, so
+  // foreign deps are harmlessly ignored.
+  const { data: deps, error } = await supabase
     .from("trade_step_deps")
     .select("step_code, predecessor_code");
+  if (error) throw error;
   const flags = computeAreaFlags(
     steps.map((s) => ({ step_code: s.step_code, step_type: s.step_type, status: s.status })),
     (deps ?? []) as TradeStepDep[],
