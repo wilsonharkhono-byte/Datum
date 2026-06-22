@@ -61,4 +61,29 @@ describe("projectStepStatus", () => {
     }));
     expect(r.status).toBe("accepted");
   });
+
+  it("captures actual_start at the earliest in_progress event", () => {
+    const r = projectStepStatus(input({ workEvents: [
+      ev("in_progress", "2026-07-02T00:00:00Z"),
+      ev("in_progress", "2026-07-05T00:00:00Z"),
+    ] }));
+    expect(r.actualStart).toBe("2026-07-02T00:00:00Z");
+    expect(r.actualEnd).toBe(null);
+  });
+
+  it("captures actual_end when the step resolves to accepted/done_with_defects", () => {
+    const r = projectStepStatus(input({
+      workEvents: [ev("in_progress", "2026-07-02T00:00:00Z"), ev("done", "2026-07-08T00:00:00Z")],
+      checkpoints: [{ required: true, result: "pass" }],
+    }));
+    expect(r.status).toBe("accepted");
+    expect(r.actualStart).toBe("2026-07-02T00:00:00Z");
+    expect(r.actualEnd).toBe("2026-07-08T00:00:00Z");
+  });
+
+  it("has null actuals when never started", () => {
+    const r = projectStepStatus(input());
+    expect(r.actualStart).toBe(null);
+    expect(r.actualEnd).toBe(null);
+  });
 });
