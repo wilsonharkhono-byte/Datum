@@ -11,6 +11,9 @@ import {
   getBriefData,
   getAdvisorData,
   listPendingCardEventDrafts,
+  getRecentNotifications,
+  getUnreadCount,
+  getRecentActivity,
   keys,
 } from "@datum/core";
 import type { GetAdvisorOpts } from "@datum/core";
@@ -114,5 +117,35 @@ export function useReviewDrafts() {
   return useQuery({
     queryKey: keys.reviewDrafts(),
     queryFn: () => listPendingCardEventDrafts(supabase),
+  });
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+/** 50 most recent notifications for the current staff member. */
+export function useNotifications(staffId: string | undefined) {
+  return useQuery({
+    queryKey: staffId ? keys.notifications(staffId) : ["notifications", "none"],
+    enabled: !!staffId,
+    queryFn: () => getRecentNotifications(supabase),
+  });
+}
+
+/** Live unread notification count for the current staff member. */
+export function useUnreadCount(staffId: string | undefined) {
+  return useQuery({
+    queryKey: staffId ? keys.unreadCount(staffId) : ["notifications", "none", "unread"],
+    enabled: !!staffId,
+    queryFn: () => getUnreadCount(supabase),
+    staleTime: 30_000,
+  });
+}
+
+/** Recent cross-project activity feed (card events, comments, new cards). */
+export function useActivity() {
+  return useQuery({
+    queryKey: keys.activity(),
+    queryFn: () => getRecentActivity(supabase),
+    staleTime: 60_000,
   });
 }

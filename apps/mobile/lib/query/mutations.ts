@@ -24,6 +24,9 @@ import {
   rejectCardEventDraft,
   notifyDraftApproved,
   notifyDraftRejected,
+  // Notifications
+  markNotificationRead,
+  markAllNotificationsRead,
 } from "@datum/core";
 import { supabase } from "@/lib/supabase/client";
 import { useSession } from "@/lib/session/session";
@@ -302,5 +305,39 @@ export function useRemoveMember(cardId: string) {
       return res;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["card-members", cardId] }),
+  });
+}
+
+// ─── Notifications: mark read ─────────────────────────────────────────────────
+
+/** Mark a single notification as read. Invalidates notifications + unread-count. */
+export function useMarkRead(staffId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (notificationId: string) => {
+      const res = await markNotificationRead(supabase, notificationId);
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.notifications(staffId) });
+      void qc.invalidateQueries({ queryKey: keys.unreadCount(staffId) });
+    },
+  });
+}
+
+/** Mark all unread notifications as read. Invalidates notifications + unread-count. */
+export function useMarkAllRead(staffId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await markAllNotificationsRead(supabase);
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.notifications(staffId) });
+      void qc.invalidateQueries({ queryKey: keys.unreadCount(staffId) });
+    },
   });
 }
