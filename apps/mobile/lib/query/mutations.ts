@@ -398,3 +398,117 @@ export function useSetAreaTarget(projectId: string) {
     },
   });
 }
+
+// ─── Areas: CRUD + reorder + AI apply ────────────────────────────────────────
+
+import {
+  createArea,
+  updateArea,
+  deleteArea,
+  reorderAreas,
+  applyAreaProposal,
+  type CreateAreaInputType,
+  type UpdateAreaInputType,
+  type DeleteAreaInputType,
+  type ReorderAreasInputType,
+  type ApplyAreaProposalInputType,
+} from "@datum/core";
+
+/**
+ * Create a new area. Invalidates areas + rooms + matrix on settle.
+ */
+export function useCreateArea(projectId: string, slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Omit<CreateAreaInputType, "projectId">) => {
+      const res = await createArea(supabase, { ...input, projectId });
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.areas(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.rooms(slug) });
+      void qc.invalidateQueries({ queryKey: keys.matrix(projectId) });
+    },
+  });
+}
+
+/**
+ * Update an existing area. Invalidates areas + rooms + matrix on settle.
+ */
+export function useUpdateArea(projectId: string, slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateAreaInputType) => {
+      const res = await updateArea(supabase, input);
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.areas(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.rooms(slug) });
+      void qc.invalidateQueries({ queryKey: keys.matrix(projectId) });
+    },
+  });
+}
+
+/**
+ * Delete an area. RLS is the backstop — no canManage guard in core.
+ * Invalidates areas + rooms + matrix on settle.
+ */
+export function useDeleteArea(projectId: string, slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: DeleteAreaInputType) => {
+      const res = await deleteArea(supabase, input);
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.areas(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.rooms(slug) });
+      void qc.invalidateQueries({ queryKey: keys.matrix(projectId) });
+    },
+  });
+}
+
+/**
+ * Atomically reorder areas. Calls the reorder_project_areas RPC.
+ * Invalidates areas + rooms + matrix on settle.
+ */
+export function useReorderAreas(projectId: string, slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ReorderAreasInputType) => {
+      const res = await reorderAreas(supabase, input);
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.areas(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.rooms(slug) });
+      void qc.invalidateQueries({ queryKey: keys.matrix(projectId) });
+    },
+  });
+}
+
+/**
+ * Apply an AI area proposal the user has reviewed.
+ * Invalidates areas + rooms + matrix + areaProposal on settle.
+ */
+export function useApplyAreaProposal(projectId: string, slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ApplyAreaProposalInputType) => {
+      const res = await applyAreaProposal(supabase, input);
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.areas(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.rooms(slug) });
+      void qc.invalidateQueries({ queryKey: keys.matrix(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.areaProposal(projectId) });
+    },
+  });
+}

@@ -17,6 +17,8 @@ import {
   fetchMatrix,
   getProjectScheduleCells,
   getGateCheckpoints,
+  getProjectRooms,
+  getProjectAreas,
   keys,
 } from "@datum/core";
 import type { GetAdvisorOpts } from "@datum/core";
@@ -197,5 +199,31 @@ export function useGateCheckpoints(gateCode: string | undefined) {
     enabled: !!gateCode,
     queryFn: () => getGateCheckpoints(supabase, gateCode!),
     staleTime: Infinity,
+  });
+}
+
+// ─── Rooms + Areas ────────────────────────────────────────────────────────────
+
+/**
+ * ProjectRooms (sorted Room[]) for a project identified by its slug (project_code).
+ * Sorted by urgency via sortRoomsByUrgency in core — blockers first, then stage progress.
+ */
+export function useRooms(slug: string) {
+  return useQuery({
+    queryKey: keys.rooms(slug),
+    queryFn: () => getProjectRooms(supabase, slug),
+    enabled: !!slug,
+  });
+}
+
+/**
+ * Area[] for a project, ordered by sort_order asc, area_code asc.
+ * Disabled until projectId is known.
+ */
+export function useAreas(projectId: string | undefined) {
+  return useQuery({
+    queryKey: projectId ? keys.areas(projectId) : ["areas", "none"],
+    enabled: !!projectId,
+    queryFn: () => getProjectAreas(supabase, projectId!),
   });
 }
