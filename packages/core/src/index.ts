@@ -243,3 +243,26 @@ export {
   type RejectDraftInputType,
   type RejectDraftResult,
 } from "./drafts/reject";
+
+// ─── Notification queries + mutations ─────────────────────────────────────────
+export {
+  getRecentNotifications,
+  getUnreadCount,
+  type Notification,
+} from "./notifications/queries";
+
+export {
+  MarkReadInput,
+  type MarkReadInput as MarkReadInputType,
+  type NotificationResult,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "./notifications/mutations";
+
+// ─── Activity feed ────────────────────────────────────────────────────────────
+export {
+  getRecentActivity,
+  summarizeEvent,
+  type ActivityItem,
+  type ActivityKind,
+} from "./activity/queries";
