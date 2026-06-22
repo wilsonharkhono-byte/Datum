@@ -6,22 +6,26 @@
  *     getProjectBySlug, addProjectMember, removeProjectMember); keep
  *     pure helpers real via requireActual (canManageAccess, etc.)
  *   - @/lib/supabase/client: stub (core fns mocked; no real DB calls)
- *   - @/lib/env: stub
+ *   - @/lib/env: stub — WEB_BASE_URL set to "https://web.datum.test" by default
  *   - @/lib/session/session: injectable via mockSession
  *   - expo-router: stub useLocalSearchParams({ slug: "ARIN-1" }), useRouter
  *   - react-native-safe-area-context: SafeAreaView → View
  *   - @tanstack/react-query: real impl; onlineManager stub
  *   - Alert.alert: jest.spyOn to simulate confirm/cancel
+ *   - global.fetch: jest.fn() for /api/staff/create calls
  *
  * Covers:
  *   1. Members render (name, role, since date)
  *   2. Remove button triggers Alert.alert; confirm calls removeProjectMember
  *   3. Add member calls addProjectMember with correct staffId + role
- *   4. Staff-create stub shows the "belum di mobile" notice (no network)
- *   5. Non-manager (designer role): no remove button, no add section
- *   6. Empty state when no active members
- *   7. Error state when getProjectMembers rejects
- *   8. Loading skeleton while query is pending
+ *   4. Staff-create form renders when WEB_BASE_URL is set (principal)
+ *   5. Staff-create form: submitting POSTs to /api/staff/create and shows temp password
+ *   6. Staff-create form: 403 response shows readable Bahasa error
+ *   7. Staff-create form: WEB_BASE_URL unset shows graceful "tersedia di web" notice
+ *   8. Non-manager (designer role): no remove button, no add section
+ *   9. Empty state when no active members
+ *   10. Error state when getProjectMembers rejects
+ *   11. Loading skeleton while query is pending
  */
 
 import React from "react";
@@ -72,9 +76,15 @@ jest.mock("@/lib/supabase/client", () => ({
   },
 }));
 
+// Default: WEB_BASE_URL is set so the staff-create form renders
+let mockWebBaseUrl: string | undefined = "https://web.datum.test";
+
 jest.mock("@/lib/env", () => ({
   SUPABASE_URL: "https://test.supabase.co",
   SUPABASE_ANON_KEY: "anon-key",
+  get WEB_BASE_URL() {
+    return mockWebBaseUrl;
+  },
 }));
 
 let mockSessionStaff: import("@datum/core").CurrentStaff | null = {
@@ -183,8 +193,20 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// fetch mock
+// ─────────────────────────────────────────────────────────────────────────────
+
+const mockFetch = jest.fn();
+
+beforeAll(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).fetch = mockFetch;
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
+  mockWebBaseUrl = "https://web.datum.test";
   mockSessionStaff = {
     id: "staff-principal-001",
     full_name: "Budi Santoso",
@@ -194,6 +216,18 @@ beforeEach(() => {
   mockGetProjectBySlug.mockResolvedValue(PROJECT_SETTINGS);
   mockGetProjectMembers.mockResolvedValue([MEMBER_BUDI, MEMBER_DIAH, MEMBER_INACTIVE]);
   mockGetAvailableStaff.mockResolvedValue(AVAIL_STAFF);
+
+  // Default fetch: success
+  mockFetch.mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      ok: true,
+      staffId: "new-uuid",
+      email: "baru@datum.com",
+      tempPassword: "TempPass123!",
+    }),
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,26 +313,91 @@ describe("MembersScreen", () => {
     });
   });
 
-  it("4. staff-create stub shows the 'belum di mobile' notice when pressed", async () => {
-    const alertSpy = jest.spyOn(Alert, "alert");
-
+  it("4. staff-create form renders when WEB_BASE_URL is set", async () => {
     render(<MembersScreen />, { wrapper: Wrapper });
-    await waitFor(() => expect(screen.getByText(/Buat staf baru/)).toBeTruthy());
 
-    // Press the stub button
-    fireEvent.press(screen.getByText(/Buat staf baru/));
-
-    expect(alertSpy).toHaveBeenCalledWith(
-      "Buat Staf Baru",
-      expect.stringContaining("belum di mobile"),
-      expect.any(Array),
-    );
-    // No addProjectMember or removeProjectMember calls (no server path)
-    expect(mockAddProjectMember).not.toHaveBeenCalled();
-    expect(mockRemoveProjectMember).not.toHaveBeenCalled();
+    await waitFor(() => {
+      // The "Buat Staf Baru" section label appears
+      expect(screen.getByText("Buat Staf Baru")).toBeTruthy();
+      // The form should contain a "Buat Staf" submit button (not the old stub)
+      expect(screen.getByText("Buat Staf")).toBeTruthy();
+    });
   });
 
-  it("5. non-manager (designer role): no remove button, no add section", async () => {
+  it("5. submitting the staff-create form POSTs to /api/staff/create and shows temp password", async () => {
+    render(<MembersScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => expect(screen.getByText("Buat Staf")).toBeTruthy());
+
+    // Fill in the form
+    fireEvent.changeText(screen.getByLabelText("Nama Lengkap"), "Staf Baru");
+    fireEvent.changeText(screen.getByLabelText("Email"), "baru@datum.com");
+    fireEvent.changeText(screen.getByLabelText("Password Sementara"), "TempPass123!");
+
+    // Submit
+    await act(async () => {
+      fireEvent.press(screen.getByText("Buat Staf"));
+    });
+
+    await waitFor(() => {
+      // fetch was called with the right endpoint
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/staff/create"),
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            Authorization: "Bearer test-token",
+          }),
+        }),
+      );
+      // Temp password is shown
+      expect(screen.getByText("TempPass123!")).toBeTruthy();
+    });
+  });
+
+  it("6. staff-create form: 403 response shows readable Bahasa error", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({
+        ok: false,
+        error: "Hanya principal yang bisa membuat akun principal atau admin.",
+      }),
+    });
+
+    render(<MembersScreen />, { wrapper: Wrapper });
+    await waitFor(() => expect(screen.getByText("Buat Staf")).toBeTruthy());
+
+    fireEvent.changeText(screen.getByLabelText("Nama Lengkap"), "Test Staf");
+    fireEvent.changeText(screen.getByLabelText("Email"), "test@datum.com");
+    fireEvent.changeText(screen.getByLabelText("Password Sementara"), "TestPass123!");
+
+    await act(async () => {
+      fireEvent.press(screen.getByText("Buat Staf"));
+    });
+
+    await waitFor(() => {
+      // The server's error message is relayed as-is; the 403 branch shows json.error
+      expect(
+        screen.getByText(/hanya principal|tidak memiliki akses/i),
+      ).toBeTruthy();
+    });
+  });
+
+  it("7. WEB_BASE_URL unset → shows 'tersedia di web' notice, not the form", async () => {
+    mockWebBaseUrl = undefined;
+
+    render(<MembersScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      // The graceful notice should appear instead of the form
+      expect(screen.getByText(/tersedia di web/i)).toBeTruthy();
+      // No "Buat Staf" submit button
+      expect(screen.queryByText("Buat Staf")).toBeNull();
+    });
+  });
+
+  it("8. non-manager (designer role): no remove button, no add section", async () => {
     // Override session to a non-manager
     mockSessionStaff = {
       id: "staff-diah-002",
@@ -318,7 +417,7 @@ describe("MembersScreen", () => {
     expect(screen.getByText(/Hanya principal dan admin/)).toBeTruthy();
   });
 
-  it("6. empty state when no active members", async () => {
+  it("9. empty state when no active members", async () => {
     mockGetProjectMembers.mockResolvedValue([MEMBER_INACTIVE]);
 
     render(<MembersScreen />, { wrapper: Wrapper });
@@ -327,14 +426,14 @@ describe("MembersScreen", () => {
     );
   });
 
-  it("7. error state when getProjectMembers rejects", async () => {
+  it("10. error state when getProjectMembers rejects", async () => {
     mockGetProjectMembers.mockRejectedValue(new Error("DB error"));
 
     render(<MembersScreen />, { wrapper: Wrapper });
     await waitFor(() => expect(screen.getByText("DB error")).toBeTruthy());
   });
 
-  it("8. loading skeleton while projectSettings query is pending", async () => {
+  it("11. loading skeleton while projectSettings query is pending", async () => {
     // Never resolves
     mockGetProjectBySlug.mockReturnValue(new Promise(() => {}));
 

@@ -37,6 +37,8 @@ import { ProjectMemberRow as MemberRowCard } from "@/components/members/MemberRo
 import { useProjectMembers, useAvailableStaff, useProjectSettings } from "@/lib/query/hooks";
 import { useAddProjectMember, useRemoveProjectMember } from "@/lib/query/mutations";
 import { useSession } from "@/lib/session/session";
+import { useQueryClient } from "@tanstack/react-query";
+import { StaffCreateForm } from "@/components/members/StaffCreateForm";
 
 // ─── Role options for the add-member picker ───────────────────────────────────
 
@@ -160,36 +162,7 @@ function AddMemberPicker({ projectId, activeStaffIds }: AddMemberPickerProps) {
   );
 }
 
-// ─── TODO(staff-create): needs /api/staff/create server route — roadmap locked decision.
-// The createStaffWithPassword function in @datum/core/projects/staff-create.ts
-// uses the service-role admin client (auth.admin.createUser). Per the foundation
-// spec §7, the service-role client is NEVER used on mobile. Until a thin
-// /api/staff/create server route (web API route) is built, staff creation on
-// mobile is blocked. This button shows a notice instead of a broken form.
-
-function StaffCreateStub() {
-  return (
-    <Pressable
-      onPress={() =>
-        Alert.alert(
-          "Buat Staf Baru",
-          // TODO(staff-create): needs /api/staff/create server route — roadmap locked decision
-          "Buat staf baru tersedia di web (belum di mobile). Silakan buka DATUM di browser untuk menambah staf baru.",
-          [{ text: "OK" }],
-        )
-      }
-      className="mt-2 rounded border border-dashed border-border/60 px-3 py-3"
-      accessibilityLabel="Buat staf baru (belum tersedia di mobile)"
-    >
-      <Text variant="secondary" className="text-center">
-        Buat staf baru ›
-      </Text>
-      <Text variant="muted" className="mt-0.5 text-center text-[11px]">
-        Tersedia di web · belum di mobile
-      </Text>
-    </Pressable>
-  );
-}
+// StaffCreateStub removed — replaced by StaffCreateForm (wired to /api/staff/create).
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
@@ -197,6 +170,7 @@ export default function MembersScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { staff: currentStaff } = useSession();
   const canManage = canManageAccess(currentStaff);
+  const queryClient = useQueryClient();
 
   const settingsQ = useProjectSettings(slug);
   const projectId = settingsQ.data?.id;
@@ -320,10 +294,16 @@ export default function MembersScreen() {
                 activeStaffIds={activeStaffIds}
               />
 
-              {/* Staff-create stub */}
+              {/* Staff-create form */}
               <View className="mt-4">
                 <Text variant="label" className="mb-2">Buat Staf Baru</Text>
-                <StaffCreateStub />
+                <StaffCreateForm
+                  onCreated={() => {
+                    // Invalidate the available-staff query so the add-member
+                    // picker shows the newly created staff.
+                    void queryClient.invalidateQueries({ queryKey: ["available-staff"] });
+                  }}
+                />
               </View>
             </View>
           ) : (
