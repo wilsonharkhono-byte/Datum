@@ -132,3 +132,33 @@ export async function updateAreaStep(
 
   await projectAreaStep(supabase, args.areaStepId);
 }
+
+export type SetCheckpointArgs = {
+  checkpointId: string;
+  result: "pending" | "pass" | "fail";
+  checkedByStaffId?: string;
+};
+
+export async function setCheckpointResult(
+  supabase: SupabaseClient<Database>,
+  args: SetCheckpointArgs,
+): Promise<void> {
+  const { data: cp, error } = await supabase
+    .from("area_step_checkpoints")
+    .select("area_step_id")
+    .eq("id", args.checkpointId)
+    .single();
+  if (error || !cp) throw error ?? new Error("checkpoint not found");
+
+  const { error: upErr } = await supabase
+    .from("area_step_checkpoints")
+    .update({
+      result: args.result,
+      checked_by: args.checkedByStaffId ?? null,
+      checked_at: new Date().toISOString(),
+    })
+    .eq("id", args.checkpointId);
+  if (upErr) throw upErr;
+
+  await projectAreaStep(supabase, cp.area_step_id);
+}
