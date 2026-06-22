@@ -32,7 +32,7 @@ export function computeAreaFlags(steps: FlagStep[], deps: TradeStepDep[]): AreaF
     steps.some((s) => notStarted.has(s.step_code) && predsOf.get(s.step_code)!.includes(code));
   const needsDecision = steps
     .filter((s) => (s.step_type === "decision" || s.step_type === "procurement"))
-    .filter((s) => !DONE.has(s.status) && s.status !== "not_started")
+    .filter((s) => !DONE.has(s.status))
     .filter((s) => gatesANotStarted(s.step_code))
     .map((s) => s.step_code);
 

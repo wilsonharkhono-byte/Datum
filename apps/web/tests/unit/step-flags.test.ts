@@ -32,6 +32,16 @@ describe("computeAreaFlags", () => {
       { step_code: "B3", step_type: "procurement", status: "not_started" },
       { step_code: "B6", step_type: "site_work", status: "not_started" },
     ];
+    // B1 (decision, in_progress) gates not_started B3; B3 (procurement, not_started)
+    // gates not_started B6 — both are open decision/procurement gates per the spec.
+    expect(computeAreaFlags(steps, deps).needsDecision).toEqual(["B1", "B3"]);
+  });
+
+  it("needsDecision surfaces a not_started decision/procurement that gates another not_started step", () => {
+    const steps: S[] = [
+      { step_code: "B1", step_type: "decision", status: "not_started" },
+      { step_code: "B3", step_type: "procurement", status: "not_started" },
+    ];
     expect(computeAreaFlags(steps, deps).needsDecision).toEqual(["B1"]);
   });
 
