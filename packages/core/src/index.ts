@@ -25,6 +25,47 @@ export {
 export { filterProjects, groupProjects, UNGROUPED_LABEL, type ProjectGroup } from "./projects/grouping";
 export { developmentTint, TINTS, type Tint } from "./projects/tint";
 
+// ─── Project members (reads) ─────────────────────────────────────────────────
+export {
+  getProjectMembers,
+  getAvailableStaff,
+  type ProjectMemberRow,
+} from "./projects/members";
+
+// ─── Project by slug (settings header) ───────────────────────────────────────
+export {
+  getProjectBySlug,
+  type ProjectSettingsRow,
+} from "./projects/by-slug";
+
+// ─── Project member mutations ─────────────────────────────────────────────────
+export {
+  AddProjectMemberInput,
+  type AddProjectMemberInputType,
+  RemoveProjectMemberInput,
+  type RemoveProjectMemberInputType,
+  type MemberMutationResult,
+  addProjectMember,
+  removeProjectMember,
+} from "./projects/member-write";
+
+// ─── Project update ───────────────────────────────────────────────────────────
+export {
+  PROJECT_STATUS,
+  UpdateProjectInput,
+  type UpdateProjectInputType,
+  type UpdateProjectResult,
+  updateProject,
+} from "./projects/update";
+
+// ─── Staff validation (schema only; createStaffWithPassword stays in web) ─────
+export {
+  STAFF_ROLES,
+  type StaffRoleValue,
+  CreateStaffInput,
+  type CreateStaffInputType,
+} from "./validation/staff";
+
 export { COLORS, FONT_FAMILY, TYPE, SPACE, RADIUS, TOUCH_TARGET } from "./tokens";
 
 export { getBoardForProject, mapBoardBundle, getProjectTopics, type Board, type BoardColumn, type BoardBundle } from "./cards/board";

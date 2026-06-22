@@ -1,36 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Staff } from "@datum/db";
-
-export type ProjectMemberRow = {
-  staff_id: string;
-  role_on_project: string;
-  active_from: string;
-  active_until: string | null;
-  staff: Pick<Staff, "id" | "full_name" | "role" | "email" | "active"> | null;
-};
-
-export async function getProjectMembers(
-  supabase: SupabaseClient<Database>,
-  projectId: string,
-): Promise<ProjectMemberRow[]> {
-  const { data, error } = await supabase
-    .from("project_staff")
-    .select(`staff_id, role_on_project, active_from, active_until,
-             staff:staff_id (id, full_name, role, email, active)`)
-    .eq("project_id", projectId)
-    .order("active_from", { ascending: true });
-  if (error) throw error;
-  return (data as unknown as ProjectMemberRow[]) ?? [];
-}
-
-export async function getAvailableStaff(
-  supabase: SupabaseClient<Database>,
-): Promise<Pick<Staff, "id" | "full_name" | "role" | "email">[]> {
-  const { data, error } = await supabase
-    .from("staff")
-    .select("id, full_name, role, email")
-    .eq("active", true)
-    .order("full_name");
-  if (error) throw error;
-  return (data ?? []) as Pick<Staff, "id" | "full_name" | "role" | "email">[];
-}
+/**
+ * Re-exports from @datum/core — moved as part of the members/settings strangler.
+ * The actual query logic now lives in packages/core/src/projects/members.ts.
+ */
+export { getProjectMembers, getAvailableStaff } from "@datum/core";
+export type { ProjectMemberRow } from "@datum/core";

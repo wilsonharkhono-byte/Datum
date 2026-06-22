@@ -24,10 +24,21 @@ describe("query keys", () => {
     expect(keys.areas("proj-uuid")).toEqual(["areas", "proj-uuid"]);
     expect(keys.areaProposal("proj-uuid")).toEqual(["areaProposal", "proj-uuid"]);
   });
+  it("builds member/settings tuples", () => {
+    expect(keys.projectMembers("proj-uuid")).toEqual(["project-members", "proj-uuid"]);
+    expect(keys.availableStaff()).toEqual(["available-staff"]);
+    expect(keys.projectSettings("ARIN-1")).toEqual(["project-settings", "ARIN-1"]);
+  });
   it("declares the persisted roots", () => {
     expect(PERSISTED_KEY_ROOTS).toEqual(["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints", "rooms", "areas"]);
   });
   it("areaProposal is NOT in PERSISTED_KEY_ROOTS", () => {
     expect((PERSISTED_KEY_ROOTS as readonly string[]).includes("areaProposal")).toBe(false);
+  });
+  it("projectMembers / availableStaff / projectSettings are NOT in PERSISTED_KEY_ROOTS", () => {
+    const roots = PERSISTED_KEY_ROOTS as readonly string[];
+    expect(roots.includes("project-members")).toBe(false);
+    expect(roots.includes("available-staff")).toBe(false);
+    expect(roots.includes("project-settings")).toBe(false);
   });
 });

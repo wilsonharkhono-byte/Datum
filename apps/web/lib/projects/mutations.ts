@@ -1,17 +1,19 @@
 "use server";
 
-import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentStaff, canManageAccess } from "@/lib/auth/require-role";
-import type { Database } from "@datum/db";
 import {
   CreateProjectInput,
   type CreateProjectResult,
   createProject as coreCreateProject,
+  UpdateProjectInput,
+  type UpdateProjectResult,
+  updateProject as coreUpdateProject,
 } from "@datum/core";
 
 export type { CreateProjectResult } from "@datum/core";
+export type { UpdateProjectResult } from "@datum/core";
 export { CreateProjectInput };
 
 export async function createProject(formData: FormData): Promise<CreateProjectResult> {
@@ -53,22 +55,6 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
   return result;
 }
 
-const PROJECT_STATUS = ["design", "construction", "finishing", "handover", "closed"] as const;
-
-const UpdateProjectInput = z.object({
-  projectId:       z.string().uuid(),
-  projectName:     z.string().min(1).max(120).optional(),
-  clientName:      z.string().max(120).nullable().optional(),
-  location:        z.string().max(200).nullable().optional(),
-  status:          z.enum(PROJECT_STATUS).optional(),
-  targetHandover:  z.string().nullable().optional(),
-  kickoffDate:     z.string().nullable().optional(),
-  coverImagePath:  z.string().nullable().optional(),
-  developmentName: z.string().max(120).nullable().optional(),
-});
-
-export type UpdateProjectResult = { ok: true } | { ok: false; error: string };
-
 export async function updateProject(formData: FormData): Promise<UpdateProjectResult> {
   let input;
   try {
@@ -94,52 +80,23 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
 
   const supabase = await createSupabaseServerClient();
 
-  const patch: Database["public"]["Tables"]["projects"]["Update"] = {};
-  if (input.projectName !== undefined)    patch.project_name = input.projectName;
-  if (input.clientName !== undefined)     patch.client_name = input.clientName;
-  if (input.location !== undefined)       patch.location = input.location;
-  if (input.status !== undefined)         patch.status = input.status;
-  if (input.targetHandover !== undefined) patch.target_handover = input.targetHandover;
-  if (input.kickoffDate !== undefined)    patch.kickoff_date = input.kickoffDate;
+  // Fetch the project_code for revalidation *before* the update
+  const { data: existing } = await supabase
+    .from("projects")
+    .select("project_code")
+    .eq("id", input.projectId)
+    .maybeSingle();
 
-  if (input.coverImagePath !== undefined) patch.cover_image_path = input.coverImagePath;
+  const result = await coreUpdateProject(supabase, input);
 
-  if (input.developmentName !== undefined) {
-    if (input.developmentName === null) {
-      patch.development_id = null;
-    } else {
-      const name = input.developmentName.trim();
-      const { data: found } = await supabase
-        .from("developments")
-        .select("id")
-        .ilike("name", name)
-        .maybeSingle();
-      if (found) {
-        patch.development_id = found.id;
-      } else {
-        const { data: created, error: cErr } = await supabase
-          .from("developments")
-          .insert({ name })
-          .select("id")
-          .single();
-        if (cErr) return { ok: false, error: cErr.message };
-        patch.development_id = created.id;
-      }
+  if (result.ok) {
+    revalidatePath("/");
+    if (existing?.project_code) {
+      revalidatePath(`/project/${existing.project_code}`);
+      revalidatePath(`/project/${existing.project_code}/settings`);
+      revalidatePath(`/project/${existing.project_code}/schedule`);
     }
   }
 
-  if (Object.keys(patch).length === 0) return { ok: true };
-
-  const { data: existing } = await supabase
-    .from("projects").select("project_code").eq("id", input.projectId).maybeSingle();
-  const { error } = await supabase.from("projects").update(patch).eq("id", input.projectId);
-  if (error) return { ok: false, error: error.message };
-
-  revalidatePath("/");
-  if (existing?.project_code) {
-    revalidatePath(`/project/${existing.project_code}`);
-    revalidatePath(`/project/${existing.project_code}/settings`);
-    revalidatePath(`/project/${existing.project_code}/schedule`);
-  }
-  return { ok: true };
+  return result;
 }
