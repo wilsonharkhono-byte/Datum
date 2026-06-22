@@ -164,3 +164,6 @@ export {
   notifyDraftRejected,
   notifyDraftPending,
 } from "./notifications/producers";
+
+// ─── Global search ────────────────────────────────────────────────────────────
+export { searchAll, type SearchHit, type SearchResults } from "./search/queries";
