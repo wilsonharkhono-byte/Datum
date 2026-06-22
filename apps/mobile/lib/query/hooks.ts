@@ -10,6 +10,7 @@ import {
   getCardAttachments,
   getBriefData,
   getAdvisorData,
+  listPendingCardEventDrafts,
   keys,
 } from "@datum/core";
 import type { GetAdvisorOpts } from "@datum/core";
@@ -103,5 +104,15 @@ export function useAdvisor(scope?: { projectId: string }) {
     queryFn: () => getAdvisorData(supabase, opts),
     // Re-fetch `now` on each call so the score reflects the real current time.
     staleTime: 60_000,
+  });
+}
+
+// ─── Review queue ─────────────────────────────────────────────────────────────
+
+/** All pending AI card-event drafts (status='draft', draft_type='card_event'). */
+export function useReviewDrafts() {
+  return useQuery({
+    queryKey: keys.reviewDrafts(),
+    queryFn: () => listPendingCardEventDrafts(supabase),
   });
 }

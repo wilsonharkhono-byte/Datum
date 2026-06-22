@@ -19,8 +19,14 @@ import {
   type CreateCardEventInputType,
   type ResolveEventInputType,
   type CardMemberRole,
+  // Review queue
+  approveCardEventDraft,
+  rejectCardEventDraft,
+  notifyDraftApproved,
+  notifyDraftRejected,
 } from "@datum/core";
 import { supabase } from "@/lib/supabase/client";
+import { useSession } from "@/lib/session/session";
 
 // ─── useAddCard ───────────────────────────────────────────────────────────────
 
@@ -174,6 +180,98 @@ export function useDeleteComment(cardId: string) {
       return res;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["card-comments", cardId] }),
+  });
+}
+
+// ─── Review queue: draft approve / reject ─────────────────────────────────────
+
+/**
+ * Approve a pending AI draft.
+ *
+ * On success, best-effort fires notifyDraftApproved (wrapped in try/catch —
+ * RLS may deny the approver inserting a notification for the author; that is
+ * an open question and must NOT fail the approval itself).
+ *
+ * NOTE: recomputeProjectGates is web-only; mobile relies on cron/realtime.
+ */
+export function useApproveDraft() {
+  const qc = useQueryClient();
+  const { staff } = useSession();
+  return useMutation({
+    mutationFn: async ({ draftId }: { draftId: string; cardSlug: string | null; projectCode: string | null; cardId: string | null; draftAuthorId: string | null; eventKind: string }) => {
+      const approverId = staff?.id;
+      if (!approverId) throw new Error("Tidak ada sesi — silakan masuk kembali");
+      const res = await approveCardEventDraft(supabase, { draftId, approverId });
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSuccess: async (res, vars) => {
+      if (!res.ok) return;
+      // Best-effort notify — RLS may prevent inserting for a different author
+      try {
+        if (res.draftAuthorId && res.cardSlug && res.projectCode) {
+          await notifyDraftApproved(supabase, {
+            draftId:         vars.draftId,
+            draftAuthorId:   res.draftAuthorId,
+            approverActorId: staff!.id,
+            projectId:       res.projectId,
+            projectCode:     res.projectCode,
+            cardId:          res.eventId,   // we use the new event's project+card as context
+            cardSlug:        res.cardSlug,
+            eventKind:       res.eventKind,
+          });
+        }
+      } catch {
+        // Swallow — RLS denial or network hiccup must not break the approve
+      }
+    },
+    onSettled: (_data, _err, vars) => {
+      void qc.invalidateQueries({ queryKey: keys.reviewDrafts() });
+      // Invalidate the affected card if we have the slug + code
+      if (vars.projectCode && vars.cardSlug) {
+        void qc.invalidateQueries({ queryKey: keys.card(vars.projectCode, vars.cardSlug) });
+      }
+    },
+  });
+}
+
+/**
+ * Reject a pending AI draft.
+ *
+ * On success, best-effort fires notifyDraftRejected (same try/catch rationale
+ * as approve — see above).
+ */
+export function useRejectDraft() {
+  const qc = useQueryClient();
+  const { staff } = useSession();
+  return useMutation({
+    mutationFn: async ({ draftId, reason }: { draftId: string; reason?: string }) => {
+      const rejectorId = staff?.id;
+      if (!rejectorId) throw new Error("Tidak ada sesi — silakan masuk kembali");
+      const res = await rejectCardEventDraft(supabase, { draftId, rejectorId, reason });
+      if (!res.ok) throw new Error(res.error);
+      return res;
+    },
+    onSuccess: async (res, vars) => {
+      if (!res.ok) return;
+      try {
+        if (res.draftAuthorId) {
+          await notifyDraftRejected(supabase, {
+            draftId:         vars.draftId,
+            draftAuthorId:   res.draftAuthorId,
+            rejectorActorId: staff!.id,
+            projectId:       res.projectId,
+            reason:          vars.reason ?? null,
+            eventKind:       res.eventKind,
+          });
+        }
+      } catch {
+        // Swallow — RLS denial or network hiccup must not break the reject
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.reviewDrafts() });
+    },
   });
 }
 
