@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCurrentStaff } from "@/lib/auth/require-role";
+import { createSupabaseClientForRequest } from "@/lib/supabase/from-request";
+import { getCurrentStaff } from "@datum/core";
 import { AnthropicNotConfiguredError } from "@/lib/assistant/anthropic";
 import {
   extractAreaProposal,
@@ -23,7 +23,9 @@ const MAX_CARDS = 200;
 
 export async function POST(req: Request) {
   // Auth: signed-in staff only.
-  const caller = await getCurrentStaff();
+  // createSupabaseClientForRequest handles both cookie (web) and Bearer (mobile).
+  const supabase = await createSupabaseClientForRequest(req);
+  const caller = await getCurrentStaff(supabase);
   if (!caller) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -34,8 +36,6 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
-
-  const supabase = await createSupabaseServerClient();
 
   // Membership gate: read the project under the session client. RLS only
   // returns the row if the caller is a member (or principal/admin/estimator).
