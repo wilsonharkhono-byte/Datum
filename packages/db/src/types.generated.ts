@@ -383,6 +383,64 @@ export type Database = {
           },
         ]
       }
+      area_step_events: {
+        Row: {
+          area_step_id: string
+          created_at: string
+          id: string
+          logged_by_staff_id: string | null
+          note: string | null
+          occurred_at: string
+          percent_complete: number | null
+          project_id: string
+          status: string
+        }
+        Insert: {
+          area_step_id: string
+          created_at?: string
+          id?: string
+          logged_by_staff_id?: string | null
+          note?: string | null
+          occurred_at?: string
+          percent_complete?: number | null
+          project_id: string
+          status: string
+        }
+        Update: {
+          area_step_id?: string
+          created_at?: string
+          id?: string
+          logged_by_staff_id?: string | null
+          note?: string | null
+          occurred_at?: string
+          percent_complete?: number | null
+          project_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "area_step_events_area_step_id_fkey"
+            columns: ["area_step_id"]
+            isOneToOne: false
+            referencedRelation: "area_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "area_step_events_logged_by_staff_id_fkey"
+            columns: ["logged_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "area_step_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       area_steps: {
         Row: {
           actual_end: string | null
