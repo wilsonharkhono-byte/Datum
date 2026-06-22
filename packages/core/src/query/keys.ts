@@ -8,6 +8,15 @@ export const keys = {
   notifications: (staffId: string) => ["notifications", staffId] as const,
   unreadCount: (staffId: string) => ["notifications", staffId, "unread"] as const,
   activity: () => ["activity"] as const,
+  // ─── Schedule / gates / matrix ────────────────────────────────────────────
+  /** Overlaid ScheduledCell[] for a project (includes per-area target overlay). */
+  schedule: (projectId: string) => ["schedule", projectId] as const,
+  /** Map areaId→targetDate for a project (which areas have a PM-set baseline). */
+  areaTargets: (projectId: string) => ["areaTargets", projectId] as const,
+  /** MatrixData (areas × gates × cells) for a project. */
+  matrix: (projectId: string) => ["matrix", projectId] as const,
+  /** Lampiran-A checkpoint templates for one gate (static reference, staleTime=Infinity). */
+  gateCheckpoints: (gateCode: string) => ["gateCheckpoints", gateCode] as const,
 };
 
-export const PERSISTED_KEY_ROOTS = ["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity"] as const;
+export const PERSISTED_KEY_ROOTS = ["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints"] as const;

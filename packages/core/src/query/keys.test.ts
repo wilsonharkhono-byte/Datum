@@ -13,7 +13,13 @@ describe("query keys", () => {
     expect(keys.unreadCount("staff-123")).toEqual(["notifications", "staff-123", "unread"]);
     expect(keys.activity()).toEqual(["activity"]);
   });
+  it("builds schedule/matrix/gates tuples", () => {
+    expect(keys.schedule("proj-uuid")).toEqual(["schedule", "proj-uuid"]);
+    expect(keys.areaTargets("proj-uuid")).toEqual(["areaTargets", "proj-uuid"]);
+    expect(keys.matrix("proj-uuid")).toEqual(["matrix", "proj-uuid"]);
+    expect(keys.gateCheckpoints("A")).toEqual(["gateCheckpoints", "A"]);
+  });
   it("declares the persisted roots", () => {
-    expect(PERSISTED_KEY_ROOTS).toEqual(["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity"]);
+    expect(PERSISTED_KEY_ROOTS).toEqual(["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints"]);
   });
 });

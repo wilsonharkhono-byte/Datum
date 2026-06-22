@@ -222,6 +222,71 @@ export {
 // ─── Gates: labels ────────────────────────────────────────────────────────────
 export { gateLabel, gateShortName, GATE_SHORT_NAME } from "./gates/labels";
 
+// ─── Gates: readiness rules (pure) ───────────────────────────────────────────
+export {
+  evaluateGate,
+  RULE_VERSION,
+  RELEVANT_KINDS,
+  type ReadinessState,
+  type GateInput,
+  type GateResult,
+} from "./gates/readiness-rules";
+
+// ─── Gates: schedule overlay (pure) ──────────────────────────────────────────
+export {
+  overlayAreaTargetDates,
+  shiftIsoDate,
+  type ScheduledCell,
+} from "./gates/schedule-overlay";
+
+// ─── Gates: schedule reads ────────────────────────────────────────────────────
+export {
+  getProjectScheduleCells,
+  getAreaTargetDates,
+  getCardNextDeadline,
+  type NextDeadline,
+} from "./gates/schedule";
+
+// ─── Gates: recompute (readiness, rule-engine) ────────────────────────────────
+export {
+  RecomputeInput,
+  recomputeProjectGates,
+  type RecomputeResult,
+} from "./gates/recompute";
+
+// ─── Gates: schedule RPC (compute_project_schedule) ──────────────────────────
+export {
+  recomputeProjectSchedule,
+  type ScheduleRecomputeResult,
+} from "./gates/schedule-rpc";
+
+// ─── Gates: advance (markGatePassed + getGateCheckpoints) ────────────────────
+export {
+  MarkGatePassedInput,
+  ADVANCEABLE,
+  markGatePassed,
+  getGateCheckpoints,
+  type MarkGatePassedInput as MarkGatePassedInputType,
+  type MarkGatePassedResult,
+  type GateCheckpoint,
+} from "./gates/advance";
+
+// ─── Gates: area target (setAreaTargetDate) ───────────────────────────────────
+export {
+  TargetInput,
+  setAreaTargetDate,
+  type TargetInput as TargetInputType,
+  type AreaTargetResult,
+} from "./gates/area-target";
+
+// ─── Matrix: fetch-matrix ─────────────────────────────────────────────────────
+export {
+  fetchMatrix,
+  type MatrixData,
+  type MatrixArea,
+  type MatrixCell,
+} from "./matrix/fetch-matrix";
+
 // ─── Draft reads + mutations ──────────────────────────────────────────────────
 export {
   listPendingCardEventDrafts,
