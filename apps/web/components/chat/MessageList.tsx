@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
+import { stripCitationTokens } from "@datum/core";
 import { InlineCardSnippet } from "./InlineCardSnippet";
 import { ProposalCard, type Proposal } from "./ProposalCard";
 
@@ -18,15 +19,7 @@ export type Message =
     }
   | { role: "assistant"; proposal: Proposal };
 
-/**
- * Citation tokens ([card:uuid] / [event:uuid]) are extracted server-side and
- * rendered as InlineCardSnippet below the bubble — hide the raw markers from
- * the visible text. Safe mid-stream: a partially-arrived token stays visible
- * only until its closing bracket streams in.
- */
-function stripCitationTokens(text: string): string {
-  return text.replace(/\s*\[(?:card|event):[0-9a-f-]{36}\]/gi, "");
-}
+// stripCitationTokens imported from @datum/core (see top of file)
 
 /** Subtle three-dot typing indicator. Static dots under prefers-reduced-motion. */
 function PendingDots() {

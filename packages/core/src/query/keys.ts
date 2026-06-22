@@ -34,3 +34,14 @@ export const keys = {
 };
 
 export const PERSISTED_KEY_ROOTS = ["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints", "rooms", "areas"] as const;
+
+// ─── Assistant query keys ─────────────────────────────────────────────────────
+
+export const assistantKeys = {
+  /** Snippet (card + recent events) for inline citation rendering. */
+  snippet: (cardId: string, eventIds: string[]) =>
+    ["assistant", "snippet", cardId, eventIds.join(",")] as const,
+  /** Assistant session id (persisted per project for thread continuity). */
+  session: (projectId: string) =>
+    ["assistant", "session", projectId] as const,
+};

@@ -12,16 +12,10 @@ import {
 } from "@/lib/assistant/anthropic";
 import { EVENT_KINDS, EventPayloadSchemas, type EventKind } from "@datum/types";
 import { isTemplateCardTitle, deriveCardLabel } from "@/lib/cards/template-card";
+import { CaptureRequest } from "@datum/core";
 
-const Body = z.object({
-  projectId: z.string().uuid(),
-  text:      z.string().min(1).max(4000),
-  file:      z.object({
-    name: z.string().min(1).max(255),
-    mime: z.string().min(1).max(120),
-    size: z.number().int().nonnegative().max(20_971_520), // 20MB
-  }).optional(),
-});
+// CaptureRequest from core is the canonical body schema (shared with mobile).
+const Body = CaptureRequest;
 
 const CAPTURE_SYSTEM = `Anda adalah asisten internal DATUM untuk WHAstudio.
 

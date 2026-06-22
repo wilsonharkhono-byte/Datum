@@ -1,6 +1,6 @@
 export type { DatumClient } from "./client";
 
-export { keys, PERSISTED_KEY_ROOTS } from "./query/keys";
+export { keys, PERSISTED_KEY_ROOTS, assistantKeys } from "./query/keys";
 export { createKVPersister, type AsyncKV } from "./query/persister";
 export { makeQueryClient, CACHE_BUSTER, CACHE_MAX_AGE } from "./query/client";
 export { subscribeToProjectChanges, type CardsChange } from "./realtime/project";
@@ -437,3 +437,52 @@ export {
   type ApplyAreaProposalResult,
   applyAreaProposal,
 } from "./areas/apply-proposal";
+
+// ─── Assistant: protocol (pure NDJSON parsers + citation helpers) ─────────────
+export {
+  parseStreamLine,
+  extractCitations,
+  stripCitationTokens,
+  type AssistantStreamEvent,
+  type Citation,
+} from "./assistant/protocol";
+
+// ─── Assistant: schemas (Zod, shared by web routes + mobile client) ───────────
+export {
+  ChatRequest,
+  type ChatRequest as ChatRequestType,
+  CaptureRequest,
+  type CaptureRequest as CaptureRequestType,
+  type Proposal,
+} from "./assistant/schemas";
+
+// ─── Assistant: offline queue (storage-agnostic) ──────────────────────────────
+export {
+  readQueue,
+  enqueue,
+  peek,
+  remove,
+  drain,
+  QUEUE_CAP,
+  TANYA_MAX_AGE_MS,
+  type QueuedItem,
+  type QueuedMode,
+  type QueueStorage,
+} from "./assistant/offline-queue";
+
+// ─── Assistant: snippet read (client-injected) ────────────────────────────────
+export {
+  getCardSnippet,
+  type CardSnippet,
+  type SnippetEvent,
+} from "./assistant/snippet";
+
+// ─── Cards: area-link (read + mutations, client-injected) ─────────────────────
+export {
+  AreaLinkInput,
+  type AreaLinkInputType,
+  type AreaLinkResult,
+  getCardAreas,
+  linkCardToArea,
+  unlinkCardFromArea,
+} from "./cards/area-link";

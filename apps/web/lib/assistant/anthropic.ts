@@ -1,5 +1,6 @@
 // apps/web/lib/assistant/anthropic.ts
 import Anthropic from "@anthropic-ai/sdk";
+export { extractCitations } from "@datum/core";
 
 export class AnthropicNotConfiguredError extends Error {
   constructor() {
@@ -98,16 +99,4 @@ export async function askAssistant(args: {
   };
 }
 
-export function extractCitations(answer: string): { cardId: string; eventIds: string[] }[] {
-  const map = new Map<string, Set<string>>();
-  const cardRe = /\[card:([0-9a-f-]{36})\]/gi;
-  const eventRe = /\[event:([0-9a-f-]{36})\]/gi;
-  for (const m of answer.matchAll(cardRe)) {
-    if (!map.has(m[1]!)) map.set(m[1]!, new Set());
-  }
-  for (const m of answer.matchAll(eventRe)) {
-    const card = [...map.keys()][map.size - 1]; // best-effort: attach to last mentioned card
-    if (card) map.get(card)!.add(m[1]!);
-  }
-  return [...map.entries()].map(([cardId, eventIds]) => ({ cardId, eventIds: [...eventIds] }));
-}
+// extractCitations is re-exported from @datum/core (see top of file)
