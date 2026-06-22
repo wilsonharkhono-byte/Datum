@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentStaff, type CurrentStaff } from "@datum/core";
 import { clearAsyncCache } from "@/lib/query/async-kv";
+import { registerForPushNotificationsAsync } from "@/lib/notifications/push";
 
 type Status = "loading" | "authenticated" | "unauthenticated";
 type SessionValue = { status: Status; staff: CurrentStaff | null; signOut: () => Promise<void> };
@@ -22,6 +23,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setStaff(null); setStatus("unauthenticated"); return;
     }
     setStaff(current); setStatus("authenticated");
+    // Fire-and-forget: register push token after auth is confirmed.
+    // Any failure is swallowed inside registerForPushNotificationsAsync.
+    registerForPushNotificationsAsync().catch(() => {});
   }
 
   useEffect(() => {

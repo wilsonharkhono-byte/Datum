@@ -486,3 +486,12 @@ export {
   linkCardToArea,
   unlinkCardFromArea,
 } from "./cards/area-link";
+
+// ─── Push tokens (client-injected, isomorphic) ────────────────────────────────
+export {
+  UpsertPushTokenInput,
+  type UpsertPushTokenInput as UpsertPushTokenInputType,
+  type PushPlatform,
+  type UpsertPushTokenResult,
+  upsertPushToken,
+} from "./notifications/push-tokens";
