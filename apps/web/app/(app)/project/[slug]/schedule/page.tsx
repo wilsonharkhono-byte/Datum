@@ -8,6 +8,8 @@ import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
+import { getAreaStepView } from "@/lib/steps/queries";
+import { AreaStepsPanel } from "@/components/schedule/AreaStepsPanel";
 
 export default async function ProjectSchedulePage({
   params,
@@ -34,6 +36,11 @@ export default async function ProjectSchedulePage({
   const matrix = await fetchMatrix(project.id);
   const scheduleCells = await getProjectScheduleCells(project.id);
   const areaTargets = await getAreaTargetDates(project.id);
+
+  const bathroomAreas = (matrix?.areas ?? []).filter((a) => a.area_type === "bathroom");
+  const stepViews = await Promise.all(
+    bathroomAreas.map(async (a) => ({ area: a, view: await getAreaStepView(supabase, a.id) })),
+  );
 
   // Count stale cells
   const { count: staleCount } = await supabase
@@ -134,6 +141,19 @@ export default async function ProjectSchedulePage({
                 </div>
               );
             })}
+          </div>
+        </section>
+      ) : null}
+
+      {stepViews.length > 0 ? (
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
+            Langkah pekerjaan — kamar mandi
+          </h2>
+          <div className="flex flex-col gap-2">
+            {stepViews.map(({ area, view }) => (
+              <AreaStepsPanel key={area.id} areaName={area.area_name} steps={view.steps} flags={view.flags} />
+            ))}
           </div>
         </section>
       ) : null}
