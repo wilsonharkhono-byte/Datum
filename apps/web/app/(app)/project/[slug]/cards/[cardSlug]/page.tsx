@@ -67,22 +67,24 @@ export default async function CardDetailPage({
         {/* Trello-style modal shell — warm-white surface, dark signature header,
             focused 2-column body on desktop, stacks to one column on mobile. */}
         <div className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_8px_24px_-12px_rgba(122,107,86,0.35)]">
-          {/* Modal-style header — brand's signature dark bar, like the homepage Projek Aktif row */}
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2.5 text-[var(--text-inverse)] md:px-6">
+          {/* Modal-style header — brand's signature dark bar, like the homepage Projek Aktif row.
+              On mobile the long "topic · Detail Kartu" label is hidden and the back link
+              truncates so the row can't overflow the viewport (which clipped Edit). */}
+          <div className="flex items-center justify-between gap-2 border-b border-[var(--foreground)] bg-[var(--foreground)] px-3 py-2 text-[var(--text-inverse)] sm:gap-3 sm:px-4 sm:py-2.5 md:px-6">
             <Link
               href={`/project/${slug}`}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
+              className="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
             >
-              ← {project.project_code}
+              <span className="truncate">← {project.project_code}</span>
             </Link>
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <Link
                 href={`/project/${slug}/cards/${cardSlug}/print`}
-                className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
+                className="text-xs font-semibold uppercase tracking-wide text-[var(--text-inverse-secondary)] hover:text-[var(--text-inverse)]"
               >
                 Cetak →
               </Link>
-              <span className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-inverse-secondary)]">
+              <span className="hidden text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-inverse-secondary)] sm:inline">
                 {topicName} · Detail Kartu
               </span>
             </div>
