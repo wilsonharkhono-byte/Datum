@@ -9,9 +9,10 @@
  *   - @/lib/supabase/client: stub (auth.getSession → { data: { session: { access_token } } }).
  *   - @/lib/env: WEB_BASE_URL set or unset per test group.
  *   - @/lib/session/session: stub useSession with authenticated staff.
+ *   - @/lib/query/hooks: mock useProjects per test.
  *   - expo-router: stub useRouter / push.
  *   - expo-crypto: stub randomUUID.
- *   - @react-native-async-storage/async-storage: jest mock.
+ *   - @react-native-async-storage/async-storage: jest mock (in-memory store).
  *   - @tanstack/react-query: real; stub onlineManager.
  *   - react-native-safe-area-context: stub SafeAreaView → View.
  *   - expo-image-picker: stub (not called in these tests).
@@ -22,6 +23,9 @@
  *   3. 401 response surfaces a readable Indonesian error
  *   4. WEB_BASE_URL unset shows notice and disables sending
  *   5. Offline: failed fetch enqueues the item
+ *   6. Project picker: renders chips; selecting enables chat; send carries real projectId
+ *   7. Empty-projects: shows notice; chat hidden
+ *   8. Remembered selection: AsyncStorage value is restored and pre-selects that chip
  */
 
 import React from "react";
@@ -40,6 +44,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // ---------------------------------------------------------------------------
 
 jest.mock("@react-native-async-storage/async-storage", () => {
+  // Store lives inside the factory so it is not subject to Jest's hoisting guard.
   const store = new Map<string, string>();
   return {
     __esModule: true,
@@ -48,6 +53,8 @@ jest.mock("@react-native-async-storage/async-storage", () => {
       setItem: jest.fn(async (k: string, v: string) => void store.set(k, v)),
       removeItem: jest.fn(async (k: string) => void store.delete(k)),
       clear: jest.fn(async () => void store.clear()),
+      // Expose the store for test setup (pre-seeding remembered selection)
+      __store: store,
     },
   };
 });
@@ -122,6 +129,17 @@ jest.mock("@/lib/session/session", () => ({
   }),
 }));
 
+// ── useProjects mock ──────────────────────────────────────────────────────────
+// Mutable so each test can configure its own return value.
+let mockProjectsResult: {
+  data: unknown[];
+  isLoading: boolean;
+} = { data: [], isLoading: false };
+
+jest.mock("@/lib/query/hooks", () => ({
+  useProjects: () => mockProjectsResult,
+}));
+
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -192,6 +210,40 @@ import AssistantTab, { AssistantChat } from "./assistant";
 
 const TEST_PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 
+// Sample projects list for picker tests
+const SAMPLE_PROJECTS = [
+  {
+    id: TEST_PROJECT_ID,
+    project_code: "ARIN-1",
+    project_name: "Arin Phase 1",
+    client_name: "PT Arin",
+    location: "Jakarta",
+    status: "active",
+    target_handover: null,
+    development_id: null,
+    development_name: null,
+    development_area_label: null,
+    development_sort_order: null,
+    cover_image_path: null,
+    cover_url: null,
+  },
+  {
+    id: "22222222-2222-2222-2222-222222222222",
+    project_code: "BENT-2",
+    project_name: "Bentara Phase 2",
+    client_name: "PT Bentara",
+    location: "Surabaya",
+    status: "active",
+    target_handover: null,
+    development_id: null,
+    development_name: null,
+    development_area_label: null,
+    development_sort_order: null,
+    cover_image_path: null,
+    cover_url: null,
+  },
+];
+
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
@@ -206,9 +258,17 @@ const g = globalThis as any;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const globalFetch = g.fetch as typeof fetch | undefined;
 
+// Helper to get the in-process AsyncStorage store for pre-seeding tests.
+function getAsyncStorageStore(): Map<string, string> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+  return (jest.requireMock("@react-native-async-storage/async-storage") as any).default.__store as Map<string, string>;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  getAsyncStorageStore().clear();
   mockWebBaseUrl = "https://web.test";
+  mockProjectsResult = { data: SAMPLE_PROJECTS, isLoading: false };
   mockGetSession.mockResolvedValue({
     data: { session: { access_token: "tok-abc" } },
   });
@@ -429,5 +489,121 @@ describe("AssistantTab", () => {
 
     // Restore
     onlineManager.isOnline = origIsOnline;
+  });
+
+  // ── 6. Project picker: renders chips; selecting enables chat; send carries real projectId ──
+
+  it("renders project chips in the picker and enables chat after selecting a project", async () => {
+    mockParseStreamLine.mockImplementation((line: string) => {
+      if (!line.trim()) return null;
+      try { return JSON.parse(line) as object; } catch { return null; }
+    });
+    mockExtractCitations.mockReturnValue([]);
+
+    const ndjson = [
+      JSON.stringify({ type: "delta", text: "Info proyek." }),
+      JSON.stringify({ type: "done", sessionId: "s1", citations: [], usage: { input_tokens: 1, output_tokens: 1 } }),
+    ];
+    g.fetch = jest.fn().mockResolvedValue(mockFetchNdjson(ndjson));
+
+    wrap(<AssistantTab />);
+
+    // Both project chips should be visible
+    await waitFor(() => {
+      expect(screen.getByTestId("project-chip-ARIN-1")).toBeTruthy();
+      expect(screen.getByTestId("project-chip-BENT-2")).toBeTruthy();
+    });
+
+    // Since AsyncStorage is empty, the first project is auto-selected; the chat is shown.
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Tanya tentang proyek…")).toBeTruthy();
+    });
+
+    // Select the second project
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("project-chip-BENT-2"));
+    });
+
+    // Chat is still visible after switching project
+    expect(screen.getByPlaceholderText("Tanya tentang proyek…")).toBeTruthy();
+
+    // Send a message — the fetch body should carry the second project's id
+    const input = screen.getByPlaceholderText("Tanya tentang proyek…");
+    await act(async () => {
+      fireEvent.changeText(input, "Status proyek?");
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("send-button"));
+    });
+
+    await waitFor(() => {
+      expect(g.fetch).toHaveBeenCalledWith(
+        "https://web.test/api/assistant/message",
+        expect.objectContaining({
+          body: expect.stringContaining("22222222-2222-2222-2222-222222222222"),
+        }),
+      );
+    });
+  });
+
+  // ── 7. Empty projects: shows notice; chat hidden ──────────────────────────
+
+  it("shows no-project notice and hides chat when there are no projects", async () => {
+    mockProjectsResult = { data: [], isLoading: false };
+
+    wrap(<AssistantTab />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("no-project-notice")).toBeTruthy();
+      // "Pilih proyek dulu" is the heading inside no-project-notice
+      expect(screen.getByText(/Pilih proyek dulu/i)).toBeTruthy();
+    });
+
+    // Chat input should NOT render when there is no project selected
+    expect(screen.queryByPlaceholderText("Tanya tentang proyek…")).toBeNull();
+  });
+
+  // ── 8. Remembered selection: AsyncStorage value is restored ──────────────
+
+  it("restores the previously-selected project from AsyncStorage", async () => {
+    // Pre-seed AsyncStorage with the second project's id
+    getAsyncStorageStore().set("datum.assistant.projectId", "22222222-2222-2222-2222-222222222222");
+
+    mockParseStreamLine.mockImplementation((line: string) => {
+      if (!line.trim()) return null;
+      try { return JSON.parse(line) as object; } catch { return null; }
+    });
+    mockExtractCitations.mockReturnValue([]);
+
+    const ndjson = [
+      JSON.stringify({ type: "delta", text: "Ok." }),
+      JSON.stringify({ type: "done", sessionId: "s2", citations: [], usage: { input_tokens: 1, output_tokens: 1 } }),
+    ];
+    g.fetch = jest.fn().mockResolvedValue(mockFetchNdjson(ndjson));
+
+    wrap(<AssistantTab />);
+
+    // Chat should be shown with the restored project (BENT-2 = second project)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Tanya tentang proyek…")).toBeTruthy();
+    });
+
+    // Send and verify the restored project id is used
+    const input = screen.getByPlaceholderText("Tanya tentang proyek…");
+    await act(async () => {
+      fireEvent.changeText(input, "Cek status");
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("send-button"));
+    });
+
+    await waitFor(() => {
+      expect(g.fetch).toHaveBeenCalledWith(
+        "https://web.test/api/assistant/message",
+        expect.objectContaining({
+          body: expect.stringContaining("22222222-2222-2222-2222-222222222222"),
+        }),
+      );
+    });
   });
 });

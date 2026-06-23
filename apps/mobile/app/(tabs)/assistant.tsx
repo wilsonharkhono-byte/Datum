@@ -39,11 +39,13 @@ import {
 import type { Citation, Proposal } from "@datum/core";
 import { supabase } from "@/lib/supabase/client";
 import { useSession } from "@/lib/session/session";
+import { useProjects } from "@/lib/query/hooks";
 import { WEB_BASE_URL } from "@/lib/env";
 import { Text } from "@/components/ui/Text";
 import { Screen } from "@/components/ui/Screen";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
+import { ProjectSwitcher, useProjectSelection } from "@/components/chat/ProjectSwitcher";
 import type { ChatMessage } from "@/components/chat/MessageList";
 import type { AttachedFile } from "@/components/chat/MessageInput";
 
@@ -565,19 +567,36 @@ export function AssistantChat({ projectId }: { projectId: string }) {
   );
 }
 
+// ─── NoProjectNotice ──────────────────────────────────────────────────────────
+
+function NoProjectNotice() {
+  return (
+    <View className="flex-1 items-center justify-center px-6" testID="no-project-notice">
+      <Text variant="heading" className="mb-2 text-center">
+        Pilih proyek dulu
+      </Text>
+      <Text variant="muted" className="text-center leading-5">
+        Belum ada proyek yang dipilih. Pilih proyek di atas untuk memulai.
+      </Text>
+    </View>
+  );
+}
+
 // ─── AssistantTab (root export) ───────────────────────────────────────────────
 
 /**
  * The assistant tab root.
  *
  * - Shows a notice when WEB_BASE_URL is not configured (AI is optional).
- * - Passes PLACEHOLDER_PROJECT_ID to AssistantChat; in the full design this
- *   comes from route params / a project-picker sheet (deferred).
+ * - Loads projects via useProjects() and shows a horizontal chip picker.
+ * - Persists the selected project id in AsyncStorage (datum.assistant.projectId).
+ * - Passes the resolved project id into AssistantChat; chat is disabled until
+ *   a project is selected.
  */
-const PLACEHOLDER_PROJECT_ID = "";
-
 export default function AssistantTab() {
   const { status } = useSession();
+  const { data: projects = [], isLoading: projectsLoading } = useProjects();
+  const { selectedId, isRestoring, select } = useProjectSelection(projects);
 
   if (!WEB_BASE_URL) {
     return (
@@ -609,9 +628,32 @@ export default function AssistantTab() {
     );
   }
 
+  // Resolved project id — null while restoring AsyncStorage or projects loading.
+  const resolvedProjectId =
+    !isRestoring && !projectsLoading && selectedId ? selectedId : null;
+
   return (
     <Screen className="px-0">
-      <AssistantChat projectId={PLACEHOLDER_PROJECT_ID} />
+      {/* Project picker bar */}
+      <View className="border-b border-border/30">
+        <ProjectSwitcher
+          projects={projects}
+          isLoading={projectsLoading || isRestoring}
+          selectedId={selectedId}
+          onSelect={select}
+        />
+      </View>
+
+      {resolvedProjectId ? (
+        <AssistantChat projectId={resolvedProjectId} />
+      ) : projectsLoading || isRestoring ? (
+        // Still loading — AssistantChat not mounted yet
+        <View className="flex-1 items-center justify-center">
+          <Text variant="muted">Memuat…</Text>
+        </View>
+      ) : (
+        <NoProjectNotice />
+      )}
     </Screen>
   );
 }
