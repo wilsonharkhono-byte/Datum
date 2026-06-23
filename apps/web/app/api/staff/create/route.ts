@@ -25,6 +25,7 @@ import { createSupabaseClientForRequest } from "@/lib/supabase/from-request";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentStaff, canManageAccess } from "@datum/core";
 import { CreateStaffInput } from "@datum/core";
+import { createStaffWithPasswordCore } from "@/lib/projects/staff-mutations";
 
 export async function POST(req: Request) {
   // ── 1. Authenticate ────────────────────────────────────────────────────────
@@ -86,74 +87,21 @@ export async function POST(req: Request) {
 
   // ── 5. Create auth user + staff row (service-role; never touches client) ───
   const admin = createSupabaseAdminClient();
+  const result = await createStaffWithPasswordCore(admin, input);
 
-  const { data: authData, error: authErr } = await admin.auth.admin.createUser({
-    email: input.email,
-    password: input.password,
-    email_confirm: true,
-    user_metadata: { full_name: input.fullName },
-  });
-
-  if (authErr || !authData.user) {
-    if (authErr?.message?.toLowerCase().includes("already")) {
-      return NextResponse.json(
-        { ok: false, error: "Email ini sudah terdaftar di Supabase Auth." },
-        { status: 409 },
-      );
+  if (!result.ok) {
+    // Map structured errors to appropriate HTTP status codes
+    if (result.error.includes("sudah terdaftar")) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: 409 });
     }
-    return NextResponse.json(
-      { ok: false, error: authErr?.message ?? "Gagal membuat akun auth." },
-      { status: 500 },
-    );
-  }
-
-  const newUserId = authData.user.id;
-
-  // Insert staff row
-  const { error: staffErr } = await admin.from("staff").insert({
-    id: newUserId,
-    full_name: input.fullName,
-    role: input.role,
-    email: input.email,
-    cost_visible: input.costVisible ?? false,
-    active: true,
-  });
-
-  if (staffErr) {
-    // Roll back auth user to avoid orphan
-    await admin.auth.admin.deleteUser(newUserId);
-    return NextResponse.json(
-      { ok: false, error: `Gagal membuat staf: ${staffErr.message}` },
-      { status: 500 },
-    );
-  }
-
-  // Optionally assign to a project
-  if (input.projectId && input.roleOnProject) {
-    const today = new Date().toISOString().slice(0, 10);
-    const { error: psErr } = await admin.from("project_staff").insert({
-      project_id: input.projectId,
-      staff_id: newUserId,
-      role_on_project: input.roleOnProject,
-      cost_visible: input.costVisible ?? false,
-      active_from: today,
-    });
-    if (psErr) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Staf dibuat tapi gagal ditambahkan ke proyek: ${psErr.message}`,
-        },
-        { status: 500 },
-      );
-    }
+    return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
   }
 
   // ── 6. Return result (temp password shown once to the admin) ───────────────
   return NextResponse.json({
     ok: true,
-    staffId: newUserId,
-    email: input.email,
+    staffId: result.staffId,
+    email: result.email,
     tempPassword: input.password,
   });
 }

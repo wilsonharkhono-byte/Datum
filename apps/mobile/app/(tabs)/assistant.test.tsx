@@ -73,6 +73,7 @@ const mockCreateCardEvent = jest.fn();
 const mockAttachToEvent = jest.fn();
 const mockLinkCardToArea = jest.fn();
 const mockGetCardSnippet = jest.fn();
+const mockUploadCardAttachment = jest.fn();
 
 jest.mock("@datum/core", () => {
   const actual = jest.requireActual<typeof import("@datum/core")>("@datum/core");
@@ -156,6 +157,11 @@ jest.mock("expo-image-picker", () => ({
   launchImageLibraryAsync: jest.fn().mockResolvedValue({ canceled: true, assets: [] }),
 }), { virtual: true });
 
+jest.mock("@/lib/attachments/pick-and-upload", () => ({
+  uploadCardAttachment: (...args: unknown[]) => mockUploadCardAttachment(...args),
+  pickImageAsset: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock("react-native-safe-area-context", () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => {
     const { View } = require("react-native");
@@ -207,6 +213,7 @@ function mockFetchJson(body: unknown, status = 200) {
 // ---------------------------------------------------------------------------
 
 import AssistantTab, { AssistantChat } from "./assistant";
+import { ProposalCard } from "@/components/chat/ProposalCard";
 
 const TEST_PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -275,6 +282,7 @@ beforeEach(() => {
   mockDrain.mockResolvedValue([]);
   mockEnqueue.mockResolvedValue({ id: "q-1", mode: "tanya", text: "", ts: 0 });
   mockGetCardSnippet.mockResolvedValue(null);
+  mockUploadCardAttachment.mockResolvedValue({ ok: true });
 });
 
 afterEach(() => {
@@ -561,6 +569,106 @@ describe("AssistantTab", () => {
 
     // Chat input should NOT render when there is no project selected
     expect(screen.queryByPlaceholderText("Tanya tentang proyek…")).toBeNull();
+  });
+
+  // ── 9. ProposalCard: attachment-only failure → success + warning (no error) ──
+
+  it("ProposalCard shows success state + attach warning when event succeeds but upload fails", async () => {
+    const proposal = {
+      projectId: "proj-uuid-1",
+      cardId: "card-uuid-1",
+      cardTitle: "Pekerjaan Lantai",
+      cardSlug: "arin-1-flooring",
+      topicName: "In Progress",
+      eventKind: "note" as const,
+      payload: { text: "Lantai selesai 60%" },
+      rationale: "",
+      confidence: 0.9,
+      fileMeta: null,
+      areaHint: null,
+      createNew: false,
+      newCardTitle: null,
+    };
+
+    const pendingFile = {
+      uri: "file:///test/photo.jpg",
+      name: "photo.jpg",
+      mime: "image/jpeg",
+      size: 12345,
+    };
+
+    // Event succeeds, attachment upload fails
+    mockCreateCardEvent.mockResolvedValue({ ok: true, eventId: "ev-new-2" });
+    mockUploadCardAttachment.mockResolvedValue({ ok: false, error: "Storage quota exceeded" });
+
+    wrap(<ProposalCard proposal={proposal} pendingFile={pendingFile} />);
+
+    // Commit
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("proposal-save-btn"));
+    });
+
+    await waitFor(() => {
+      // Success state must be shown
+      expect(screen.getByText(/Tersimpan di kartu/)).toBeTruthy();
+      // Attachment warning must appear
+      expect(screen.getByTestId("attach-warning")).toBeTruthy();
+      expect(screen.getByText(/Lampiran gagal diunggah/)).toBeTruthy();
+      // No full error state
+      expect(screen.queryByText(/text-critical/)).toBeNull();
+    });
+
+    // createCardEvent was called, uploadCardAttachment was attempted
+    expect(mockCreateCardEvent).toHaveBeenCalledTimes(1);
+    expect(mockUploadCardAttachment).toHaveBeenCalledTimes(1);
+  });
+
+  // ── 10. ProposalCard: event-creation failure → error state (no success) ──────
+
+  it("ProposalCard shows error state when event creation itself fails", async () => {
+    const proposal = {
+      projectId: "proj-uuid-1",
+      cardId: "card-uuid-1",
+      cardTitle: "Pekerjaan Lantai",
+      cardSlug: "arin-1-flooring",
+      topicName: "In Progress",
+      eventKind: "note" as const,
+      payload: { text: "Lantai selesai 60%" },
+      rationale: "",
+      confidence: 0.9,
+      fileMeta: null,
+      areaHint: null,
+      createNew: false,
+      newCardTitle: null,
+    };
+
+    const pendingFile = {
+      uri: "file:///test/photo.jpg",
+      name: "photo.jpg",
+      mime: "image/jpeg",
+      size: 12345,
+    };
+
+    // Event creation fails
+    mockCreateCardEvent.mockResolvedValue({ ok: false, error: "Database unavailable" });
+
+    wrap(<ProposalCard proposal={proposal} pendingFile={pendingFile} />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("proposal-save-btn"));
+    });
+
+    await waitFor(() => {
+      // Error message must be shown (from the critical text)
+      expect(screen.getByText(/Database unavailable/)).toBeTruthy();
+      // No success state
+      expect(screen.queryByText(/Tersimpan di kartu/)).toBeNull();
+      // No attach-warning since we never reached the upload step
+      expect(screen.queryByTestId("attach-warning")).toBeNull();
+    });
+
+    // Upload was never attempted
+    expect(mockUploadCardAttachment).not.toHaveBeenCalled();
   });
 
   // ── 8. Remembered selection: AsyncStorage value is restored ──────────────

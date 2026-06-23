@@ -68,6 +68,7 @@ export function ProposalCard({
   type Status = "pending" | "saving" | "saved" | "discarded" | "error";
   const [status, setStatus] = useState<Status>("pending");
   const [error, setError] = useState<string | null>(null);
+  const [attachWarning, setAttachWarning] = useState<string | null>(null);
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [linkArea, setLinkArea] = useState(true);
   const [areaLinked, setAreaLinked] = useState(false);
@@ -153,7 +154,7 @@ export function ProposalCard({
         return;
       }
 
-      // 3. Upload pending file if attached — uses shared helper (fetch(uri).blob() pattern).
+      // 3. Upload pending file if attached — best-effort, never blocks event save.
       if (pendingFile) {
         const uploadRes = await uploadCardAttachment(supabase, {
           projectId: proposal.projectId,
@@ -172,9 +173,8 @@ export function ProposalCard({
             "skipped" in uploadRes && uploadRes.skipped
               ? uploadRes.reason
               : uploadRes.error;
-          setStatus("error");
-          setError(`Event tersimpan tapi lampiran gagal: ${msg}`);
-          return;
+          // Attachment failure is non-blocking — event was already saved successfully.
+          setAttachWarning(`Lampiran gagal diunggah: ${msg}`);
         }
       }
 
@@ -323,6 +323,15 @@ export function ProposalCard({
           </Text>
         </View>
       )}
+
+      {/* Attachment warning (non-blocking — shown even on success) */}
+      {attachWarning ? (
+        <View className="mb-2 rounded border border-border/40 bg-warning-bg px-2 py-1" testID="attach-warning">
+          <Text className="text-[11px] font-semibold text-warning">
+            ⚠ {attachWarning}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Error message */}
       {error ? (
