@@ -305,8 +305,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         // Never lose the text: park it in the offline queue (the user bubble
         // stays visible in the thread) and announce it with an amber bubble.
         // No "Coba lagi" here — the drain triggers re-send automatically.
-        enqueue(projectId, { mode: runMode, text: input, ts: Date.now() });
-        setQueueCount(readQueue(projectId).length);
+        await enqueue(projectId, { mode: runMode, text: input, ts: Date.now() });
+        setQueueCount((await readQueue(projectId)).length);
         setMessages((m) => [...m, { role: "assistant" as const, content: QUEUED_NOTICE, queued: true }]);
       } else {
         const msg = `Gagal: ${e instanceof Error ? e.message : String(e)}`;
@@ -360,7 +360,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   // is what stops an overlapping drain from double-sending meanwhile.
   async function drainQueue() {
     if (drainingRef.current || busyRef.current) return;
-    const items = drain(projectId);
+    const items = await drain(projectId);
     setQueueCount(items.length);
     if (items.length === 0) return;
     drainingRef.current = true;
@@ -374,13 +374,13 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         try {
           if (item.mode === "tanya") await runTanya(item.text);
           else await runCatat(item.text, null);
-          remove(projectId, item.id);
+          await remove(projectId, item.id);
         } catch (e) {
           if (!(e instanceof NetworkError)) {
             // The server received and rejected this item — re-sending the
             // same payload won't succeed, so drop it (the text stays visible
             // in the thread) instead of wedging the queue head forever.
-            remove(projectId, item.id);
+            await remove(projectId, item.id);
             setMessages((m) => [...m, {
               role: "assistant" as const,
               content: `Gagal mengirim pesan tertunda: ${e instanceof Error ? e.message : String(e)}`,
@@ -390,7 +390,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           break; // stop on first failure; remaining items stay queued
         } finally {
           inFlightIds.current.delete(item.id);
-          setQueueCount(readQueue(projectId).length);
+          setQueueCount((await readQueue(projectId)).length);
         }
       }
     } finally {
