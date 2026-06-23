@@ -63,14 +63,14 @@ export function MoveCardControl({
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       <label htmlFor="move-card-column" className="sr-only">Kolom tujuan</label>
       <select
         id="move-card-column"
         value={targetId}
         onChange={(e) => setTargetId(e.target.value)}
         disabled={move.isPending}
-        className="select-brand-sm"
+        className="select-brand-sm min-w-0 max-w-full"
       >
         {topics.map((t) => (
           <option key={t.id} value={t.id}>{t.name}</option>

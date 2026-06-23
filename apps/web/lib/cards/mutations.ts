@@ -4,6 +4,27 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  CreateCardInput as CoreCreateCardInput,
+  createCard as coreCreateCard,
+  CreateTopicInput as CoreCreateTopicInput,
+  createTopic as coreCreateTopic,
+  MoveCardInput as CoreMoveCardInput,
+  moveCard as coreMoveCard,
+  createCardEvent as coreCreateCardEvent,
+  collectPayloadFromEntries,
+  resolveCardEvent as coreResolveCardEvent,
+  attachToEvent as coreAttachToEvent,
+  signAttachment as coreSignAttachment,
+  reanalyzeAttachment as coreReanalyzeAttachment,
+  createComment as coreCreateComment,
+  editComment as coreEditComment,
+  deleteComment as coreDeleteComment,
+  addCardMember as coreAddCardMember,
+  removeCardMember as coreRemoveCardMember,
+  approveCardEventDraft as coreApproveCardEventDraft,
+  rejectCardEventDraft as coreRejectCardEventDraft,
+} from "@datum/core";
+import {
   EVENT_KINDS,
   EventPayloadSchemas,
   COST_VISIBLE_KINDS,
@@ -20,6 +41,7 @@ import {
   notifyDraftPending,
   notifyPrincipalsOfHighRiskEvent,
 } from "@/lib/notifications/producers";
+import { sendExpoPush } from "@/lib/notifications/push-send";
 import { recomputeProjectGates } from "@/lib/gates/recompute";
 
 // Union of RELEVANT_KINDS in lib/gates/readiness-rules.ts — the kinds that can
@@ -29,31 +51,23 @@ const GATE_RELEVANT_KINDS: ReadonlySet<EventKind> = new Set([
   "work", "material", "decision", "vendor", "drawing", "client_request", "document",
 ]);
 
-const CreateCardInput = z.object({
+// Re-export core type so web callers that import CreateCardResult from here still work.
+export type CreateCardResult =
+  | { ok: true; slug: string; id: string }
+  | { ok: false; error: string };
+
+// Web-only schema includes projectCode (needed for revalidatePath only).
+const WebCreateCardInput = z.object({
   projectId:   z.string().uuid(),
   topicId:     z.string().uuid(),
   projectCode: z.string().min(1),
   title:       z.string().min(1).max(120),
 });
 
-function toSlug(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "kartu"
-  );
-}
-
-export type CreateCardResult =
-  | { ok: true; slug: string; id: string }
-  | { ok: false; error: string };
-
 export async function createCard(formData: FormData): Promise<CreateCardResult> {
   let input;
   try {
-    input = CreateCardInput.parse({
+    input = WebCreateCardInput.parse({
       projectId:   formData.get("projectId"),
       topicId:     formData.get("topicId"),
       projectCode: formData.get("projectCode"),
@@ -64,71 +78,34 @@ export async function createCard(formData: FormData): Promise<CreateCardResult> 
   }
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
-
-  const base = toSlug(input.title);
-  let slug = base;
-  for (let i = 2; i < 100; i++) {
-    const { data: existing } = await supabase
-      .from("cards")
-      .select("id")
-      .eq("project_id", input.projectId)
-      .eq("slug", slug)
-      .maybeSingle();
-    if (!existing) break;
-    slug = `${base}-${i}`;
-  }
-
-  const { data: inserted, error } = await supabase.from("cards").insert({
-    project_id:          input.projectId,
-    topic_id:            input.topicId,
-    title:               input.title,
-    slug,
-    created_by_staff_id: user.id,
-  }).select("id").single();
-  if (error || !inserted) return { ok: false, error: error?.message ?? "Gagal membuat kartu" };
+  const result = await coreCreateCard(supabase, {
+    projectId: input.projectId,
+    topicId:   input.topicId,
+    title:     input.title,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}`);
-  return { ok: true, slug, id: inserted.id };
+  return result;
 }
 
 // ─── createTopic ──────────────────────────────────────────────────────────────
-
-const CreateTopicInput = z.object({
-  projectId:   z.string().uuid(),
-  projectCode: z.string().min(1),
-  name:        z.string().min(1).max(120),
-});
-
-// Derive a project-unique topic code from the column name. topics.code is
-// `not null` + `unique(project_id, code)`, but the board UI only asks for a
-// human name — so we slug the name into an uppercase code and disambiguate
-// with a numeric suffix the same way createCard does for slugs.
-function toTopicCode(name: string): string {
-  return (
-    name
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 36) || "KOLOM"
-  );
-}
 
 export type CreateTopicResult =
   | { ok: true; topicId: string }
   | { ok: false; error: string };
 
-// Any project member may add a column — the topics_insert RLS policy gates on
-// project membership, not role. We only need a signed-in staff row to stamp
-// created_by_staff_id.
+// Web-only schema includes projectCode (needed for revalidatePath only).
+const WebCreateTopicInput = z.object({
+  projectId:   z.string().uuid(),
+  projectCode: z.string().min(1),
+  name:        z.string().min(1).max(120),
+});
+
 export async function createTopic(formData: FormData): Promise<CreateTopicResult> {
   let input;
   try {
-    input = CreateTopicInput.parse({
+    input = WebCreateTopicInput.parse({
       projectId:   formData.get("projectId"),
       projectCode: formData.get("projectCode"),
       name:        formData.get("name"),
@@ -138,56 +115,14 @@ export async function createTopic(formData: FormData): Promise<CreateTopicResult
   }
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
-
-  const base = toTopicCode(input.name);
-  let code = base;
-  for (let i = 2; i < 100; i++) {
-    const { data: existing } = await supabase
-      .from("topics")
-      .select("id")
-      .eq("project_id", input.projectId)
-      .eq("code", code)
-      .maybeSingle();
-    if (!existing) break;
-    code = `${base}-${i}`.slice(0, 40);
-  }
-
-  // Append to the end of the board.
-  const { data: maxRow } = await supabase
-    .from("topics")
-    .select("sort_order")
-    .eq("project_id", input.projectId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const nextSort = (maxRow?.sort_order ?? -1) + 1;
-
-  const { data: inserted, error } = await supabase
-    .from("topics")
-    .insert({
-      project_id:          input.projectId,
-      code,
-      name:                input.name,
-      topic_type:          "general",
-      sort_order:          nextSort,
-      created_by_staff_id: user.id,
-    })
-    .select("id")
-    .single();
-  if (error) {
-    if (error.code === "23505") {
-      return { ok: false, error: `Kode kolom "${code}" sudah ada di proyek ini` };
-    }
-    return { ok: false, error: error.message };
-  }
+  const result = await coreCreateTopic(supabase, {
+    projectId: input.projectId,
+    name:      input.name,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}`);
-  return { ok: true, topicId: inserted.id };
+  return result;
 }
 
 // ─── createCardEvent ──────────────────────────────────────────────────────────
@@ -205,25 +140,8 @@ export type CreateCardEventResult =
   | { ok: true; eventId: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-function collectPayload(formData: FormData): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-  for (const [key, value] of formData.entries()) {
-    if (!key.startsWith("payload_")) continue;
-    const field = key.slice("payload_".length);
-    const raw = typeof value === "string" ? value : "";
-    if (raw.trim() === "") continue;
-    // Heuristic: amount/percent_complete/quantity → number; attendees → string[]
-    if (field === "amount" || field === "percent_complete" || field === "quantity") {
-      const n = Number(raw);
-      if (!Number.isNaN(n)) payload[field] = n;
-    } else if (field === "attendees") {
-      payload[field] = raw.split(",").map((s) => s.trim()).filter(Boolean);
-    } else {
-      payload[field] = raw;
-    }
-  }
-  return payload;
-}
+// collectPayloadFromEntries is imported from @datum/core above.
+// Web callers pass formData.entries() — DOM FormData stays in web layer only.
 
 export async function createCardEvent(formData: FormData): Promise<CreateCardEventResult> {
   let input;
@@ -240,52 +158,40 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
     return { ok: false, error: "Form tidak valid" };
   }
 
-  const rawPayload = collectPayload(formData);
-  const schema = EventPayloadSchemas[input.eventKind as EventKind];
-  const parsed = schema.safeParse(rawPayload);
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      if (issue.path[0] && typeof issue.path[0] === "string") {
-        fieldErrors[issue.path[0]] = issue.message;
-      }
-    }
-    return { ok: false, error: "Isi data wajib", fieldErrors };
-  }
-
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
 
-  const occurred = input.occurredAt
-    ? new Date(input.occurredAt).toISOString()
-    : new Date().toISOString();
+  // Delegate the DB insert + payload validation to core.
+  const rawPayload = collectPayloadFromEntries(formData.entries());
+  const result = await coreCreateCardEvent(supabase, {
+    cardId:          input.cardId,
+    projectId:       input.projectId,
+    eventKind:       input.eventKind,
+    payload:         rawPayload,
+    occurredAt:      input.occurredAt,
+    loggedByStaffId: user.id,
+  });
+  if (!result.ok) return result;
 
-  const { data, error } = await supabase.from("card_events").insert({
-    card_id:            input.cardId,
-    project_id:         input.projectId,
-    event_kind:         input.eventKind,
-    payload:            parsed.data as unknown as Database["public"]["Tables"]["card_events"]["Insert"]["payload"],
-    occurred_at:        occurred,
-    logged_by_staff_id: user.id,
-    source_kind:        "manual",
-    cost_visible:       COST_VISIBLE_KINDS.has(input.eventKind),
-  }).select("id").single();
-  if (error) return { ok: false, error: error.message };
-
+  // ── Web-only side effects ─────────────────────────────────────────────────
   // Gate matrix cells depend on this event — recompute best-effort,
   // fire-and-forget so the save never waits on it.
   if (GATE_RELEVANT_KINDS.has(input.eventKind)) {
     void recomputeProjectGates(input.projectId, input.projectCode).catch(console.warn);
   }
 
+  // Re-parse the payload so notification helpers have a typed value.
+  const schema = EventPayloadSchemas[input.eventKind as EventKind];
+  const parsedPayload = schema.parse(rawPayload) as Record<string, unknown>;
+
   const { data: cardRow } = await supabase
     .from("cards").select("title, slug").eq("id", input.cardId).maybeSingle();
   if (cardRow) {
     await notifyWatchersOfEvent(supabase, {
-      eventId: data.id,
+      eventId: result.eventId,
       eventKind: input.eventKind,
-      payload: parsed.data as Record<string, unknown>,
+      payload: parsedPayload,
       actorId: user.id,
       projectId: input.projectId,
       projectCode: input.projectCode,
@@ -293,11 +199,27 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
       cardSlug: cardRow.slug,
       cardTitle: cardRow.title,
     });
+    // Best-effort Expo push for watcher event — derive recipients same way producer does.
+    void (async () => {
+      const { data: members } = await supabase
+        .from("card_members").select("staff_id")
+        .eq("card_id", input.cardId).is("removed_at", null);
+      const recipientIds = [...new Set(
+        (members ?? []).map((m) => m.staff_id)
+          .filter((id): id is string => typeof id === "string" && id !== user.id),
+      )];
+      await sendExpoPush(recipientIds, {
+        title: `${input.eventKind} baru di "${cardRow.title}"`,
+        body:  `${input.eventKind} baru di "${cardRow.title}"`,
+        data:  { link: `/project/${input.projectCode}/cards/${cardRow.slug}` },
+      });
+    })().catch(console.warn);
     if (HIGH_RISK_KINDS.has(input.eventKind)) {
-      const p = parsed.data as Record<string, unknown>;
-      const preview = pickPreview(p);
+      const preview = pickPreview(parsedPayload);
+      // notifyPrincipalsOfHighRiskEvent uses the service-role admin client —
+      // kept here (web-only, NOT in @datum/core).
       await notifyPrincipalsOfHighRiskEvent(supabase, {
-        eventId: data.id,
+        eventId: result.eventId,
         eventKind: input.eventKind,
         actorId: user.id,
         projectId: input.projectId,
@@ -311,7 +233,7 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
-  return { ok: true, eventId: data.id };
+  return { ok: true, eventId: result.eventId };
 }
 
 function pickPreview(payload: Record<string, unknown>): string | null {
@@ -370,43 +292,32 @@ export async function createComment(formData: FormData): Promise<CreateCommentRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
 
-  // Parse @mentions — extract @<first-name-token>, resolve to active staff by case-insensitive first-name match
-  const mentionTokens = Array.from(new Set(
-    (input.body.match(/@([a-zA-Z][a-zA-Z0-9_-]{1,30})/g) ?? [])
-      .map((m) => m.slice(1).toLowerCase())
-  ));
+  const result = await coreCreateComment(supabase, {
+    cardId:           input.cardId,
+    projectId:        input.projectId,
+    body:             input.body,
+    createdByStaffId: user.id,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
 
-  let mentionedStaffIds: string[] = [];
-  if (mentionTokens.length > 0) {
-    const { data: candidates } = await supabase
-      .from("staff").select("id, full_name").eq("active", true);
-    const ids = new Set<string>();
-    for (const cand of candidates ?? []) {
-      const first = (cand.full_name ?? "").split(/\s+/)[0]?.toLowerCase();
-      if (first && mentionTokens.includes(first)) ids.add(cand.id);
-    }
-    mentionedStaffIds = Array.from(ids);
-  }
-
-  const { data: inserted, error } = await supabase.from("card_comments").insert({
-    card_id:             input.cardId,
-    project_id:          input.projectId,
-    body:                input.body,
-    mentions:            mentionedStaffIds,
-    created_by_staff_id: user.id,
-  }).select("id").single();
-  if (error) return { ok: false, error: error.message };
-
-  if (inserted?.id) {
-    await notifyMentions(supabase, {
-      mentionedStaffIds,
-      actorId: user.id,
-      projectId: input.projectId,
-      cardId: input.cardId,
-      cardSlug: input.cardSlug,
-      cardComment: { id: inserted.id, body: input.body },
-      projectCode: input.projectCode,
-    });
+  await notifyMentions(supabase, {
+    mentionedStaffIds: result.mentions,
+    actorId:           user.id,
+    projectId:         input.projectId,
+    cardId:            input.cardId,
+    cardSlug:          input.cardSlug,
+    cardComment:       { id: result.commentId, body: input.body },
+    projectCode:       input.projectCode,
+  });
+  // Best-effort Expo push for mention — same recipient filter as producer.
+  {
+    const recipientIds = result.mentions.filter((id) => id !== user.id);
+    const preview = input.body.length > 100 ? input.body.slice(0, 100) + "…" : input.body;
+    void sendExpoPush(recipientIds, {
+      title: "Anda disebut di komentar",
+      body:  preview,
+      data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
+    }).catch(console.warn);
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
@@ -438,40 +349,30 @@ export async function editComment(formData: FormData): Promise<CreateCommentResu
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  // Re-extract mentions from the edited body
-  const mentionTokens = Array.from(new Set(
-    (input.body.match(/@([a-zA-Z][a-zA-Z0-9_-]{1,30})/g) ?? [])
-      .map((m) => m.slice(1).toLowerCase())
-  ));
-  let mentionedStaffIds: string[] = [];
-  if (mentionTokens.length > 0) {
-    const { data: candidates } = await supabase
-      .from("staff").select("id, full_name").eq("active", true);
-    const ids = new Set<string>();
-    for (const cand of candidates ?? []) {
-      const first = (cand.full_name ?? "").split(/\s+/)[0]?.toLowerCase();
-      if (first && mentionTokens.includes(first)) ids.add(cand.id);
-    }
-    mentionedStaffIds = Array.from(ids);
-  }
+  const result = await coreEditComment(supabase, {
+    commentId: input.commentId,
+    body:      input.body,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
 
-  const { data: updatedComment, error } = await supabase.from("card_comments")
-    .update({ body: input.body, edited_at: new Date().toISOString(), mentions: mentionedStaffIds })
-    .eq("id", input.commentId)
-    .select("id, card_id, project_id")
-    .single();
-  if (error) return { ok: false, error: error.message };
-
-  if (updatedComment?.id && updatedComment.card_id && updatedComment.project_id) {
-    await notifyMentions(supabase, {
-      mentionedStaffIds,
-      actorId: user.id,
-      projectId: updatedComment.project_id,
-      cardId: updatedComment.card_id,
-      cardSlug: input.cardSlug,
-      cardComment: { id: updatedComment.id, body: input.body },
-      projectCode: input.projectCode,
-    });
+  await notifyMentions(supabase, {
+    mentionedStaffIds: result.mentions,
+    actorId:           user.id,
+    projectId:         result.projectId,
+    cardId:            result.cardId,
+    cardSlug:          input.cardSlug,
+    cardComment:       { id: input.commentId, body: input.body },
+    projectCode:       input.projectCode,
+  });
+  // Best-effort Expo push for mention in edited comment.
+  {
+    const recipientIds = result.mentions.filter((id) => id !== user.id);
+    const preview = input.body.length > 100 ? input.body.slice(0, 100) + "…" : input.body;
+    void sendExpoPush(recipientIds, {
+      title: "Anda disebut di komentar",
+      body:  preview,
+      data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
+    }).catch(console.warn);
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
@@ -501,10 +402,8 @@ export async function deleteComment(formData: FormData): Promise<CreateCommentRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  const { error } = await supabase.from("card_comments")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", input.commentId);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreDeleteComment(supabase, input.commentId);
+  if (!result.ok) return { ok: false, error: result.error };
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
 }
@@ -541,12 +440,12 @@ export async function attachToEvent(formData: FormData): Promise<AttachToEventRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  const { error } = await supabase.from("card_attachments").insert({
-    card_event_id: input.cardEventId,
-    storage_path:  input.storagePath,
-    mime_type:     input.mimeType,
+  const result = await coreAttachToEvent(supabase, {
+    cardEventId: input.cardEventId,
+    storagePath: input.storagePath,
+    mimeType:    input.mimeType,
   });
-  if (error) return { ok: false, error: error.message };
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -573,12 +472,7 @@ export async function signAttachment(formData: FormData): Promise<SignAttachment
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.storage
-    .from("card-attachments")
-    .createSignedUrl(input.storagePath, 60 * 10); // 10 minutes
-  if (error || !data) return { ok: false, error: error?.message ?? "Gagal membuat URL" };
-
-  return { ok: true, url: data.signedUrl };
+  return coreSignAttachment(supabase, input.storagePath);
 }
 
 // ─── reanalyzeAttachment ──────────────────────────────────────────────────────
@@ -611,11 +505,8 @@ export async function reanalyzeAttachment(formData: FormData): Promise<Reanalyze
 
   // RLS gates this update to attachments whose parent event is in an accessible
   // project, so a user can only re-queue attachments they may write.
-  const { error } = await supabase
-    .from("card_attachments")
-    .update({ ai_status: "pending", ai_attempts: 0, ai_error: null })
-    .eq("id", input.attachmentId);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreReanalyzeAttachment(supabase, input.attachmentId);
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -650,28 +541,13 @@ export async function addCardMember(formData: FormData): Promise<MemberResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  // Upsert pattern: if a soft-removed row exists, un-remove it; otherwise insert.
-  const { data: existing } = await supabase.from("card_members")
-    .select("removed_at")
-    .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role)
-    .maybeSingle();
-
-  let dbErr;
-  if (existing) {
-    const { error } = await supabase.from("card_members")
-      .update({ removed_at: null, added_at: new Date().toISOString(), added_by_staff_id: user.id })
-      .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role);
-    dbErr = error;
-  } else {
-    const { error } = await supabase.from("card_members").insert({
-      card_id:           input.cardId,
-      staff_id:          input.staffId,
-      role:              input.role,
-      added_by_staff_id: user.id,
-    });
-    dbErr = error;
-  }
-  if (dbErr) return { ok: false, error: dbErr.message };
+  const result = await coreAddCardMember(supabase, {
+    cardId:         input.cardId,
+    staffId:        input.staffId,
+    role:           input.role,
+    addedByStaffId: user.id,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -699,11 +575,12 @@ export async function removeCardMember(formData: FormData): Promise<MemberResult
     return { ok: false, error: "Form tidak valid" };
   }
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("card_members")
-    .update({ removed_at: new Date().toISOString() })
-    .eq("card_id", input.cardId).eq("staff_id", input.staffId).eq("role", input.role)
-    .is("removed_at", null);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreRemoveCardMember(supabase, {
+    cardId:  input.cardId,
+    staffId: input.staffId,
+    role:    input.role,
+  });
+  if (!result.ok) return result;
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
 }
@@ -769,6 +646,21 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
         newStatus: input.status,
         actorId: user.id,
       });
+      // Best-effort Expo push for status change — same recipient derivation as producer.
+      void (async () => {
+        const { data: members } = await supabase
+          .from("card_members").select("staff_id")
+          .eq("card_id", input.cardId).is("removed_at", null);
+        const recipientIds = [...new Set(
+          (members ?? []).map((m) => m.staff_id)
+            .filter((id): id is string => typeof id === "string" && id !== user.id),
+        )];
+        await sendExpoPush(recipientIds, {
+          title: "Status kartu diperbarui",
+          body:  `Status "${cardRow.title}" diubah ke ${input.status}`,
+          data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
+        });
+      })().catch(console.warn);
     }
   }
 
@@ -779,20 +671,21 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
 
 // ─── moveCard — Slice 1.2b ────────────────────────────────────────────────────
 
-const MoveCardInput = z.object({
-  cardId:       z.string().uuid(),
-  newTopicId:   z.string().uuid(),
-  projectId:    z.string().uuid(),
-  projectCode:  z.string().min(1),
-  cardSlug:     z.string().min(1),
-});
-
 export type MoveCardResult = { ok: true } | { ok: false; error: string };
+
+// Web-only schema includes projectCode + cardSlug for revalidatePath.
+const WebMoveCardInput = z.object({
+  cardId:      z.string().uuid(),
+  newTopicId:  z.string().uuid(),
+  projectId:   z.string().uuid(),
+  projectCode: z.string().min(1),
+  cardSlug:    z.string().min(1),
+});
 
 export async function moveCard(formData: FormData): Promise<MoveCardResult> {
   let input;
   try {
-    input = MoveCardInput.parse({
+    input = WebMoveCardInput.parse({
       cardId:      formData.get("cardId"),
       newTopicId:  formData.get("newTopicId"),
       projectId:   formData.get("projectId"),
@@ -804,26 +697,16 @@ export async function moveCard(formData: FormData): Promise<MoveCardResult> {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
-
-  // Sanity: the target topic must belong to the same project
-  const { data: topic } = await supabase
-    .from("topics").select("id, project_id")
-    .eq("id", input.newTopicId).maybeSingle();
-  if (!topic) return { ok: false, error: "Kolom tujuan tidak ditemukan" };
-  if (topic.project_id !== input.projectId) {
-    return { ok: false, error: "Kolom tujuan ada di proyek lain" };
-  }
-
-  const { error } = await supabase.from("cards")
-    .update({ topic_id: input.newTopicId })
-    .eq("id", input.cardId);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreMoveCard(supabase, {
+    cardId:     input.cardId,
+    newTopicId: input.newTopicId,
+    projectId:  input.projectId,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   revalidatePath(`/project/${input.projectCode}`);
-  return { ok: true };
+  return result;
 }
 
 // ─── Slice 1.2d — draft/approval flow for high-risk chat captures ─────────────
@@ -860,7 +743,7 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
     return { ok: false, error: "Form tidak valid" };
   }
 
-  const rawPayload = collectPayload(formData);
+  const rawPayload = collectPayloadFromEntries(formData.entries());
   const schema = EventPayloadSchemas[input.eventKind];
   const parsed = schema.safeParse(rawPayload);
   if (!parsed.success) {
@@ -907,6 +790,18 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
       cardTitle: cardRow.title,
       cardId: input.cardId,
     });
+    // Best-effort Expo push for draft pending — same principal query as producer.
+    void (async () => {
+      const { data: principals } = await supabase
+        .from("staff").select("id").eq("active", true).eq("role", "principal");
+      const recipientIds = (principals ?? [])
+        .map((s) => s.id).filter((id) => id !== user.id);
+      await sendExpoPush(recipientIds, {
+        title: "Draft menunggu approval",
+        body:  `Draft ${input.eventKind} baru menunggu approval untuk "${cardRow.title}"`,
+        data:  { link: "/review" },
+      });
+    })().catch(console.warn);
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
@@ -914,7 +809,10 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
   return { ok: true, draftId: data.id };
 }
 
-const ApproveDraftInput = z.object({
+// ApproveDraftInput / RejectDraftInput now live in @datum/core (imported above
+// via coreApproveCardEventDraft / coreRejectCardEventDraft).
+// Web schemas remain local for FormData → args adaption only.
+const WebApproveDraftInput = z.object({
   draftId: z.string().uuid(),
 });
 
@@ -925,7 +823,7 @@ export type ApproveDraftResult =
 export async function approveCardEventDraft(formData: FormData): Promise<ApproveDraftResult> {
   let input;
   try {
-    input = ApproveDraftInput.parse({ draftId: formData.get("draftId") });
+    input = WebApproveDraftInput.parse({ draftId: formData.get("draftId") });
   } catch {
     return { ok: false, error: "Form tidak valid" };
   }
@@ -933,74 +831,43 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  // Load the draft
-  const { data: draft, error: dErr } = await supabase
-    .from("data_drafts").select("*").eq("id", input.draftId).maybeSingle();
-  if (dErr || !draft) return { ok: false, error: "Draft tidak ditemukan" };
-  if (draft.status !== "draft") return { ok: false, error: `Draft sudah ${draft.status}` };
-  if (draft.draft_type !== "card_event") return { ok: false, error: "Draft bukan card_event" };
+  // Delegate DB logic + validation to @datum/core
+  const result = await coreApproveCardEventDraft(supabase, {
+    draftId: input.draftId,
+    approverId: user.id,
+  });
+  if (!result.ok) return result;
 
-  const proposed = draft.proposed_payload as {
-    kind: string;
-    payload: Record<string, unknown>;
-    card_id: string;
-    occurred_at: string;
-  };
-
-  // Re-validate the payload defensively
-  const schema = EventPayloadSchemas[proposed.kind as keyof typeof EventPayloadSchemas];
-  if (!schema) return { ok: false, error: `Kind tidak valid: ${proposed.kind}` };
-  const recheck = schema.safeParse(proposed.payload);
-  if (!recheck.success) return { ok: false, error: "Payload tidak lolos validasi ulang" };
-
-  // Insert the card_event
-  const { data: ev, error: evErr } = await supabase.from("card_events").insert({
-    card_id:            proposed.card_id,
-    project_id:         draft.project_id,
-    event_kind:         proposed.kind as Database["public"]["Enums"]["card_event_kind"],
-    payload:            proposed.payload as unknown as Database["public"]["Tables"]["card_events"]["Insert"]["payload"],
-    occurred_at:        proposed.occurred_at,
-    logged_by_staff_id: draft.created_by_staff_id,
-    source_kind:        "chat",
-    cost_visible:       COST_VISIBLE_KINDS.has(proposed.kind as EventKind),
-    draft_id:           draft.id,
-  }).select("id").single();
-  if (evErr) return { ok: false, error: evErr.message };
-
-  // Mark the draft approved + record promotion
-  await supabase.from("data_drafts").update({
-    status:               "approved",
-    approved_by_staff_id: user.id,
-    approved_at:          new Date().toISOString(),
-    promoted_record_type: "card_events",
-    promoted_record_id:   ev.id,
-  }).eq("id", draft.id);
-
-  const { data: cardRow } = await supabase
-    .from("cards").select("slug").eq("id", proposed.card_id).maybeSingle();
-  const { data: projRow } = await supabase
-    .from("projects").select("project_code").eq("id", draft.project_id).maybeSingle();
-  if (projRow && GATE_RELEVANT_KINDS.has(proposed.kind as EventKind)) {
-    void recomputeProjectGates(draft.project_id, projRow.project_code).catch(console.warn);
+  // Web-only side effects using metadata returned by core
+  if (result.gateRelevant && result.projectCode) {
+    void recomputeProjectGates(result.projectId, result.projectCode).catch(console.warn);
   }
-  if (cardRow && projRow && draft.created_by_staff_id) {
+  if (result.cardSlug && result.projectCode && result.draftAuthorId) {
     await notifyDraftApproved(supabase, {
-      draftId: draft.id,
-      draftAuthorId: draft.created_by_staff_id,
+      draftId: input.draftId,
+      draftAuthorId: result.draftAuthorId,
       approverActorId: user.id,
-      projectId: draft.project_id,
-      projectCode: projRow.project_code,
-      cardId: proposed.card_id,
-      cardSlug: cardRow.slug,
-      eventKind: proposed.kind,
+      projectId: result.projectId,
+      projectCode: result.projectCode,
+      cardId: "", // not needed by notifyDraftApproved — it only needs slug
+      cardSlug: result.cardSlug,
+      eventKind: result.eventKind,
     });
+    // Best-effort Expo push for draft approved — recipient is the draft author.
+    if (result.draftAuthorId !== user.id) {
+      void sendExpoPush([result.draftAuthorId], {
+        title: "Draft Anda disetujui",
+        body:  `Draft ${result.eventKind} Anda disetujui dan dicatat di kartu`,
+        data:  { link: `/project/${result.projectCode}/cards/${result.cardSlug}` },
+      }).catch(console.warn);
+    }
   }
 
   revalidatePath("/review");
-  return { ok: true, eventId: ev.id };
+  return { ok: true, eventId: result.eventId };
 }
 
-const RejectDraftInput = z.object({
+const WebRejectDraftInput = z.object({
   draftId: z.string().uuid(),
   reason:  z.string().max(500).optional(),
 });
@@ -1008,7 +875,7 @@ const RejectDraftInput = z.object({
 export async function rejectCardEventDraft(formData: FormData): Promise<MemberResult> {
   let input;
   try {
-    input = RejectDraftInput.parse({
+    input = WebRejectDraftInput.parse({
       draftId: formData.get("draftId"),
       reason:  formData.get("reason") || undefined,
     });
@@ -1019,26 +886,33 @@ export async function rejectCardEventDraft(formData: FormData): Promise<MemberRe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
 
-  const { error } = await supabase.from("data_drafts").update({
-    status:               "rejected",
-    rejected_by_staff_id: user.id,
-    rejected_at:          new Date().toISOString(),
-    rejection_reason:     input.reason ?? null,
-  }).eq("id", input.draftId).eq("status", "draft");
-  if (error) return { ok: false, error: error.message };
+  // Delegate DB logic to @datum/core
+  const result = await coreRejectCardEventDraft(supabase, {
+    draftId: input.draftId,
+    rejectorId: user.id,
+    reason: input.reason,
+  });
+  if (!result.ok) return result;
 
-  const { data: draft } = await supabase
-    .from("data_drafts").select("project_id, created_by_staff_id, proposed_payload").eq("id", input.draftId).maybeSingle();
-  if (draft && draft.created_by_staff_id) {
-    const kind = (draft.proposed_payload as { kind?: string })?.kind ?? "card_event";
+  // Web-only side effect: notify draft author
+  if (result.draftAuthorId) {
     await notifyDraftRejected(supabase, {
       draftId: input.draftId,
-      draftAuthorId: draft.created_by_staff_id,
+      draftAuthorId: result.draftAuthorId,
       rejectorActorId: user.id,
-      projectId: draft.project_id ?? "",
+      projectId: result.projectId,
       reason: input.reason ?? null,
-      eventKind: kind,
+      eventKind: result.eventKind,
     });
+    // Best-effort Expo push for draft rejected — recipient is the draft author.
+    if (result.draftAuthorId !== user.id) {
+      const reasonText = input.reason ? ` — alasan: "${input.reason}"` : "";
+      void sendExpoPush([result.draftAuthorId], {
+        title: "Draft Anda ditolak",
+        body:  `Draft ${result.eventKind} Anda ditolak${reasonText}`,
+        data:  { link: "/review" },
+      }).catch(console.warn);
+    }
   }
 
   revalidatePath("/review");
@@ -1078,12 +952,12 @@ export async function resolveCardEvent(formData: FormData): Promise<ResolveEvent
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi tidak ditemukan, silakan login ulang" };
 
-  const { error } = await supabase.rpc("resolve_card_event", {
-    p_event_id:   input.eventId,
-    p_new_status: input.newStatus,
-    p_reason:     input.reason ?? undefined,
+  const result = await coreResolveCardEvent(supabase, {
+    eventId:   input.eventId,
+    newStatus: input.newStatus,
+    reason:    input.reason,
   });
-  if (error) return { ok: false, error: error.message };
+  if (!result.ok) return result;
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };

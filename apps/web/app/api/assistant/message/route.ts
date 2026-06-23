@@ -1,5 +1,6 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseClientForRequest } from "@/lib/supabase/from-request";
 import { retrieveProjectContext, buildContextBlock } from "@/lib/assistant/retrieval";
 import {
   streamAssistant,
@@ -27,7 +28,7 @@ function errorMessage(e: unknown): string {
 }
 
 export async function POST(req: Request) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseClientForRequest(req);
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -127,6 +128,7 @@ export async function POST(req: Request) {
             });
           } catch (e) {
             console.warn("[assistant/message] audit write failed — returning answer without session", e);
+            Sentry.captureException(e);
           }
 
           send({ type: "done", sessionId, citations, usage });

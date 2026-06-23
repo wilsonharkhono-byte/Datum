@@ -27,14 +27,14 @@ export function RecomputeButton({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {message ? <span className="text-[11px] text-green-700">{message}</span> : null}
       {error ? <span className="text-[11px] text-red-700">{error}</span> : null}
       <button
         type="button"
         onClick={recompute}
         disabled={pending}
-        className="rounded bg-[#141210] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] hover:bg-[#3a3527] disabled:bg-[var(--text-muted)]"
+        className="inline-flex min-h-11 items-center justify-center rounded bg-[#141210] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] hover:bg-[#3a3527] disabled:bg-[var(--text-muted)] md:min-h-0"
       >
         {pending ? "Menghitung…" : "Hitung ulang readiness"}
       </button>

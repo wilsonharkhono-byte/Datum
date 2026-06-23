@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseClientForRequest } from "@/lib/supabase/from-request";
 import { retrieveProjectContext } from "@/lib/assistant/retrieval";
 import {
   AnthropicNotConfiguredError,
@@ -12,16 +12,10 @@ import {
 } from "@/lib/assistant/anthropic";
 import { EVENT_KINDS, EventPayloadSchemas, type EventKind } from "@datum/types";
 import { isTemplateCardTitle, deriveCardLabel } from "@/lib/cards/template-card";
+import { CaptureRequest } from "@datum/core";
 
-const Body = z.object({
-  projectId: z.string().uuid(),
-  text:      z.string().min(1).max(4000),
-  file:      z.object({
-    name: z.string().min(1).max(255),
-    mime: z.string().min(1).max(120),
-    size: z.number().int().nonnegative().max(20_971_520), // 20MB
-  }).optional(),
-});
+// CaptureRequest from core is the canonical body schema (shared with mobile).
+const Body = CaptureRequest;
 
 const CAPTURE_SYSTEM = `Anda adalah asisten internal DATUM untuk WHAstudio.
 
@@ -58,7 +52,7 @@ FORMAT OUTPUT — WAJIB JSON murni, TANPA markdown fence, TANPA penjelasan di lu
 }`;
 
 export async function POST(req: Request) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseClientForRequest(req);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

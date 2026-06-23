@@ -17,8 +17,8 @@ export function ActivityItem({ item }: { item: Item }) {
   const cardHref = `/project/${item.projectCode}/cards/${item.cardSlug}`;
   return (
     <li className="rounded border border-[#B5AFA8] bg-white p-3 text-xs">
-      <div className="mb-1 flex items-center justify-between text-[10px]">
-        <div className="flex items-center gap-1.5">
+      <div className="mb-1 flex flex-col gap-0.5 text-[10px] sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide ${KIND_COLOR[item.kind] ?? ""}`}>
             {item.eventKind ?? KIND_LABEL[item.kind] ?? item.kind}
           </span>

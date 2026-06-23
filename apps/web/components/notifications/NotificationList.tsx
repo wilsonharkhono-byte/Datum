@@ -45,7 +45,7 @@ export function NotificationList({ items }: { items: Notification[] }) {
         </div>
       ) : null}
       {items.length > 0 ? (
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-[#524E49]">{unread} belum dibaca dari {items.length} terbaru</p>
           {unread > 0 ? (
             <button
@@ -53,7 +53,7 @@ export function NotificationList({ items }: { items: Notification[] }) {
               onClick={markAll}
               disabled={busy}
               aria-label="Tandai semua notifikasi sebagai dibaca"
-              className="rounded border border-[#B5AFA8] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56] disabled:opacity-50"
+              className="inline-flex min-h-11 items-center justify-center rounded border border-[#B5AFA8] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56] disabled:opacity-50 md:min-h-0"
             >
               tandai semua dibaca
             </button>
@@ -85,7 +85,7 @@ export function NotificationList({ items }: { items: Notification[] }) {
                   type="button"
                   onClick={() => markOne(n.id)}
                   aria-label="Tandai notifikasi ini sebagai dibaca"
-                  className="px-2 py-1 text-xs text-[#7A6B56] hover:underline"
+                  className="inline-flex min-h-11 shrink-0 items-center px-2 py-1 text-xs text-[#7A6B56] hover:underline md:min-h-0"
                 >
                   tandai dibaca
                 </button>

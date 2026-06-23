@@ -3,37 +3,36 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  markNotificationRead as coreMarkRead,
+  markAllNotificationsRead as coreMarkAllRead,
+  type NotificationResult,
+} from "@datum/core";
 
-const MarkReadInput = z.object({
+export type { NotificationResult };
+
+const MarkReadFormInput = z.object({
   notificationId: z.string().uuid(),
 });
-
-export type NotificationResult = { ok: true } | { ok: false; error: string };
 
 export async function markNotificationRead(formData: FormData): Promise<NotificationResult> {
   let input;
   try {
-    input = MarkReadInput.parse({ notificationId: formData.get("notificationId") });
+    input = MarkReadFormInput.parse({ notificationId: formData.get("notificationId") });
   } catch {
     return { ok: false, error: "Form tidak valid" };
   }
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", input.notificationId);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreMarkRead(supabase, input.notificationId);
+  if (!result.ok) return result;
   revalidatePath("/notifications");
   return { ok: true };
 }
 
 export async function markAllNotificationsRead(): Promise<NotificationResult> {
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .is("read_at", null);
-  if (error) return { ok: false, error: error.message };
+  const result = await coreMarkAllRead(supabase);
+  if (!result.ok) return result;
   revalidatePath("/notifications");
   return { ok: true };
 }

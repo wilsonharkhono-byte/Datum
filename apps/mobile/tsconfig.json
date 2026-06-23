@@ -11,7 +11,9 @@
       "@datum/types": ["../../packages/types/src"],
       "@datum/types/*": ["../../packages/types/src/*"],
       "@datum/db": ["../../packages/db/src"],
-      "@datum/db/*": ["../../packages/db/src/*"]
+      "@datum/db/*": ["../../packages/db/src/*"],
+      "@datum/core": ["../../packages/core/src"],
+      "@datum/core/*": ["../../packages/core/src/*"]
     },
     "types": ["react-native", "jest"]
   },
@@ -19,6 +21,10 @@
     "**/*.ts",
     "**/*.tsx",
     "expo-env.d.ts",
+    "nativewind-env.d.ts",
     ".expo/types/**/*.ts"
+  ],
+  "exclude": [
+    "tests/no-service-role.test.ts"
   ]
 }

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { describeAttachment, attachmentSkipReason } from "@/lib/attachments/analyze";
@@ -42,6 +43,10 @@ export async function GET(req: Request) {
       console.warn("[cron/analyze-attachments] claim RPC missing — migration not applied yet");
       return NextResponse.json({ skipped: "migration_pending" });
     }
+    console.error(
+      `[cron/analyze-attachments] claim RPC failed: code=${error.code} message=${error.message}`,
+    );
+    Sentry.captureException(new Error(error.message), { extra: { code: error.code } });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -81,6 +86,8 @@ export async function GET(req: Request) {
         .eq("id", att.id);
       done++;
     } catch (e) {
+      console.warn(`[cron/analyze-attachments] attachment ${att.id} failed: ${errMsg(e)}`);
+      Sentry.captureException(e, { extra: { attachmentId: att.id } });
       await supabase
         .from("card_attachments")
         .update({ ai_status: "failed", ai_error: errMsg(e), ai_processed_at: now() })
@@ -89,5 +96,10 @@ export async function GET(req: Request) {
     }
   }
 
+  if ((claimed?.length ?? 0) > 0) {
+    console.log(
+      `[cron/analyze-attachments] summary: claimed=${claimed?.length ?? 0} done=${done} skipped=${skipped} failed=${failed}`,
+    );
+  }
   return NextResponse.json({ claimed: claimed?.length ?? 0, done, skipped, failed });
 }

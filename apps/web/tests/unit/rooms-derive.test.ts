@@ -9,7 +9,7 @@ import {
   stageProgress,
   type Room,
   type RoomGateCell,
-} from "@/lib/rooms/derive";
+} from "@datum/core";
 import type { GateCode } from "@datum/types";
 
 function cell(gate: GateCode, status: RoomGateCell["status"]): RoomGateCell {

@@ -305,8 +305,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         // Never lose the text: park it in the offline queue (the user bubble
         // stays visible in the thread) and announce it with an amber bubble.
         // No "Coba lagi" here — the drain triggers re-send automatically.
-        enqueue(projectId, { mode: runMode, text: input, ts: Date.now() });
-        setQueueCount(readQueue(projectId).length);
+        await enqueue(projectId, { mode: runMode, text: input, ts: Date.now() });
+        setQueueCount((await readQueue(projectId)).length);
         setMessages((m) => [...m, { role: "assistant" as const, content: QUEUED_NOTICE, queued: true }]);
       } else {
         const msg = `Gagal: ${e instanceof Error ? e.message : String(e)}`;
@@ -360,7 +360,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   // is what stops an overlapping drain from double-sending meanwhile.
   async function drainQueue() {
     if (drainingRef.current || busyRef.current) return;
-    const items = drain(projectId);
+    const items = await drain(projectId);
     setQueueCount(items.length);
     if (items.length === 0) return;
     drainingRef.current = true;
@@ -374,13 +374,13 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         try {
           if (item.mode === "tanya") await runTanya(item.text);
           else await runCatat(item.text, null);
-          remove(projectId, item.id);
+          await remove(projectId, item.id);
         } catch (e) {
           if (!(e instanceof NetworkError)) {
             // The server received and rejected this item — re-sending the
             // same payload won't succeed, so drop it (the text stays visible
             // in the thread) instead of wedging the queue head forever.
-            remove(projectId, item.id);
+            await remove(projectId, item.id);
             setMessages((m) => [...m, {
               role: "assistant" as const,
               content: `Gagal mengirim pesan tertunda: ${e instanceof Error ? e.message : String(e)}`,
@@ -390,7 +390,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           break; // stop on first failure; remaining items stay queued
         } finally {
           inFlightIds.current.delete(item.id);
-          setQueueCount(readQueue(projectId).length);
+          setQueueCount((await readQueue(projectId)).length);
         }
       }
     } finally {
@@ -429,8 +429,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         {/* Layer 1 — signature dark header bar.
             Carries the assistant label, segmented mode control, and helper text.
             On mobile (when onClose is provided), shows a close button instead. */}
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[var(--text-inverse)]">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[var(--text-inverse)]">
+          <div className="flex min-w-0 items-center gap-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)]">
               <SparkIcon size={12} /> Asisten
             </span>
@@ -457,7 +457,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {queueCount > 0 ? (
               <span
                 className="rounded border border-[var(--flag-warning)]/40 bg-[var(--flag-warning-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--flag-warning)]"
@@ -547,9 +547,12 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         </button>
       ) : null}
 
-      {/* Mobile full-screen sheet */}
+      {/* Mobile full-screen sheet. Safe-area insets keep the dark header clear
+          of the notch/status bar and the input clear of the home indicator. */}
       {mobileOpen ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-[var(--surface)] md:hidden">
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] md:hidden"
+        >
           {renderDock(() => setMobileOpen(false))}
         </div>
       ) : null}

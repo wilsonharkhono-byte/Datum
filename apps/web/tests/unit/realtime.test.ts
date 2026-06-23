@@ -27,12 +27,6 @@ vi.mock("@/lib/supabase/client", () => ({
   createSupabaseBrowserClient: () => supabaseMock,
 }));
 
-// realtime.ts debounces via window.setTimeout; the node test env has no window.
-vi.stubGlobal("window", {
-  setTimeout: (fn: () => void, ms?: number) => setTimeout(fn, ms),
-  clearTimeout: (id: number) => clearTimeout(id),
-});
-
 import { subscribeToProjectChanges } from "@/lib/cards/realtime";
 
 beforeEach(() => {

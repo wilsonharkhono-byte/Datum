@@ -3,9 +3,11 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { GateCodes } from "@datum/types";
-import { evaluateGate, RULE_VERSION } from "./readiness-rules";
-import type { CardEvent } from "@datum/db";
+import { recomputeProjectGates as coreRecomputeProjectGates } from "@datum/core";
+
+// NOTE: recomputeProjectGates (the JS rule engine) is NOT web-only — its body
+// lives in @datum/core/gates/recompute. This wrapper adds auth + revalidatePath.
+// Mobile calls core.recomputeProjectGates directly (no revalidatePath needed).
 
 const RecomputeInput = z.object({
   projectId:   z.string().uuid(),
@@ -33,98 +35,18 @@ export async function recomputeAreaGateStatus(formData: FormData): Promise<Recom
  * Project-wide recompute of every (area, gate) cell. Shared by the manual
  * button above and the fire-and-forget trigger after gate-relevant
  * card_event inserts (lib/cards/mutations.ts createCardEvent).
+ *
+ * After a gate mutation, mobile won't call this directly — cron/realtime
+ * covers invalidation. The web wrapper calls revalidatePath; mobile does not.
  */
 export async function recomputeProjectGates(
   projectId:   string,
   projectCode: string,
 ): Promise<RecomputeResult> {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
-
-  // 1. Load all areas for the project
-  const { data: areas, error: aErr } = await supabase
-    .from("areas").select("id").eq("project_id", projectId);
-  if (aErr) return { ok: false, error: aErr.message };
-  if (!areas || areas.length === 0) {
-    return { ok: true, cellsUpdated: 0, ruleVersion: RULE_VERSION };
+  const result = await coreRecomputeProjectGates(supabase, projectId, projectCode);
+  if (result.ok) {
+    revalidatePath(`/project/${projectCode}/schedule`);
   }
-
-  // 2. For each area, fetch card_events on cards linked to that area
-  //    Two-step query for type clarity
-  const { data: cardLinks, error: clErr } = await supabase
-    .from("card_areas")
-    .select("card_id, area_id, cards!inner(project_id)")
-    .eq("cards.project_id", projectId);
-  if (clErr) return { ok: false, error: clErr.message };
-
-  const cardsByArea = new Map<string, string[]>();
-  for (const link of cardLinks ?? []) {
-    const arr = cardsByArea.get(link.area_id) ?? [];
-    arr.push(link.card_id);
-    cardsByArea.set(link.area_id, arr);
-  }
-
-  const allCardIds = Array.from(new Set([...cardsByArea.values()].flat()));
-  const eventsByCard = new Map<string, CardEvent[]>();
-  if (allCardIds.length > 0) {
-    const { data: events, error: eErr } = await supabase
-      .from("card_events")
-      .select("*")
-      .in("card_id", allCardIds);
-    if (eErr) return { ok: false, error: eErr.message };
-    for (const ev of events ?? []) {
-      const arr = eventsByCard.get(ev.card_id) ?? [];
-      arr.push(ev);
-      eventsByCard.set(ev.card_id, arr);
-    }
-  }
-
-  // 2b. A gate the PM manually confirmed (status='passed' + actual_end_date)
-  //     is a human decision, NOT a derived value — recompute must never
-  //     clobber it back to a rule-computed state, or the next gate-relevant
-  //     card_event (which fire-and-forget triggers a recompute) would silently
-  //     "un-pass" the gate. Load those sticky cells and skip their status on
-  //     the upsert below; we still refresh their recompute bookkeeping
-  //     (readiness_score/last_recomputed_at/stale) for diagnostics.
-  const { data: passedCells, error: pErr } = await supabase
-    .from("area_gate_status")
-    .select("area_id, gate_code")
-    .eq("project_id", projectId)
-    .eq("status", "passed")
-    .not("actual_end_date", "is", null);
-  if (pErr) return { ok: false, error: pErr.message };
-  const stickyPassed = new Set(
-    (passedCells ?? []).map((c) => `${c.area_id}|${c.gate_code}`),
-  );
-
-  // 3. For each (area, gate), evaluate the rule and upsert area_gate_status
-  const now = new Date().toISOString();
-  let cellsUpdated = 0;
-  for (const area of areas) {
-    const areaCardIds = cardsByArea.get(area.id) ?? [];
-    const areaEvents = areaCardIds.flatMap((cid) => eventsByCard.get(cid) ?? []);
-    for (const gate of GateCodes) {
-      const result = evaluateGate(gate, { events: areaEvents });
-      const isSticky = stickyPassed.has(`${area.id}|${gate}`);
-      const { error: uErr } = await supabase.from("area_gate_status").upsert({
-        project_id:           projectId,
-        area_id:              area.id,
-        gate_code:            gate,
-        // Sticky-passed cells keep their confirmed status + blocking_reason;
-        // only recompute bookkeeping (score/last_recomputed_at/stale) refreshes.
-        ...(isSticky
-          ? {}
-          : { status: result.status, blocking_reason: result.blockingReason }),
-        readiness_score:      result.readinessScore,
-        last_recomputed_at:   now,
-        stale:                false,
-      }, { onConflict: "project_id,area_id,gate_code" });
-      if (uErr) return { ok: false, error: `${gate}/${area.id}: ${uErr.message}` };
-      cellsUpdated++;
-    }
-  }
-
-  revalidatePath(`/project/${projectCode}/schedule`);
-  return { ok: true, cellsUpdated, ruleVersion: RULE_VERSION };
+  return result;
 }

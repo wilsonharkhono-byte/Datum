@@ -217,7 +217,7 @@ export function CreateStaffForm({
         <label htmlFor={`${formId}-pw`} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
           Password sementara *
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             id={`${formId}-pw`}
             type="text"
@@ -226,13 +226,13 @@ export function CreateStaffForm({
             disabled={pending}
             required
             minLength={8}
-            className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-sm focus:border-[var(--sand-dark)] focus:outline-none"
+            className="min-h-11 min-w-0 flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-sm focus:border-[var(--sand-dark)] focus:outline-none md:min-h-0"
           />
           <button
             type="button"
             onClick={() => setPassword(generateTempPassword())}
             disabled={pending}
-            className="rounded border border-[var(--border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--text-secondary)]"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded border border-[var(--border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--text-secondary)] md:min-h-0"
           >
             Acak ulang
           </button>

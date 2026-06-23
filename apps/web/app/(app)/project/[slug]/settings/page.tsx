@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getProjectMembers, getAvailableStaff } from "@/lib/projects/member-queries";
+import { getProjectMembers, getAvailableStaff, getProjectBySlug } from "@datum/core";
 import { getProjectAreas } from "@/lib/projects/area-queries";
 import { getCurrentStaff, canManageAccess } from "@/lib/auth/require-role";
 import { ProjectMembersList } from "@/components/projects/ProjectMembersList";
@@ -30,11 +30,7 @@ export default async function ProjectSettingsPage({
   }
   const canManage = canManageAccess(caller);
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, project_code, project_name, client_name, location, status, target_handover, kickoff_date")
-    .eq("project_code", slug.toUpperCase())
-    .maybeSingle();
+  const project = await getProjectBySlug(supabase, slug);
   if (!project) {
     return (
       <div className="mx-auto max-w-3xl p-6 text-[var(--flag-critical)]">

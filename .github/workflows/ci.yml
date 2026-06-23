@@ -23,7 +23,13 @@ jobs:
 
       - run: pnpm typecheck
       - run: pnpm test
-      # - run: pnpm lint   # disabled until each package has a real lint config; placeholder echoes still pass
+      - name: Lint (web, non-blocking)
+        # react-hooks backlog is tracked separately; report violations without failing CI.
+        run: pnpm --filter web lint
+        continue-on-error: true
+      - name: Lint (mobile, non-blocking)
+        run: pnpm --filter mobile lint
+        continue-on-error: true
 
   web-e2e:
     runs-on: ubuntu-latest
