@@ -1,9 +1,10 @@
 /**
  * MobileAddEventForm — collapsible form for adding a card event on mobile.
  *
- * Mirrors web AddEventForm field sets (Bahasa Indonesia labels). Attachment
- * upload is scoped to view + caption only (read screen already handles it);
- * a native file-picker is not wired here — a clearly-labeled TODO is left.
+ * Mirrors web AddEventForm field sets (Bahasa Indonesia labels). Supports
+ * optional photo/image attachment via expo-image-picker after the event is
+ * created. Attachment failures are shown as warnings but never block saving
+ * the event itself.
  *
  * NOTE: Gate recompute + principal high-risk notifications are web-only.
  * A mobile-created event won't fire those — acceptable per spec.
@@ -16,12 +17,17 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 import type { EventKind } from "@datum/types";
 import { collectPayloadFromEntries } from "@datum/core";
 import { Text } from "@/components/ui/Text";
 import { useAddEvent } from "@/lib/query/mutations";
+import { supabase } from "@/lib/supabase/client";
+import {
+  pickImageAsset,
+  uploadCardAttachment,
+  type PickedAsset,
+} from "@/lib/attachments/pick-and-upload";
 
 // ─── Labels ───────────────────────────────────────────────────────────────────
 
@@ -195,6 +201,9 @@ export function MobileAddEventForm({
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [occurredAt, setOccurredAt] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [attachWarning, setAttachWarning] = useState<string | null>(null);
+  const [pendingAsset, setPendingAsset] = useState<PickedAsset | null>(null);
+  const [pickingFile, setPickingFile] = useState(false);
 
   const addEvent = useAddEvent(code, slug);
 
@@ -202,45 +211,78 @@ export function MobileAddEventForm({
     setFieldValues({});
     setOccurredAt("");
     setError(null);
+    setAttachWarning(null);
+    setPendingAsset(null);
   }
 
   function handleKindChange(newKind: EventKind) {
     setKind(newKind);
     setFieldValues({});
     setError(null);
+    setAttachWarning(null);
   }
 
   function handleFieldChange(name: string, value: string) {
     setFieldValues((prev) => ({ ...prev, [name]: value }));
   }
 
+  async function handlePickFile() {
+    setPickingFile(true);
+    setAttachWarning(null);
+    try {
+      const asset = await pickImageAsset();
+      setPendingAsset(asset);
+    } finally {
+      setPickingFile(false);
+    }
+  }
+
   async function handleSubmit() {
     setError(null);
+    setAttachWarning(null);
+
     // Build payload entries — prefix each with "payload_" so collectPayloadFromEntries works
     const entries = Object.entries(fieldValues).map(
       ([k, v]) => [`payload_${k}`, v] as const,
     );
     const payload = collectPayloadFromEntries(entries);
 
-    addEvent.mutate(
-      {
+    let eventId: string;
+    try {
+      const res = await addEvent.mutateAsync({
         cardId,
         projectId,
         eventKind: kind,
         payload,
         occurredAt: occurredAt || undefined,
         loggedByStaffId,
-      },
-      {
-        onSuccess: () => {
-          setOpen(false);
-          resetForm();
-        },
-        onError: (e) => {
-          setError(e instanceof Error ? e.message : "Gagal menyimpan aktivitas");
-        },
-      },
-    );
+      });
+      eventId = res.eventId;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal menyimpan aktivitas");
+      return;
+    }
+
+    // Upload attachment if one was picked — best-effort, never blocks event save.
+    if (pendingAsset) {
+      const uploadRes = await uploadCardAttachment(supabase, {
+        projectId,
+        cardId,
+        cardEventId: eventId,
+        asset: pendingAsset,
+      });
+      if (!uploadRes.ok) {
+        // Skipped (oversize/unsupported) or upload error — warn but don't fail.
+        setAttachWarning(
+          "skipped" in uploadRes && uploadRes.skipped
+            ? uploadRes.reason
+            : uploadRes.error,
+        );
+      }
+    }
+
+    setOpen(false);
+    resetForm();
   }
 
   if (!open) {
@@ -310,12 +352,40 @@ export function MobileAddEventForm({
         />
       </View>
 
-      {/* Attachment note — TODO */}
-      <View className="mb-3 rounded bg-surface-alt px-3 py-2">
-        <Text className="text-[11px] text-text-muted italic">
-          Lampiran foto / dokumen: buka kartu di browser untuk mengunggah (TODO: native file picker).
-        </Text>
+      {/* Attachment picker */}
+      <View className="mb-3">
+        {pendingAsset ? (
+          <View className="flex-row items-center gap-2 rounded border border-border/50 bg-surface-alt px-3 py-2">
+            <Text className="flex-1 text-[12px] text-text-sec" numberOfLines={1}>
+              📎 {pendingAsset.name}
+            </Text>
+            <Pressable
+              onPress={() => setPendingAsset(null)}
+              disabled={addEvent.isPending}
+              accessibilityLabel="Hapus lampiran"
+            >
+              <Text className="text-[13px] text-text-muted">✕</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => void handlePickFile()}
+            disabled={addEvent.isPending || pickingFile}
+            className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded border border-dashed border-border/60 bg-surface-alt px-4 active:opacity-70"
+            accessibilityLabel="Lampirkan foto"
+          >
+            {pickingFile ? (
+              <ActivityIndicator size="small" color="#9C8B75" />
+            ) : (
+              <Text className="text-[12px] text-text-sec">📎 + Lampiran</Text>
+            )}
+          </Pressable>
+        )}
       </View>
+
+      {attachWarning ? (
+        <Text className="mb-2 text-[11px] text-warning">{attachWarning}</Text>
+      ) : null}
 
       {error ? (
         <Text className="mb-2 text-[12px] text-red-700">{error}</Text>
@@ -324,7 +394,7 @@ export function MobileAddEventForm({
       {/* Actions */}
       <View className="flex-row gap-2">
         <Pressable
-          onPress={handleSubmit}
+          onPress={() => void handleSubmit()}
           disabled={addEvent.isPending}
           className={`flex-1 min-h-[44px] items-center justify-center rounded ${
             addEvent.isPending ? "bg-surface-alt" : "bg-primary active:opacity-90"

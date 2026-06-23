@@ -2,7 +2,11 @@
  * MessageInput.tsx — text input bar for the mobile assistant.
  *
  * Tanya mode: free text → submit.
- * Catat mode: free text + optional image/PDF from the device picker → submit.
+ * Catat mode: free text + optional image from the device photo library → submit.
+ *
+ * expo-image-picker is now a first-class dependency (installed). The attach
+ * button is shown unconditionally in Catat mode, using pickImageAsset() from
+ * the shared lib/attachments helper.
  *
  * Guard: disabled while sending or when there's neither text nor an attached file.
  */
@@ -13,32 +17,9 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 import { Text } from "@/components/ui/Text";
-
-// ── expo-image-picker ─────────────────────────────────────────────────────────
-// expo-image-picker is an optional peer dependency. When it is not installed
-// (e.g. on CI or a bare workflow without the module linked) the file-attach
-// button is hidden rather than crashing. This avoids a hard dependency on a
-// package that may not be linked in all Expo managed-workflow environments.
-// Add `expo-image-picker` to `apps/mobile/package.json` dependencies to enable.
-let _ImagePicker: {
-  requestMediaLibraryPermissionsAsync(): Promise<{ status: string }>;
-  launchImageLibraryAsync(opts: {
-    mediaTypes: string[];
-    allowsEditing: boolean;
-    quality: number;
-  }): Promise<{ canceled: boolean; assets: { uri: string; fileName?: string | null; mimeType?: string | null; fileSize?: number | null }[] }>;
-} | null = null;
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
-  _ImagePicker = require("expo-image-picker");
-} catch {
-  // Package not installed — file attachment is disabled
-  _ImagePicker = null;
-}
+import { pickImageAsset, type PickedAsset } from "@/lib/attachments/pick-and-upload";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,29 +62,14 @@ export function MessageInput({ mode, disabled, sending, onSend }: Props) {
   const canSend = !disabled && !sending && (text.trim().length > 0 || !!file);
 
   async function pickFile() {
-    if (!_ImagePicker) return; // package not installed
-
-    // Request media library permission on iOS.
-    if (Platform.OS !== "web") {
-      const { status } =
-        await _ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") return;
-    }
-
-    const result = await _ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: false,
-      quality: 0.85,
-    });
-
-    if (result.canceled || result.assets.length === 0) return;
-    const asset = result.assets[0]!;
+    const asset: PickedAsset | null = await pickImageAsset();
+    if (!asset) return;
 
     setFile({
       uri: asset.uri,
-      name: asset.fileName ?? `foto-${Date.now()}.jpg`,
-      mime: asset.mimeType ?? "image/jpeg",
-      size: asset.fileSize ?? 0,
+      name: asset.name,
+      mime: asset.mimeType,
+      size: asset.size,
     });
   }
 
@@ -136,10 +102,10 @@ export function MessageInput({ mode, disabled, sending, onSend }: Props) {
       )}
 
       <View className="flex-row items-end gap-2">
-        {/* Attach button — Catat mode only, when expo-image-picker is installed */}
-        {mode === "catat" && !!_ImagePicker && (
+        {/* Attach button — Catat mode only */}
+        {mode === "catat" && (
           <Pressable
-            onPress={pickFile}
+            onPress={() => void pickFile()}
             disabled={disabled || sending}
             accessibilityLabel="Lampirkan file"
             className="mb-1 h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-surface-alt active:opacity-70"

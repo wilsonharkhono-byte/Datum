@@ -15,13 +15,10 @@ import { useState } from "react";
 import { View, Pressable, ScrollView, TextInput, Switch } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Crypto from "expo-crypto";
 import {
   createCard,
   createCardEvent,
-  attachToEvent,
   linkCardToArea,
-  attachmentStoragePath,
   keys,
 } from "@datum/core";
 import type { Proposal } from "@datum/core";
@@ -31,6 +28,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useSession } from "@/lib/session/session";
 import { Text } from "@/components/ui/Text";
 import { Badge } from "@/components/ui/Badge";
+import { uploadCardAttachment } from "@/lib/attachments/pick-and-upload";
 import type { AttachedFile } from "./MessageInput";
 
 // ─── Kind labels (Indonesian) ─────────────────────────────────────────────────
@@ -155,40 +153,27 @@ export function ProposalCard({
         return;
       }
 
-      // 3. Upload pending file if attached
+      // 3. Upload pending file if attached — uses shared helper (fetch(uri).blob() pattern).
       if (pendingFile) {
-        const uuid = Crypto.randomUUID();
-        const storagePath = attachmentStoragePath({
+        const uploadRes = await uploadCardAttachment(supabase, {
           projectId: proposal.projectId,
           cardId,
           cardEventId: eventRes.eventId,
-          fileName: pendingFile.name,
-          uuid,
+          asset: {
+            uri: pendingFile.uri,
+            name: pendingFile.name,
+            mimeType: pendingFile.mime,
+            size: pendingFile.size,
+          },
         });
 
-        // Upload to Supabase Storage
-        const { error: upErr } = await supabase.storage
-          .from("card-attachments")
-          .upload(storagePath, { uri: pendingFile.uri } as unknown as File, {
-            contentType: pendingFile.mime,
-            upsert: false,
-          });
-
-        if (upErr) {
+        if (!uploadRes.ok) {
+          const msg =
+            "skipped" in uploadRes && uploadRes.skipped
+              ? uploadRes.reason
+              : uploadRes.error;
           setStatus("error");
-          setError(`Event tersimpan tapi upload gagal: ${upErr.message}`);
-          return;
-        }
-
-        const attachRes = await attachToEvent(supabase, {
-          cardEventId: eventRes.eventId,
-          storagePath,
-          mimeType: pendingFile.mime,
-        });
-
-        if (!attachRes.ok) {
-          setStatus("error");
-          setError(`Event tersimpan tapi simpan lampiran gagal: ${attachRes.error}`);
+          setError(`Event tersimpan tapi lampiran gagal: ${msg}`);
           return;
         }
       }
