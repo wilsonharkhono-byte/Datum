@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 import { backScheduleSteps } from "@/lib/steps/back-schedule";
+import { projectStepStatus } from "@/lib/steps/status";
 import type { TradeStepDep, TradeStepTemplate } from "@/lib/steps/types";
 
 /** Call the SQL instantiation function for an area (idempotent). */
@@ -49,4 +50,122 @@ export async function writePlannedDates(
       .eq("area_id", areaId)
       .eq("step_code", code);
   }
+}
+
+const EVENT_STATUS: Record<string, "not_started" | "in_progress" | "blocked" | "done"> = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  blocked: "blocked",
+  stalled: "blocked",
+  done_with_defects: "done",
+  accepted: "done",
+};
+
+/** Re-derive an area_step's status + actuals from its events, checkpoints, punch items. */
+export async function projectAreaStep(
+  supabase: SupabaseClient<Database>,
+  areaStepId: string,
+): Promise<void> {
+  const [evRes, cpRes, punchRes] = await Promise.all([
+    supabase.from("area_step_events").select("occurred_at, created_at, status, note, percent_complete").eq("area_step_id", areaStepId),
+    supabase.from("area_step_checkpoints").select("required, result").eq("area_step_id", areaStepId),
+    supabase.from("punch_items").select("severity, status").eq("area_step_id", areaStepId),
+  ]);
+  if (evRes.error || cpRes.error || punchRes.error) {
+    throw evRes.error ?? cpRes.error ?? punchRes.error;
+  }
+  const events = evRes.data;
+  const cps = cpRes.data;
+  const punch = punchRes.data;
+
+  const r = projectStepStatus({
+    workEvents: (events ?? []).map((e) => ({
+      occurred_at: e.occurred_at,
+      created_at: e.created_at,
+      payload: {
+        status: e.status,
+        percent_complete: e.percent_complete ?? undefined,
+        blocked_on: e.note ?? undefined,
+      },
+    })),
+    checkpoints: (cps ?? []) as { required: boolean; result: "pending" | "pass" | "fail" }[],
+    punchItems: (punch ?? []) as { severity: "kritis" | "mayor" | "minor"; status: "open" | "fixing" | "closed" }[],
+  });
+
+  const { error: upErr } = await supabase
+    .from("area_steps")
+    .update({
+      status: r.status,
+      actual_start: r.actualStart,
+      actual_end: r.actualEnd,
+      last_progress_at: r.lastProgressAt,
+      blocking_reason: r.blockingReason,
+    })
+    .eq("id", areaStepId);
+  if (upErr) throw upErr;
+}
+
+export type UpdateAreaStepArgs = {
+  areaStepId: string;
+  status?: "not_started" | "in_progress" | "blocked" | "done";
+  note?: string;
+  percentComplete?: number;
+  loggedByStaffId?: string;
+};
+
+/** Log one step event (status change or progress note) then re-project. */
+export async function updateAreaStep(
+  supabase: SupabaseClient<Database>,
+  args: UpdateAreaStepArgs,
+): Promise<void> {
+  const { data: step, error } = await supabase
+    .from("area_steps")
+    .select("project_id, status")
+    .eq("id", args.areaStepId)
+    .single();
+  if (error || !step) throw error ?? new Error("area_step not found");
+
+  const eventStatus = args.status ?? EVENT_STATUS[step.status] ?? "in_progress";
+
+  const { error: insErr } = await supabase.from("area_step_events").insert({
+    area_step_id: args.areaStepId,
+    project_id: step.project_id,
+    status: eventStatus,
+    note: args.note ?? null,
+    percent_complete: args.percentComplete ?? null,
+    logged_by_staff_id: args.loggedByStaffId ?? null,
+  });
+  if (insErr) throw insErr;
+
+  await projectAreaStep(supabase, args.areaStepId);
+}
+
+export type SetCheckpointArgs = {
+  checkpointId: string;
+  result: "pending" | "pass" | "fail";
+  checkedByStaffId?: string;
+};
+
+export async function setCheckpointResult(
+  supabase: SupabaseClient<Database>,
+  args: SetCheckpointArgs,
+): Promise<void> {
+  const { data: cp, error } = await supabase
+    .from("area_step_checkpoints")
+    .select("area_step_id")
+    .eq("id", args.checkpointId)
+    .single();
+  if (error || !cp) throw error ?? new Error("checkpoint not found");
+
+  const { error: upErr } = await supabase
+    .from("area_step_checkpoints")
+    .update({
+      result: args.result,
+      checked_by: args.checkedByStaffId ?? null,
+      checked_at: new Date().toISOString(),
+    })
+    .eq("id", args.checkpointId);
+  if (upErr) throw upErr;
+
+  await projectAreaStep(supabase, cp.area_step_id);
 }
