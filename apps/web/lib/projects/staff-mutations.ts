@@ -6,80 +6,14 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentStaff, canManageAccess } from "@/lib/auth/require-role";
 import { CreateStaffInput } from "@datum/core";
 import type { z as zType } from "zod";
+import {
+  createStaffWithPasswordCore,
+  type CreateStaffResult,
+} from "@/lib/projects/staff-core";
 
-export type CreateStaffResult =
-  | { ok: true; staffId: string; email: string }
-  | { ok: false; error: string };
+export type { CreateStaffResult };
 
-// ─── Shared core helper ───────────────────────────────────────────────────────
-
-type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
 type CreateStaffInputType = zType.infer<typeof CreateStaffInput>;
-
-/**
- * Core staff-creation logic: auth.admin.createUser + staff insert +
- * optional project_staff assignment. Takes the admin client + validated
- * input as params — no FormData, no auth/authz (callers handle those).
- *
- * Returns { ok: true, staffId, email } on success, { ok: false, error } on failure.
- * Rolls back the auth user if the staff insert fails.
- */
-export async function createStaffWithPasswordCore(
-  admin: AdminClient,
-  input: CreateStaffInputType,
-): Promise<CreateStaffResult> {
-  const { data: authData, error: authErr } = await admin.auth.admin.createUser({
-    email: input.email,
-    password: input.password,
-    email_confirm: true,
-    user_metadata: { full_name: input.fullName },
-  });
-
-  if (authErr || !authData.user) {
-    if (authErr?.message?.toLowerCase().includes("already")) {
-      return { ok: false, error: "Email ini sudah terdaftar di Supabase Auth" };
-    }
-    return { ok: false, error: authErr?.message ?? "Gagal membuat akun auth" };
-  }
-
-  const newUserId = authData.user.id;
-
-  const { error: staffErr } = await admin.from("staff").insert({
-    id:           newUserId,
-    full_name:    input.fullName,
-    role:         input.role,
-    email:        input.email,
-    cost_visible: input.costVisible ?? false,
-    active:       true,
-  });
-
-  if (staffErr) {
-    // Roll back the auth user so we don't leave an orphan
-    await admin.auth.admin.deleteUser(newUserId);
-    return { ok: false, error: `Gagal membuat staf: ${staffErr.message}` };
-  }
-
-  if (input.projectId && input.roleOnProject) {
-    const today = new Date().toISOString().slice(0, 10);
-    const { error: psErr } = await admin.from("project_staff").insert({
-      project_id:      input.projectId,
-      staff_id:        newUserId,
-      role_on_project: input.roleOnProject,
-      cost_visible:    input.costVisible ?? false,
-      active_from:     today,
-    });
-    if (psErr) {
-      return {
-        ok: false,
-        error: `Staf dibuat tapi gagal ditambahkan ke proyek: ${psErr.message}`,
-      };
-    }
-  }
-
-  return { ok: true, staffId: newUserId, email: input.email };
-}
-
-// ─── Server action (FormData) ─────────────────────────────────────────────────
 
 /**
  * Admin-only flow: provisions a new auth.users + staff row in one shot.
@@ -89,6 +23,7 @@ export async function createStaffWithPasswordCore(
  *
  * Uses service-role admin client — stays web-only (never in @datum/core or mobile).
  * Validation schema (CreateStaffInput) is shared via @datum/core.
+ * Core creation logic is in staff-core.ts (server-only, not "use server").
  */
 export async function createStaffWithPassword(
   formData: FormData,
