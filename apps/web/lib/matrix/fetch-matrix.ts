@@ -17,6 +17,7 @@ export type MatrixArea = {
   area_name: string;
   floor: string | null;
   sort_order: number;
+  area_type: string;
 };
 
 export type MatrixData = {
@@ -40,7 +41,7 @@ export async function fetchMatrix(projectId: string): Promise<MatrixData | null>
 
   const { data: areaRows } = await supabase
     .from("areas")
-    .select("id, area_code, area_name, floor, sort_order")
+    .select("id, area_code, area_name, floor, sort_order, area_type")
     .eq("project_id", projectId)
     .order("sort_order");
 
