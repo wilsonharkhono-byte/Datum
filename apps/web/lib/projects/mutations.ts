@@ -14,7 +14,8 @@ import {
 
 export type { CreateProjectResult } from "@datum/core";
 export type { UpdateProjectResult } from "@datum/core";
-export { CreateProjectInput };
+// NOTE: CreateProjectInput (a Zod value) is NOT re-exported — a "use server" file
+// may only export async functions. Import it from "@datum/core" directly.
 
 export async function createProject(formData: FormData): Promise<CreateProjectResult> {
   let input;

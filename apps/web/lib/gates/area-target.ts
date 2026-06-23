@@ -5,8 +5,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentStaff } from "@/lib/auth/get-current-user";
 import { setAreaTargetDate as coreSetAreaTargetDate } from "@datum/core";
 
-// Re-export types + schema from core so existing web importers are unbroken.
-export { TargetInput, type TargetInputType, type AreaTargetResult } from "@datum/core";
+// A "use server" file may only export async functions. Types only here; the
+// TargetInput schema value is imported from "@datum/core" directly where needed.
+export type { TargetInputType, AreaTargetResult } from "@datum/core";
 
 /**
  * R4 — set (or clear) the honest handover target for a single area.

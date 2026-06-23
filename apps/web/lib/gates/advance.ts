@@ -8,13 +8,13 @@ import {
   getGateCheckpoints as coreGetGateCheckpoints,
 } from "@datum/core";
 
-// Re-export types + schemas from core so existing web importers are unbroken.
-export {
-  MarkGatePassedInput,
-  ADVANCEABLE,
-  type MarkGatePassedInput as MarkGatePassedInputType,
-  type MarkGatePassedResult,
-  type GateCheckpoint,
+// A "use server" file may only export async functions. Re-export TYPES only;
+// the schema/const values (MarkGatePassedInput, ADVANCEABLE) are imported from
+// "@datum/core" directly by any consumer that needs them.
+export type {
+  MarkGatePassedInput as MarkGatePassedInputType,
+  MarkGatePassedResult,
+  GateCheckpoint,
 } from "@datum/core";
 
 /**
