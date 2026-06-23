@@ -41,6 +41,7 @@ import {
   notifyDraftPending,
   notifyPrincipalsOfHighRiskEvent,
 } from "@/lib/notifications/producers";
+import { sendExpoPush } from "@/lib/notifications/push-send";
 import { recomputeProjectGates } from "@/lib/gates/recompute";
 
 // Union of RELEVANT_KINDS in lib/gates/readiness-rules.ts — the kinds that can
@@ -198,6 +199,21 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
       cardSlug: cardRow.slug,
       cardTitle: cardRow.title,
     });
+    // Best-effort Expo push for watcher event — derive recipients same way producer does.
+    void (async () => {
+      const { data: members } = await supabase
+        .from("card_members").select("staff_id")
+        .eq("card_id", input.cardId).is("removed_at", null);
+      const recipientIds = [...new Set(
+        (members ?? []).map((m) => m.staff_id)
+          .filter((id): id is string => typeof id === "string" && id !== user.id),
+      )];
+      await sendExpoPush(recipientIds, {
+        title: `${input.eventKind} baru di "${cardRow.title}"`,
+        body:  `${input.eventKind} baru di "${cardRow.title}"`,
+        data:  { link: `/project/${input.projectCode}/cards/${cardRow.slug}` },
+      });
+    })().catch(console.warn);
     if (HIGH_RISK_KINDS.has(input.eventKind)) {
       const preview = pickPreview(parsedPayload);
       // notifyPrincipalsOfHighRiskEvent uses the service-role admin client —
@@ -293,6 +309,16 @@ export async function createComment(formData: FormData): Promise<CreateCommentRe
     cardComment:       { id: result.commentId, body: input.body },
     projectCode:       input.projectCode,
   });
+  // Best-effort Expo push for mention — same recipient filter as producer.
+  {
+    const recipientIds = result.mentions.filter((id) => id !== user.id);
+    const preview = input.body.length > 100 ? input.body.slice(0, 100) + "…" : input.body;
+    void sendExpoPush(recipientIds, {
+      title: "Anda disebut di komentar",
+      body:  preview,
+      data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
+    }).catch(console.warn);
+  }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -338,6 +364,16 @@ export async function editComment(formData: FormData): Promise<CreateCommentResu
     cardComment:       { id: input.commentId, body: input.body },
     projectCode:       input.projectCode,
   });
+  // Best-effort Expo push for mention in edited comment.
+  {
+    const recipientIds = result.mentions.filter((id) => id !== user.id);
+    const preview = input.body.length > 100 ? input.body.slice(0, 100) + "…" : input.body;
+    void sendExpoPush(recipientIds, {
+      title: "Anda disebut di komentar",
+      body:  preview,
+      data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
+    }).catch(console.warn);
+  }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true };
@@ -610,6 +646,21 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
         newStatus: input.status,
         actorId: user.id,
       });
+      // Best-effort Expo push for status change — same recipient derivation as producer.
+      void (async () => {
+        const { data: members } = await supabase
+          .from("card_members").select("staff_id")
+          .eq("card_id", input.cardId).is("removed_at", null);
+        const recipientIds = [...new Set(
+          (members ?? []).map((m) => m.staff_id)
+            .filter((id): id is string => typeof id === "string" && id !== user.id),
+        )];
+        await sendExpoPush(recipientIds, {
+          title: "Status kartu diperbarui",
+          body:  `Status "${cardRow.title}" diubah ke ${input.status}`,
+          data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
+        });
+      })().catch(console.warn);
     }
   }
 
@@ -739,6 +790,18 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
       cardTitle: cardRow.title,
       cardId: input.cardId,
     });
+    // Best-effort Expo push for draft pending — same principal query as producer.
+    void (async () => {
+      const { data: principals } = await supabase
+        .from("staff").select("id").eq("active", true).eq("role", "principal");
+      const recipientIds = (principals ?? [])
+        .map((s) => s.id).filter((id) => id !== user.id);
+      await sendExpoPush(recipientIds, {
+        title: "Draft menunggu approval",
+        body:  `Draft ${input.eventKind} baru menunggu approval untuk "${cardRow.title}"`,
+        data:  { link: "/review" },
+      });
+    })().catch(console.warn);
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
@@ -790,6 +853,14 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
       cardSlug: result.cardSlug,
       eventKind: result.eventKind,
     });
+    // Best-effort Expo push for draft approved — recipient is the draft author.
+    if (result.draftAuthorId !== user.id) {
+      void sendExpoPush([result.draftAuthorId], {
+        title: "Draft Anda disetujui",
+        body:  `Draft ${result.eventKind} Anda disetujui dan dicatat di kartu`,
+        data:  { link: `/project/${result.projectCode}/cards/${result.cardSlug}` },
+      }).catch(console.warn);
+    }
   }
 
   revalidatePath("/review");
@@ -833,6 +904,15 @@ export async function rejectCardEventDraft(formData: FormData): Promise<MemberRe
       reason: input.reason ?? null,
       eventKind: result.eventKind,
     });
+    // Best-effort Expo push for draft rejected — recipient is the draft author.
+    if (result.draftAuthorId !== user.id) {
+      const reasonText = input.reason ? ` — alasan: "${input.reason}"` : "";
+      void sendExpoPush([result.draftAuthorId], {
+        title: "Draft Anda ditolak",
+        body:  `Draft ${result.eventKind} Anda ditolak${reasonText}`,
+        data:  { link: "/review" },
+      }).catch(console.warn);
+    }
   }
 
   revalidatePath("/review");
