@@ -5,6 +5,7 @@ export { createKVPersister, type AsyncKV } from "./query/persister";
 export { makeQueryClient, CACHE_BUSTER, CACHE_MAX_AGE } from "./query/client";
 export { subscribeToProjectChanges, type CardsChange } from "./realtime/project";
 export { subscribeToOwnNotifications, type UnreadDelta } from "./realtime/notifications";
+export { subscribeToAreaGateChanges, type AreaGatesChange } from "./realtime/area-gates";
 
 export {
   getCurrentStaff,

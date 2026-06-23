@@ -20,6 +20,14 @@ import type { MatrixData, MatrixCell, ScheduledCell } from "@datum/core";
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+
+// ── realtime hook: capture calls so we can assert projectId is passed ─────────
+const mockUseAreaGatesRealtime = jest.fn();
+jest.mock("@/lib/realtime/useRealtimeInvalidation", () => ({
+  useAreaGatesRealtime: (...args: unknown[]) => mockUseAreaGatesRealtime(...args),
+  useProjectRealtime: jest.fn(),
+  useNotificationsRealtime: jest.fn(),
+}));
 jest.mock("@/lib/env", () => ({
   SUPABASE_URL: "https://test.supabase.co",
   SUPABASE_ANON_KEY: "test-anon-key",
@@ -208,6 +216,7 @@ describe("ScheduleScreen", () => {
     mockGetGateCheckpoints.mockResolvedValue(FIXTURE_CHECKPOINTS);
     mockMarkGatePassed.mockResolvedValue({ ok: true, completedDate: "2026-06-22" });
     mockSetAreaTargetDate.mockResolvedValue({ ok: true });
+    mockUseAreaGatesRealtime.mockReturnValue(undefined);
   });
 
   // ── Renders areas with gate statuses ────────────────────────────────────────
@@ -459,6 +468,29 @@ describe("ScheduleScreen", () => {
 
     expect(getByText("Belum mulai")).toBeTruthy();
     expect(getByText("Siap serah")).toBeTruthy();
+  });
+
+  // ── Realtime subscription ────────────────────────────────────────────────────
+
+  it("calls useAreaGatesRealtime with resolved projectId", () => {
+    const client = makeClient();
+    seedClient(client);
+    render(<ScheduleScreen />, { wrapper: wrapper(client) });
+    // useAreaGatesRealtime must have been called at least once with the project id
+    // (may also be called with undefined before board resolves)
+    const calledWithId = mockUseAreaGatesRealtime.mock.calls.some(
+      (args) => args[0] === PROJECT_ID,
+    );
+    expect(calledWithId).toBe(true);
+  });
+
+  it("does not crash when projectId is undefined (board not yet resolved)", () => {
+    const client = makeClient();
+    // Do not seed board data → projectId stays undefined on first render
+    mockGetBoardForProject.mockReturnValue(new Promise(() => {}));
+    expect(() => render(<ScheduleScreen />, { wrapper: wrapper(client) })).not.toThrow();
+    // hook called with undefined initially — that is valid
+    expect(mockUseAreaGatesRealtime).toHaveBeenCalledWith(undefined);
   });
 });
 

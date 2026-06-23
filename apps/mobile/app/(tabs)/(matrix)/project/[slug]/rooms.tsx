@@ -36,6 +36,7 @@ import {
   useReorderAreas,
   useApplyAreaProposal,
 } from "@/lib/query/mutations";
+import { useAreaGatesRealtime } from "@/lib/realtime/useRealtimeInvalidation";
 import { relativeTimeId, AREA_TYPES, type AreaType } from "@datum/core";
 import type { Area } from "@datum/db";
 
@@ -219,6 +220,10 @@ export default function RoomsScreen() {
   const roomsQ = useRooms(slug ?? "");
   const projectId = roomsQ.data?.projectId;
   const areasQ = useAreas(projectId);
+
+  // Live realtime: area_gate_status / areas / card_areas changes invalidate
+  // rooms + areas + matrix + areaTargets. Refetch-on-focus stays as fallback.
+  useAreaGatesRealtime(projectId, slug ?? undefined);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 

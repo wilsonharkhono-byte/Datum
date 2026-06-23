@@ -5,14 +5,11 @@
  * projectId is resolved from the already-cached board query so we avoid a
  * redundant round-trip.
  *
- * REALTIME GAP: The `area_gate_status` table does not yet have a Supabase
- * realtime publication. Gate-status changes (from cron recomputes or other
- * clients) will not push to this screen automatically. Kept fresh via:
- *   1. refetchOnWindowFocus on matrix + schedule queries.
- *   2. Pull-to-refresh (RefreshControl below).
- * Once the publication is enabled (DB migration needed), hook into
- * subscribeToProjectChanges in @datum/core/realtime and invalidate
- * keys.matrix(projectId) + keys.schedule(projectId).
+ * Kept fresh via:
+ *   1. useAreaGatesRealtime — live Supabase subscription on area_gate_status /
+ *      areas / card_areas; invalidates matrix + schedule + areaTargets on change.
+ *   2. refetchOnWindowFocus on matrix + schedule queries (fallback).
+ *   3. Pull-to-refresh (RefreshControl below).
  */
 
 import { useState, useCallback } from "react";
@@ -34,6 +31,7 @@ import { GateAdvanceSheet, type AdvanceTarget } from "@/components/schedule/Gate
 import { useBoard } from "@/lib/query/hooks";
 import { useMatrix, useScheduleCells } from "@/lib/query/hooks";
 import { useSetAreaTarget } from "@/lib/query/mutations";
+import { useAreaGatesRealtime } from "@/lib/realtime/useRealtimeInvalidation";
 
 // ─── RulesExplainer (light inline accordion) ──────────────────────────────────
 
@@ -105,6 +103,10 @@ export default function ScheduleScreen() {
   const matrixQuery = useMatrix(projectId);
   const scheduleQuery = useScheduleCells(projectId);
   const setTargetMutation = useSetAreaTarget(projectId ?? "");
+
+  // Live realtime: area_gate_status / areas / card_areas changes invalidate
+  // matrix + schedule + areaTargets. Refetch-on-focus stays as fallback.
+  useAreaGatesRealtime(projectId);
 
   const [advanceTarget, setAdvanceTarget] = useState<AdvanceTarget | null>(null);
   const [refreshing, setRefreshing] = useState(false);

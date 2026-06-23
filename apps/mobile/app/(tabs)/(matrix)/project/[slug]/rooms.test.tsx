@@ -78,6 +78,14 @@ jest.mock("@/lib/supabase/client", () => ({
   },
 }));
 
+// ── realtime hook: capture calls so we can assert projectId + slug are passed ─
+const mockUseAreaGatesRealtime = jest.fn();
+jest.mock("@/lib/realtime/useRealtimeInvalidation", () => ({
+  useAreaGatesRealtime: (...args: unknown[]) => mockUseAreaGatesRealtime(...args),
+  useProjectRealtime: jest.fn(),
+  useNotificationsRealtime: jest.fn(),
+}));
+
 // Default: WEB_BASE_URL is unset (AI button hidden)
 let mockWebBaseUrl: string | undefined = undefined;
 jest.mock("@/lib/env", () => ({
@@ -188,6 +196,7 @@ describe("RoomsScreen", () => {
     mockWebBaseUrl = undefined; // default: AI button hidden
     // Default: areas query returns empty (projectId not known until rooms resolves)
     mockGetProjectAreas.mockResolvedValue([]);
+    mockUseAreaGatesRealtime.mockReturnValue(undefined);
   });
 
   // ── 1. Rooms render sorted with stage/blocker badges ────────────────────
@@ -487,5 +496,30 @@ describe("RoomsScreen", () => {
       expect(screen.getByText(/Gagal memuat area/)).toBeTruthy();
       expect(screen.getByText(/DB error areas/)).toBeTruthy();
     });
+  });
+
+  // ── 11. Realtime subscription ────────────────────────────────────────────────
+
+  it("calls useAreaGatesRealtime with resolved projectId and slug", async () => {
+    mockGetProjectRooms.mockResolvedValue(makeProjectRooms([makeRoom()]));
+
+    wrap(<RoomsScreen />);
+
+    await waitFor(() => {
+      // Once rooms resolve, projectId becomes "proj-001"; slug is "ARIN-1"
+      const calledWithId = mockUseAreaGatesRealtime.mock.calls.some(
+        (args) => args[0] === "proj-001" && args[1] === "ARIN-1",
+      );
+      expect(calledWithId).toBe(true);
+    });
+  });
+
+  it("initially calls useAreaGatesRealtime with undefined projectId before rooms resolve", () => {
+    // rooms query hangs — projectId stays undefined on first render
+    mockGetProjectRooms.mockReturnValue(new Promise(() => {}));
+
+    wrap(<RoomsScreen />);
+
+    expect(mockUseAreaGatesRealtime).toHaveBeenCalledWith(undefined, "ARIN-1");
   });
 });
