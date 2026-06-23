@@ -25,7 +25,7 @@ import { createSupabaseClientForRequest } from "@/lib/supabase/from-request";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentStaff, canManageAccess } from "@datum/core";
 import { CreateStaffInput } from "@datum/core";
-import { createStaffWithPasswordCore } from "@/lib/projects/staff-mutations";
+import { createStaffWithPasswordCore } from "@/lib/projects/staff-core";
 
 export async function POST(req: Request) {
   // ── 1. Authenticate ────────────────────────────────────────────────────────
