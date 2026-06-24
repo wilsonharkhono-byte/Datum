@@ -8,8 +8,9 @@ import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
-import { getAreaStepView, getAreaStepEvents } from "@/lib/steps/queries";
+import { getAreaStepView, getAreaStepEvents, getProjectStepSignals } from "@/lib/steps/queries";
 import { AreaStepsPanel } from "@/components/schedule/AreaStepsPanel";
+import { SignalSummaryPanel } from "@/components/schedule/SignalSummaryPanel";
 
 export default async function ProjectSchedulePage({
   params,
@@ -36,6 +37,13 @@ export default async function ProjectSchedulePage({
   const matrix = await fetchMatrix(project.id);
   const scheduleCells = await getProjectScheduleCells(project.id);
   const areaTargets = await getAreaTargetDates(project.id);
+
+  // WIB (Asia/Jakarta) today — same pattern as Board + MiniCard.
+  const jakartaToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  const nowIso = new Date().toISOString();
+
+  // Fetch project-wide signals (one round-trip for steps, one for deps, one for area names).
+  const projectSignals = await getProjectStepSignals(supabase, project.id, jakartaToday, nowIso);
 
   const bathroomAreas = (matrix?.areas ?? []).filter((a) => a.area_type === "bathroom");
   const stepViews = await Promise.all(
@@ -148,6 +156,8 @@ export default async function ProjectSchedulePage({
           </div>
         </section>
       ) : null}
+
+      <SignalSummaryPanel signals={projectSignals} />
 
       {stepViews.length > 0 ? (
         <section className="mb-6">
