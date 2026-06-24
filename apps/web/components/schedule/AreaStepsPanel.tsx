@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { StepDetail } from "@/components/schedule/StepDetail";
-import type { AreaStepRow } from "@/lib/steps/queries";
+import { AddStepForm } from "@/components/schedule/AddStepForm";
+import { restoreStep } from "@/lib/steps/actions";
+import type { AreaStepRow, CatalogStep, RemovedStep } from "@/lib/steps/queries";
 import type { AreaFlags } from "@/lib/steps/flags";
 
 const CHIP: Record<string, { label: string; cls: string }> = {
@@ -14,11 +17,28 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   done_with_defects: { label: "Selesai (ada defect)", cls: "bg-amber-100 text-amber-800" },
 };
 
-export function AreaStepsPanel({ areaName, steps, flags }: { areaName: string; steps: AreaStepRow[]; flags: AreaFlags }) {
+export function AreaStepsPanel({ areaId, areaName, steps, flags, addableCatalog, removedSteps }: {
+  areaId: string;
+  areaName: string;
+  steps: AreaStepRow[];
+  flags: AreaFlags;
+  addableCatalog: CatalogStep[];
+  removedSteps: RemovedStep[];
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [openStep, setOpenStep] = useState<string | null>(null);
+  const [showRemoved, setShowRemoved] = useState(false);
   const done = steps.filter((s) => s.status === "accepted" || s.status === "done_with_defects").length;
   const nameOf = (code: string | null) => steps.find((s) => s.step_code === code)?.name ?? code;
+
+  function restore(areaStepId: string) {
+    startTransition(async () => {
+      const res = await restoreStep({ areaStepId });
+      if (res.ok) router.refresh();
+    });
+  }
 
   return (
     <div className="rounded border border-[var(--border)] bg-[var(--surface)]">
@@ -58,6 +78,26 @@ export function AreaStepsPanel({ areaName, steps, flags }: { areaName: string; s
               </div>
             );
           })}
+
+          <AddStepForm areaId={areaId} addableCatalog={addableCatalog} />
+
+          {removedSteps.length > 0 ? (
+            <div className="border-t border-[var(--border)]">
+              <button type="button" onClick={() => setShowRemoved((v) => !v)}
+                className="min-h-11 w-full px-4 py-2.5 text-left text-[11px] text-[var(--text-muted)] md:min-h-0">
+                Langkah dihapus ({removedSteps.length}) <span>{showRemoved ? "▾" : "▸"}</span>
+              </button>
+              {showRemoved ? removedSteps.map((r) => (
+                <div key={r.id} className="flex items-center gap-2 border-t border-[var(--border)] px-4 py-2 text-[12px] text-[var(--text-muted)]">
+                  <span className="flex-1 line-through">{r.name}</span>
+                  <button type="button" disabled={pending} onClick={() => restore(r.id)}
+                    className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--sand-dark)] disabled:opacity-50 md:min-h-0">
+                    Pulihkan
+                  </button>
+                </div>
+              )) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

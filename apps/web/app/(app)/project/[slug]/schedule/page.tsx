@@ -8,7 +8,7 @@ import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
-import { getAreaStepView } from "@/lib/steps/queries";
+import { getAreaStepView, getRemovedAreaSteps, getAddableCatalogSteps } from "@/lib/steps/queries";
 import { AreaStepsPanel } from "@/components/schedule/AreaStepsPanel";
 
 export default async function ProjectSchedulePage({
@@ -39,7 +39,12 @@ export default async function ProjectSchedulePage({
 
   const bathroomAreas = (matrix?.areas ?? []).filter((a) => a.area_type === "bathroom");
   const stepViews = await Promise.all(
-    bathroomAreas.map(async (a) => ({ area: a, view: await getAreaStepView(supabase, a.id) })),
+    bathroomAreas.map(async (a) => ({
+      area: a,
+      view: await getAreaStepView(supabase, a.id),
+      removedSteps: await getRemovedAreaSteps(supabase, a.id),
+      addableCatalog: await getAddableCatalogSteps(supabase, a.id),
+    })),
   );
 
   // Count stale cells
@@ -151,8 +156,8 @@ export default async function ProjectSchedulePage({
             Langkah pekerjaan — kamar mandi
           </h2>
           <div className="flex flex-col gap-2">
-            {stepViews.map(({ area, view }) => (
-              <AreaStepsPanel key={area.id} areaName={area.area_name} steps={view.steps} flags={view.flags} />
+            {stepViews.map(({ area, view, removedSteps, addableCatalog }) => (
+              <AreaStepsPanel key={area.id} areaId={area.id} areaName={area.area_name} steps={view.steps} flags={view.flags} addableCatalog={addableCatalog} removedSteps={removedSteps} />
             ))}
           </div>
         </section>
