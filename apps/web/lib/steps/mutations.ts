@@ -169,3 +169,27 @@ export async function setCheckpointResult(
 
   await projectAreaStep(supabase, cp.area_step_id);
 }
+
+/** Reversibly soft-remove a step from its area. */
+export async function removeAreaStep(
+  supabase: SupabaseClient<Database>,
+  args: { areaStepId: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("area_steps")
+    .update({ removed_at: new Date().toISOString() })
+    .eq("id", args.areaStepId);
+  if (error) throw error;
+}
+
+/** Restore a soft-removed step. */
+export async function restoreAreaStep(
+  supabase: SupabaseClient<Database>,
+  args: { areaStepId: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("area_steps")
+    .update({ removed_at: null })
+    .eq("id", args.areaStepId);
+  if (error) throw error;
+}

@@ -454,6 +454,7 @@ export type Database = {
           planned_end: string | null
           planned_start: string | null
           project_id: string
+          removed_at: string | null
           status: string
           step_code: string
           updated_at: string
@@ -470,6 +471,7 @@ export type Database = {
           planned_end?: string | null
           planned_start?: string | null
           project_id: string
+          removed_at?: string | null
           status?: string
           step_code: string
           updated_at?: string
@@ -486,6 +488,7 @@ export type Database = {
           planned_end?: string | null
           planned_start?: string | null
           project_id?: string
+          removed_at?: string | null
           status?: string
           step_code?: string
           updated_at?: string
@@ -2644,10 +2647,14 @@ export type Database = {
           active: boolean
           applicability: Json
           code: string
+          created_at: string
+          created_by: string | null
           gate_code: Database["public"]["Enums"]["gate_code"]
           lead_time_days: number
           name: string
+          project_id: string | null
           sort_order: number
+          source: string
           step_type: string
           trade_role: string | null
           typical_duration_days: number
@@ -2656,10 +2663,14 @@ export type Database = {
           active?: boolean
           applicability?: Json
           code: string
+          created_at?: string
+          created_by?: string | null
           gate_code: Database["public"]["Enums"]["gate_code"]
           lead_time_days?: number
           name: string
+          project_id?: string | null
           sort_order?: number
+          source?: string
           step_type: string
           trade_role?: string | null
           typical_duration_days?: number
@@ -2668,21 +2679,39 @@ export type Database = {
           active?: boolean
           applicability?: Json
           code?: string
+          created_at?: string
+          created_by?: string | null
           gate_code?: Database["public"]["Enums"]["gate_code"]
           lead_time_days?: number
           name?: string
+          project_id?: string | null
           sort_order?: number
+          source?: string
           step_type?: string
           trade_role?: string | null
           typical_duration_days?: number
         }
         Relationships: [
           {
+            foreignKeyName: "trade_steps_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "trade_steps_gate_code_fkey"
             columns: ["gate_code"]
             isOneToOne: false
             referencedRelation: "gates"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "trade_steps_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2817,6 +2846,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_catalog_area_step: {
+        Args: { p_area_id: string; p_step_code: string }
+        Returns: string
+      }
+      add_custom_area_step: {
+        Args: { p_area_id: string; p_name: string; p_step_type: string }
+        Returns: string
+      }
       claim_attachments_for_analysis: {
         Args: { p_limit?: number }
         Returns: {

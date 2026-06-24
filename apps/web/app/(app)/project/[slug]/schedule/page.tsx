@@ -8,7 +8,7 @@ import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
-import { getAreaStepView, getAreaStepEvents, getProjectStepSignals } from "@/lib/steps/queries";
+import { getAreaStepView, getRemovedAreaSteps, getAddableCatalogSteps, getAreaStepEvents, getProjectStepSignals } from "@/lib/steps/queries";
 import { AreaStepsPanel } from "@/components/schedule/AreaStepsPanel";
 import { SignalSummaryPanel } from "@/components/schedule/SignalSummaryPanel";
 
@@ -47,7 +47,14 @@ export default async function ProjectSchedulePage({
 
   const bathroomAreas = (matrix?.areas ?? []).filter((a) => a.area_type === "bathroom");
   const stepViews = await Promise.all(
-    bathroomAreas.map(async (a) => ({ area: a, view: await getAreaStepView(supabase, a.id) })),
+    bathroomAreas.map(async (a) => {
+      const [view, removedSteps, addableCatalog] = await Promise.all([
+        getAreaStepView(supabase, a.id),
+        getRemovedAreaSteps(supabase, a.id),
+        getAddableCatalogSteps(supabase, a.id),
+      ]);
+      return { area: a, view, removedSteps, addableCatalog };
+    }),
   );
 
   // Fetch all step events for all bathroom areas in one query (keyed by step id).
@@ -165,12 +172,15 @@ export default async function ProjectSchedulePage({
             Langkah pekerjaan — kamar mandi
           </h2>
           <div className="flex flex-col gap-2">
-            {stepViews.map(({ area, view }) => (
+            {stepViews.map(({ area, view, removedSteps, addableCatalog }) => (
               <AreaStepsPanel
                 key={area.id}
+                areaId={area.id}
                 areaName={area.area_name}
                 steps={view.steps}
                 flags={view.flags}
+                addableCatalog={addableCatalog}
+                removedSteps={removedSteps}
                 stepEventsMap={stepEventsMap}
               />
             ))}

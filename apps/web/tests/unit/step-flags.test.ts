@@ -52,4 +52,20 @@ describe("computeAreaFlags", () => {
     ];
     expect(computeAreaFlags(steps, deps).blocked.sort()).toEqual(["B3", "B6"]);
   });
+
+  it("treats an absent predecessor as satisfied (removed/excluded prerequisite does not block)", () => {
+    // B6 depends on B3, but B3 is absent from the area's active steps.
+    const steps: S[] = [
+      { step_code: "B6", step_type: "site_work", status: "not_started" },
+    ];
+    expect(computeAreaFlags(steps, deps).readyToStart).toBe("B6");
+  });
+
+  it("a present-but-unfinished predecessor still blocks (regression)", () => {
+    const steps: S[] = [
+      { step_code: "B3", step_type: "procurement", status: "in_progress" },
+      { step_code: "B6", step_type: "site_work", status: "not_started" },
+    ];
+    expect(computeAreaFlags(steps, deps).readyToStart).toBe(null);
+  });
 });

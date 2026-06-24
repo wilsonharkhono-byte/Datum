@@ -24,7 +24,7 @@ export function computeAreaFlags(steps: FlagStep[], deps: TradeStepDep[]): AreaF
 
   const isReady = (code: string) =>
     status.get(code) === "not_started" &&
-    predsOf.get(code)!.every((p) => status.get(p) === "accepted");
+    predsOf.get(code)!.every((p) => !status.has(p) || status.get(p) === "accepted");
   const readyToStart = steps.find((s) => isReady(s.step_code))?.step_code ?? null;
 
   const notStarted = new Set(steps.filter((s) => s.status === "not_started").map((s) => s.step_code));

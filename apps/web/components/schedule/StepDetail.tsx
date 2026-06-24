@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { submitStepUpdate, submitCheckpointResult } from "@/lib/steps/actions";
+import { submitStepUpdate, submitCheckpointResult, removeStep } from "@/lib/steps/actions";
 import type { AreaStepRow, AreaStepEventRow } from "@/lib/steps/queries";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -105,6 +105,11 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
     run(() => submitStepUpdate({ areaStepId: step.id, status }));
   }
 
+  function remove() {
+    if (!window.confirm("Hapus langkah ini dari kamar mandi? Bisa dipulihkan nanti.")) return;
+    run(() => removeStep({ areaStepId: step.id }));
+  }
+
   return (
     <div className="border-t border-[var(--border)] bg-[var(--sand-tint)] px-4 py-3">
       <div className="mb-2 flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
@@ -144,6 +149,13 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
           ))}
         </div>
       ) : null}
+
+      <div className="mt-3 border-t border-[var(--border)] pt-2">
+        <button type="button" disabled={pending} onClick={remove}
+          className="min-h-11 text-[11px] font-semibold text-[var(--text-muted)] hover:text-red-700 disabled:opacity-50 md:min-h-0">
+          Hapus langkah
+        </button>
+      </div>
 
       {error ? <p className="mt-2 text-[11px] text-red-700">{error}</p> : null}
 
