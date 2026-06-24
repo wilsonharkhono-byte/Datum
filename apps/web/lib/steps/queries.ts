@@ -25,7 +25,16 @@ export type AreaStepRow = {
   checkpoints: AreaStepCheckpoint[];
 };
 
-/** All trade steps instantiated for one area, ordered by template sort_order, with checkpoints. */
+export type CatalogStep = { code: string; name: string };
+export type RemovedStep = { id: string; step_code: string; name: string };
+
+/** Pure: standard catalog steps whose code is not already instantiated on the area. */
+export function addableCatalog(catalog: CatalogStep[], existingCodes: string[]): CatalogStep[] {
+  const have = new Set(existingCodes);
+  return catalog.filter((c) => !have.has(c.code));
+}
+
+/** Active trade steps instantiated for one area, ordered by template sort_order then created_at, with checkpoints. */
 export async function getAreaSteps(
   supabase: SupabaseClient<Database>,
   areaId: string,
@@ -34,11 +43,12 @@ export async function getAreaSteps(
     .from("area_steps")
     .select(`
       id, step_code, status, planned_start, planned_end,
-      assigned_trade, blocking_reason, last_progress_at,
+      assigned_trade, blocking_reason, last_progress_at, created_at,
       trade_steps:step_code (sort_order, step_type, name),
       area_step_checkpoints (id, item_text, severity, required, result, sort_order)
     `)
-    .eq("area_id", areaId);
+    .eq("area_id", areaId)
+    .is("removed_at", null);
   if (error) throw error;
 
   return (data ?? [])
@@ -47,6 +57,7 @@ export async function getAreaSteps(
       const cps = (r.area_step_checkpoints as Array<AreaStepCheckpoint & { sort_order: number }> | null) ?? [];
       return {
         _sort: tmpl?.sort_order ?? 0,
+        _created: r.created_at as string,
         id: r.id,
         step_code: r.step_code,
         name: tmpl?.name ?? r.step_code,
@@ -61,8 +72,8 @@ export async function getAreaSteps(
           .map((c) => ({ id: c.id, item_text: c.item_text, severity: c.severity, required: c.required, result: c.result })),
       };
     })
-    .sort((a, b) => a._sort - b._sort)
-    .map(({ _sort, ...rest }) => rest as AreaStepRow);
+    .sort((a, b) => a._sort - b._sort || a._created.localeCompare(b._created))
+    .map(({ _sort, _created, ...rest }) => rest as AreaStepRow);
 }
 
 /** Steps for an area plus the per-area flags (siap dimulai / perlu keputusan / blocked). */
@@ -84,4 +95,39 @@ export async function getAreaStepView(
     (deps ?? []) as TradeStepDep[],
   );
   return { steps, flags };
+}
+
+/** Steps the user soft-removed from this area (for the restore list). */
+export async function getRemovedAreaSteps(
+  supabase: SupabaseClient<Database>,
+  areaId: string,
+): Promise<RemovedStep[]> {
+  const { data, error } = await supabase
+    .from("area_steps")
+    .select("id, step_code, trade_steps:step_code (name)")
+    .eq("area_id", areaId)
+    .not("removed_at", "is", null);
+  if (error) throw error;
+  return (data ?? []).map((r) => {
+    const tmpl = r.trade_steps as { name: string } | null;
+    return { id: r.id, step_code: r.step_code, name: tmpl?.name ?? r.step_code };
+  });
+}
+
+/** Firm-standard Gate B steps not yet instantiated on this area (the catalog picker). */
+export async function getAddableCatalogSteps(
+  supabase: SupabaseClient<Database>,
+  areaId: string,
+): Promise<CatalogStep[]> {
+  const [{ data: existing, error: e1 }, { data: catalog, error: e2 }] = await Promise.all([
+    supabase.from("area_steps").select("step_code").eq("area_id", areaId),
+    supabase.from("trade_steps").select("code, name")
+      .eq("gate_code", "B").eq("active", true).is("project_id", null).order("sort_order"),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+  return addableCatalog(
+    (catalog ?? []) as CatalogStep[],
+    (existing ?? []).map((r) => r.step_code),
+  );
 }
