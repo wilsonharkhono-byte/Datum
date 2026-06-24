@@ -26,9 +26,28 @@ import {
   isAlreadyNotified,
   jakartaToday,
   isMigrationPendingError,
+  GET,
 } from "@/app/api/cron/readiness-reminders/route";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
+
+// ─── Module-level mocks (hoisted) ────────────────────────────────────────────
+
+// Mock server-only modules that the cron route imports. These must be declared
+// before any imports that transitively pull in these modules.
+vi.mock("server-only", () => ({}));
+
+vi.mock("@/lib/notifications/push-send", () => ({
+  sendExpoPush: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: vi.fn(),
+}));
+
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+}));
 
 // ─── Fake Supabase builder ────────────────────────────────────────────────────
 
@@ -394,5 +413,151 @@ describe("jakartaToday", () => {
   it("returns a YYYY-MM-DD string", () => {
     const today = jakartaToday();
     expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+// ─── GET handler — sendExpoPush integration ───────────────────────────────────
+
+describe("GET /api/cron/readiness-reminders — push integration", () => {
+  // Import the mocked modules so we can control/assert them per-test.
+  // vi.mock() is hoisted, so the push-send and supabase/admin mocks are active.
+  // buildReadinessReminders is the real export; we spy on it per-test via vi.spyOn.
+  let sendExpoPushMock: ReturnType<typeof vi.fn>;
+  let createAdminMock: ReturnType<typeof vi.fn>;
+  let buildRemindersSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    const pushModule = await import("@/lib/notifications/push-send");
+    sendExpoPushMock = pushModule.sendExpoPush as ReturnType<typeof vi.fn>;
+
+    const adminModule = await import("@/lib/supabase/admin");
+    createAdminMock = adminModule.createSupabaseAdminClient as ReturnType<typeof vi.fn>;
+
+    // Spy on the real buildReadinessReminders so existing describe blocks
+    // continue using the real implementation.
+    const remindersModule = await import("@/lib/steps/reminders");
+    buildRemindersSpy = vi.spyOn(remindersModule, "buildReadinessReminders");
+  });
+
+  /** Build a cron-authorised Request */
+  function cronReq() {
+    return new Request("http://localhost/api/cron/readiness-reminders", {
+      headers: { authorization: "Bearer test-secret" },
+    });
+  }
+
+  /** Minimal chainable Supabase mock for the cron route's dedup + insert calls */
+  function makeAdmin(
+    dedupData: unknown[] | null,
+    dedupError: { message: string } | null,
+    insertError: { message: string } | null,
+  ) {
+    let callCount = 0;
+    const makeBuilder = (resp: { data: unknown[] | null; error: typeof dedupError }) => {
+      const b: any = {
+        select: () => b,
+        eq: () => b,
+        is: () => b,
+        gte: () => b,
+        limit: () => b,
+        insert: () => Promise.resolve({ error: insertError }),
+        then: (resolve: (v: any) => void) => resolve(resp),
+      };
+      return b;
+    };
+
+    return {
+      from(_table: string) {
+        // First call = dedup query, second call = insert
+        callCount++;
+        if (callCount === 1) return makeBuilder({ data: dedupData, error: dedupError });
+        return makeBuilder({ data: [], error: insertError });
+      },
+    };
+  }
+
+  const INTENT_A = {
+    recipientStaffId: "staff-A",
+    kind: READINESS_REMINDER_KIND,
+    message: "Kamar Mandi A: Screed terlambat",
+    link: "/project/BDG-H1/schedule",
+    projectId: "proj-1",
+    dedupeKey: "staff-A|proj-1|area-1|B4|behind_plan",
+  };
+
+  it("calls sendExpoPush for a written intent with correct payload", async () => {
+    process.env.CRON_SECRET = "test-secret";
+
+    buildRemindersSpy.mockResolvedValue({
+      intents: [INTENT_A],
+      projectsScanned: 1,
+      signalsFound: 1,
+    });
+
+    // dedup returns empty (not yet notified) → will insert
+    createAdminMock.mockReturnValue(makeAdmin([], null, null));
+
+    const res = await GET(cronReq());
+    const body = await res.json();
+
+    expect(body.written).toBe(1);
+    expect(body.pushed).toBe(1);
+    expect(sendExpoPushMock).toHaveBeenCalledOnce();
+    expect(sendExpoPushMock).toHaveBeenCalledWith(
+      ["staff-A"],
+      {
+        title: "Pengingat kesiapan",
+        body: INTENT_A.message,
+        data: { link: INTENT_A.link },
+      },
+    );
+  });
+
+  it("does NOT call sendExpoPush for a deduped (skipped) intent", async () => {
+    process.env.CRON_SECRET = "test-secret";
+
+    buildRemindersSpy.mockResolvedValue({
+      intents: [INTENT_A],
+      projectsScanned: 1,
+      signalsFound: 1,
+    });
+
+    // dedup returns a row → already notified → skip insert
+    createAdminMock.mockReturnValue(makeAdmin([{ id: "existing-notif" }], null, null));
+
+    const res = await GET(cronReq());
+    const body = await res.json();
+
+    expect(body.skippedDup).toBe(1);
+    expect(body.written).toBe(0);
+    expect(body.pushed).toBe(0);
+    expect(sendExpoPushMock).not.toHaveBeenCalled();
+  });
+
+  it("does not throw and still returns success when sendExpoPush rejects", async () => {
+    process.env.CRON_SECRET = "test-secret";
+
+    buildRemindersSpy.mockResolvedValue({
+      intents: [INTENT_A],
+      projectsScanned: 1,
+      signalsFound: 1,
+    });
+
+    // Insert succeeds
+    createAdminMock.mockReturnValue(makeAdmin([], null, null));
+
+    // Push explodes
+    sendExpoPushMock.mockRejectedValueOnce(new Error("Expo push failed"));
+
+    const res = await GET(cronReq());
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    // written = 1 (insert succeeded), pushed = 0 (push threw, caught)
+    expect(body.written).toBe(1);
+    expect(body.pushed).toBe(0);
+    expect(body.failed).toBe(0);
   });
 });

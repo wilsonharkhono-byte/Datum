@@ -6,11 +6,11 @@
  * to the responsible staff members, deduplicating against unread notifications
  * from the last 7 days.
  *
- * Auth: Vercel Cron Bearer (CRON_SECRET). Same pattern as analyze-attachments.
+ * For each intent that is actually written (not deduped), also sends an Expo
+ * push notification (best-effort — a push failure never affects the in-app
+ * insert or the cron's success).
  *
- * Push delivery (Expo sendExpoPush) is NOT wired here — it lives on the mobile
- * branch. Once that branch merges, call sendExpoPush on each written intent
- * here after the INSERT succeeds.
+ * Auth: Vercel Cron Bearer (CRON_SECRET). Same pattern as analyze-attachments.
  */
 
 import * as Sentry from "@sentry/nextjs";
@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildReadinessReminders, READINESS_REMINDER_KIND } from "@/lib/steps/reminders";
 import type { ReminderIntent } from "@/lib/steps/reminders";
+import { sendExpoPush } from "@/lib/notifications/push-send";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -126,6 +127,7 @@ export async function GET(req: Request) {
   let written = 0;
   let skippedDup = 0;
   let failed = 0;
+  let pushed = 0;
 
   for (const intent of intents) {
     try {
@@ -148,6 +150,19 @@ export async function GET(req: Request) {
         failed++;
       } else {
         written++;
+
+        // Best-effort Expo push — sendExpoPush never throws; wrap anyway so an
+        // unexpected error (e.g. import-time side effect) cannot break the loop.
+        try {
+          await sendExpoPush([intent.recipientStaffId], {
+            title: "Pengingat kesiapan",
+            body: intent.message,
+            data: { link: intent.link },
+          });
+          pushed++;
+        } catch (pushErr) {
+          console.warn(`${LOG} push failed for ${intent.dedupeKey}:`, pushErr);
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -159,7 +174,7 @@ export async function GET(req: Request) {
 
   console.log(
     `${LOG} summary: projects_scanned=${projectsScanned} signals_found=${signalsFound} ` +
-    `intents=${intents.length} written=${written} skipped_dup=${skippedDup} failed=${failed}`,
+    `intents=${intents.length} written=${written} skipped_dup=${skippedDup} failed=${failed} pushed=${pushed}`,
   );
 
   return NextResponse.json({
@@ -169,5 +184,6 @@ export async function GET(req: Request) {
     written,
     skippedDup,
     failed,
+    pushed,
   });
 }
