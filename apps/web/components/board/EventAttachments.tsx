@@ -69,7 +69,7 @@ function AttachmentTile({
   const [requeued, setRequeued] = useState(false);
 
   const tile = !a.signedUrl ? (
-    <span className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
+    <span className="block break-all rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
       {fileName} (memuat…)
     </span>
   ) : isImage ? (
@@ -95,9 +95,9 @@ function AttachmentTile({
       href={a.signedUrl}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)]"
+      className="flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)]"
     >
-      <PaperclipIcon size={11} /> {fileName}
+      <PaperclipIcon size={11} /> <span className="min-w-0 break-all">{fileName}</span>
     </a>
   );
 

@@ -32,7 +32,7 @@ export default async function SearchPage({
   const total = results.developments.length + results.projects.length + results.cards.length + results.events.length + results.comments.length + results.attachments.length;
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
+    <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
       <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
       <h1 className="mt-2 text-2xl font-semibold text-[#141210]">Cari</h1>
       <p className="mt-1 text-sm text-[#524E49]">

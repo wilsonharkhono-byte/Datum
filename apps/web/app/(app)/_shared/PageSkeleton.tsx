@@ -4,7 +4,7 @@
 // 16.2.6 dev/Turbopack), rendering blank instead.
 export function PageSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div aria-busy="true" className="mx-auto max-w-5xl p-6">
+    <div aria-busy="true" className="mx-auto w-full max-w-5xl p-4 sm:p-6">
       <div className="skeleton mb-3 h-3 w-24" />
       <div className="skeleton h-8 w-full max-w-md" />
       <div className="skeleton mt-2 h-4 w-full max-w-sm" />

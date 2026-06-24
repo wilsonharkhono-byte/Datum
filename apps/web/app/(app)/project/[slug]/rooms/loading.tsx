@@ -2,7 +2,7 @@
 // of room rows so the streamed content swaps in place without layout shift.
 export default function Loading() {
   return (
-    <div aria-busy="true" className="mx-auto max-w-2xl p-4">
+    <div aria-busy="true" className="mx-auto w-full max-w-2xl p-4">
       <div className="skeleton mb-3 h-3 w-28" />
       <div className="mb-4">
         <div className="skeleton h-3 w-20" />

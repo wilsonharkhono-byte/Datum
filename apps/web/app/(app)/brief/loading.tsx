@@ -2,7 +2,7 @@
 // 2-column grid of section cards, each with a title row and list rows.
 export default function Loading() {
   return (
-    <div aria-busy="true" className="mx-auto max-w-5xl p-6">
+    <div aria-busy="true" className="mx-auto w-full max-w-5xl p-4 sm:p-6">
       <div className="skeleton h-3 w-20" />
       <header className="mt-2 mb-6">
         <div className="skeleton h-3 w-28" />

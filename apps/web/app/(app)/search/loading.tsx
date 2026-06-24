@@ -2,7 +2,7 @@
 // short list of ghost result rows.
 export default function Loading() {
   return (
-    <div aria-busy="true" className="mx-auto max-w-3xl p-6">
+    <div aria-busy="true" className="mx-auto w-full max-w-3xl p-4 sm:p-6">
       <div className="skeleton h-3 w-20" />
       <div className="skeleton mt-2 h-7 w-24" />
       <div className="skeleton mt-2 h-4 w-full max-w-md" />
