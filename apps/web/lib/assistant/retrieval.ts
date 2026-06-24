@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Card, CardEvent } from "@datum/db";
 import { getAdvisorData } from "@/lib/advisor/queries";
+import { getProjectStepSignals, type ProjectStepSignalRow } from "@/lib/steps/queries";
 
 export type CardWithEvents = {
   card: Card;
@@ -14,6 +15,54 @@ const MAX_CARDS_IN_CONTEXT = 40;       // bumped from 30
 const MAX_EVENTS_PER_CARD = 8;
 const KEYWORD_HITS_CAP = 20;           // how many extra cards to pull via keyword
 
+/** Max readiness signal rows injected into context (token budget). */
+const MAX_READINESS_SIGNALS = 15;
+
+// ─── Severity label map (Bahasa Indonesia) ───────────────────────────────────
+const SEVERITY_LABEL: Record<string, string> = {
+  critical: "KRITIS",
+  high:     "TINGGI",
+  warning:  "PERHATIAN",
+  info:     "INFO",
+};
+
+/**
+ * Format a flat list of readiness signal rows into a concise context section.
+ * Pure / side-effect-free — safe to unit-test without Supabase.
+ *
+ * Returns an empty string when there are no signals.
+ * Caps to the top `MAX_READINESS_SIGNALS` rows (caller should pre-sort by severity).
+ */
+export function formatReadinessSignals(rows: ProjectStepSignalRow[]): string {
+  if (rows.length === 0) return "";
+
+  const capped = rows.slice(0, MAX_READINESS_SIGNALS);
+  const lines: string[] = ["PENGINGAT KESIAPAN / READINESS SIGNALS:"];
+  for (const row of capped) {
+    const label = SEVERITY_LABEL[row.signal.severity] ?? row.signal.severity.toUpperCase();
+    lines.push(`[${label}] ${row.areaName} · ${row.stepName}: ${row.signal.message}`);
+  }
+  return lines.join("\n");
+}
+
+// ─── Side-channel state attached to card arrays ───────────────────────────────
+// Both the advisor and readiness sections ride along with the cards array via
+// WeakMaps keyed on the exact array instance, so retrieveProjectContext and
+// buildContextBlock keep their public signatures (the API routes call them as
+// a pair: the block returned for a retrieved card set automatically carries
+// that project's priorities). Entries are GC'd with the arrays themselves.
+const advisorSectionByCards = new WeakMap<CardWithEvents[], string>();
+const readinessSectionByCards = new WeakMap<CardWithEvents[], string>();
+
+/**
+ * Compute Asia/Jakarta today as YYYY-MM-DD (UTC+7, no DST).
+ * Exported so the assistant route can share the same clock.
+ */
+export function jakartaToday(now: Date = new Date()): string {
+  const jakartaMs = now.getTime() + 7 * 60 * 60 * 1000;
+  return new Date(jakartaMs).toISOString().slice(0, 10);
+}
+
 /**
  * Retrieve cards for the assistant's context.
  * Always includes the N most-recent active cards.
@@ -26,13 +75,21 @@ export async function retrieveProjectContext(
   query?: string,
   opts?: { includeAdvisor?: boolean },
 ): Promise<CardWithEvents[]> {
+  const now = new Date();
+  const today = jakartaToday(now);
+
   // 0. "Hari Ini" advisor + gate-deadline context — kicked off first so its
   // internal Promise.all overlaps the card queries below; attached to the
   // result right before returning (see advisorSectionByCards). The capture
   // route skips it: proposals don't use the priority section.
   const advisorPromise = opts?.includeAdvisor === false
     ? Promise.resolve("")
-    : buildAdvisorSections(supabase, projectId, new Date()).catch(() => "");
+    : buildAdvisorSections(supabase, projectId, now).catch(() => "");
+
+  // 0b. Readiness signals — severity-sorted, cap to top 15 for token budget.
+  const readinessPromise = getProjectStepSignals(supabase, projectId, today, now.toISOString())
+    .then((rows) => formatReadinessSignals(rows))
+    .catch(() => "");
 
   // 1. Always: newest-active cards
   const { data: newest, error: nErr } = await supabase
@@ -98,7 +155,9 @@ export async function retrieveProjectContext(
 
   if (cards.length === 0) {
     const empty: CardWithEvents[] = [];
-    advisorSectionByCards.set(empty, await advisorPromise);
+    const [advisorStr, readinessStr] = await Promise.all([advisorPromise, readinessPromise]);
+    advisorSectionByCards.set(empty, advisorStr);
+    readinessSectionByCards.set(empty, readinessStr);
     return empty;
   }
 
@@ -153,14 +212,21 @@ export async function retrieveProjectContext(
       captionsByEventId,
     };
   });
-  advisorSectionByCards.set(result, await advisorPromise);
+  const [advisorStr, readinessStr] = await Promise.all([advisorPromise, readinessPromise]);
+  advisorSectionByCards.set(result, advisorStr);
+  readinessSectionByCards.set(result, readinessStr);
   return result;
 }
 
 export function buildContextBlock(cards: CardWithEvents[]): string {
   const advisorSections = advisorSectionByCards.get(cards) ?? "";
+  const readinessSections = readinessSectionByCards.get(cards) ?? "";
   if (cards.length === 0) {
-    return ["Tidak ada kartu yang tersedia untuk proyek ini.", advisorSections]
+    return [
+      "Tidak ada kartu yang tersedia untuk proyek ini.",
+      readinessSections,
+      advisorSections,
+    ]
       .filter(Boolean)
       .join("\n\n");
   }
@@ -182,17 +248,10 @@ export function buildContextBlock(cards: CardWithEvents[]): string {
     }
     lines.push("");
   }
+  if (readinessSections) lines.push(readinessSections);
   if (advisorSections) lines.push(advisorSections);
   return lines.join("\n");
 }
-
-// ─── "Hari Ini" advisor context injection ────────────────────────────────────
-// The advisor + gate-deadline sections ride along with the cards array via a
-// WeakMap keyed on the exact array instance, so retrieveProjectContext and
-// buildContextBlock keep their public signatures (the API routes call them as
-// a pair: the block returned for a retrieved card set automatically carries
-// that project's priorities). Entries are GC'd with the arrays themselves.
-const advisorSectionByCards = new WeakMap<CardWithEvents[], string>();
 
 const MAX_ADVISOR_ITEMS_IN_CONTEXT = 5;
 const MAX_GATE_DEADLINES_IN_CONTEXT = 5;

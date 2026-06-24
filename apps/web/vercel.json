@@ -1,6 +1,7 @@
 {
   "regions": ["sin1"],
   "crons": [
-    { "path": "/api/cron/analyze-attachments", "schedule": "* * * * *" }
+    { "path": "/api/cron/analyze-attachments", "schedule": "* * * * *" },
+    { "path": "/api/cron/readiness-reminders", "schedule": "0 1 * * *" }
   ]
 }

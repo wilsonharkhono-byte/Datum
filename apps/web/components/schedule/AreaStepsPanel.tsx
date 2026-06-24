@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { StepDetail } from "@/components/schedule/StepDetail";
 import { AddStepForm } from "@/components/schedule/AddStepForm";
 import { restoreStep } from "@/lib/steps/actions";
-import type { AreaStepRow, CatalogStep, RemovedStep } from "@/lib/steps/queries";
+import type { AreaStepRow, CatalogStep, RemovedStep, AreaStepEventRow } from "@/lib/steps/queries";
 import type { AreaFlags } from "@/lib/steps/flags";
 
 const CHIP: Record<string, { label: string; cls: string }> = {
@@ -17,13 +17,14 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   done_with_defects: { label: "Selesai (ada defect)", cls: "bg-amber-100 text-amber-800" },
 };
 
-export function AreaStepsPanel({ areaId, areaName, steps, flags, addableCatalog, removedSteps }: {
+export function AreaStepsPanel({ areaId, areaName, steps, flags, addableCatalog, removedSteps, stepEventsMap }: {
   areaId: string;
   areaName: string;
   steps: AreaStepRow[];
   flags: AreaFlags;
   addableCatalog: CatalogStep[];
   removedSteps: RemovedStep[];
+  stepEventsMap?: Map<string, AreaStepEventRow[]>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -74,7 +75,7 @@ export function AreaStepsPanel({ areaId, areaName, steps, flags, addableCatalog,
                   {flags.readyToStart === s.step_code ? <span className="text-[10px] text-[var(--sand-dark)]">siap</span> : null}
                   <span className="text-[var(--text-muted)]">{isOpen ? "▾" : "▸"}</span>
                 </button>
-                {isOpen ? <StepDetail step={s} /> : null}
+                {isOpen ? <StepDetail step={s} events={stepEventsMap?.get(s.id) ?? []} /> : null}
               </div>
             );
           })}
