@@ -14,6 +14,7 @@ export type AreaStepCheckpoint = {
 export type AreaStepRow = {
   id: string;
   step_code: string;
+  name: string;
   step_type: string;
   status: string;
   planned_start: string | null;
@@ -34,7 +35,7 @@ export async function getAreaSteps(
     .select(`
       id, step_code, status, planned_start, planned_end,
       assigned_trade, blocking_reason, last_progress_at,
-      trade_steps:step_code (sort_order, step_type),
+      trade_steps:step_code (sort_order, step_type, name),
       area_step_checkpoints (id, item_text, severity, required, result, sort_order)
     `)
     .eq("area_id", areaId);
@@ -42,12 +43,13 @@ export async function getAreaSteps(
 
   return (data ?? [])
     .map((r) => {
-      const tmpl = r.trade_steps as { sort_order: number; step_type: string } | null;
+      const tmpl = r.trade_steps as { sort_order: number; step_type: string; name: string } | null;
       const cps = (r.area_step_checkpoints as Array<AreaStepCheckpoint & { sort_order: number }> | null) ?? [];
       return {
         _sort: tmpl?.sort_order ?? 0,
         id: r.id,
         step_code: r.step_code,
+        name: tmpl?.name ?? r.step_code,
         step_type: tmpl?.step_type ?? "site_work",
         status: r.status,
         planned_start: r.planned_start,

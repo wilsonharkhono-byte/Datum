@@ -148,6 +148,7 @@ function makeMatrixData(override: Partial<MatrixData> = {}): MatrixData {
         area_name: "Master Bathroom",
         floor: "LT1",
         sort_order: 0,
+        area_type: "bathroom",
       },
       {
         id: AREA_LIVING_ID,
@@ -155,6 +156,7 @@ function makeMatrixData(override: Partial<MatrixData> = {}): MatrixData {
         area_name: "Ruang Tamu",
         floor: "LT1",
         sort_order: 1,
+        area_type: "living",
       },
     ],
     gates: ["A", "B", "C", "D", "E", "F", "G", "H"],
