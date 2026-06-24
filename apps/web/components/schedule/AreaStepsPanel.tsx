@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { StepDetail } from "@/components/schedule/StepDetail";
-import type { AreaStepRow } from "@/lib/steps/queries";
+import type { AreaStepRow, AreaStepEventRow } from "@/lib/steps/queries";
 import type { AreaFlags } from "@/lib/steps/flags";
 
 const CHIP: Record<string, { label: string; cls: string }> = {
@@ -14,7 +14,12 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   done_with_defects: { label: "Selesai (ada defect)", cls: "bg-amber-100 text-amber-800" },
 };
 
-export function AreaStepsPanel({ areaName, steps, flags }: { areaName: string; steps: AreaStepRow[]; flags: AreaFlags }) {
+export function AreaStepsPanel({ areaName, steps, flags, stepEventsMap }: {
+  areaName: string;
+  steps: AreaStepRow[];
+  flags: AreaFlags;
+  stepEventsMap?: Map<string, AreaStepEventRow[]>;
+}) {
   const [open, setOpen] = useState(false);
   const [openStep, setOpenStep] = useState<string | null>(null);
   const done = steps.filter((s) => s.status === "accepted" || s.status === "done_with_defects").length;
@@ -54,7 +59,7 @@ export function AreaStepsPanel({ areaName, steps, flags }: { areaName: string; s
                   {flags.readyToStart === s.step_code ? <span className="text-[10px] text-[var(--sand-dark)]">siap</span> : null}
                   <span className="text-[var(--text-muted)]">{isOpen ? "▾" : "▸"}</span>
                 </button>
-                {isOpen ? <StepDetail step={s} /> : null}
+                {isOpen ? <StepDetail step={s} events={stepEventsMap?.get(s.id) ?? []} /> : null}
               </div>
             );
           })}

@@ -8,7 +8,7 @@ import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
-import { getAreaStepView } from "@/lib/steps/queries";
+import { getAreaStepView, getAreaStepEvents } from "@/lib/steps/queries";
 import { AreaStepsPanel } from "@/components/schedule/AreaStepsPanel";
 
 export default async function ProjectSchedulePage({
@@ -41,6 +41,10 @@ export default async function ProjectSchedulePage({
   const stepViews = await Promise.all(
     bathroomAreas.map(async (a) => ({ area: a, view: await getAreaStepView(supabase, a.id) })),
   );
+
+  // Fetch all step events for all bathroom areas in one query (keyed by step id).
+  const allStepIds = stepViews.flatMap(({ view }) => view.steps.map((s) => s.id));
+  const stepEventsMap = await getAreaStepEvents(supabase, allStepIds);
 
   // Count stale cells
   const { count: staleCount } = await supabase
@@ -152,7 +156,13 @@ export default async function ProjectSchedulePage({
           </h2>
           <div className="flex flex-col gap-2">
             {stepViews.map(({ area, view }) => (
-              <AreaStepsPanel key={area.id} areaName={area.area_name} steps={view.steps} flags={view.flags} />
+              <AreaStepsPanel
+                key={area.id}
+                areaName={area.area_name}
+                steps={view.steps}
+                flags={view.flags}
+                stepEventsMap={stepEventsMap}
+              />
             ))}
           </div>
         </section>

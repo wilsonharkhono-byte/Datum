@@ -3,6 +3,16 @@ import type { Database } from "@datum/db";
 import { computeAreaFlags, type AreaFlags } from "@/lib/steps/flags";
 import type { TradeStepDep } from "@/lib/steps/types";
 
+export type AreaStepEventRow = {
+  id: string;
+  area_step_id: string;
+  status: string;
+  note: string | null;
+  percent_complete: number | null;
+  occurred_at: string;
+  author_name: string | null;
+};
+
 export type AreaStepCheckpoint = {
   id: string;
   item_text: string;
@@ -63,6 +73,43 @@ export async function getAreaSteps(
     })
     .sort((a, b) => a._sort - b._sort)
     .map(({ _sort, ...rest }) => rest as AreaStepRow);
+}
+
+/**
+ * Fetch all events for an area's steps in one query (one round-trip), joined to staff.full_name.
+ * Returns a map keyed by area_step_id for O(1) lookup in the render path.
+ * Ordered newest-first within each step.
+ */
+export async function getAreaStepEvents(
+  supabase: SupabaseClient<Database>,
+  stepIds: string[],
+): Promise<Map<string, AreaStepEventRow[]>> {
+  if (stepIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from("area_step_events")
+    .select("id, area_step_id, status, note, percent_complete, occurred_at, created_at, staff:logged_by_staff_id (full_name)")
+    .in("area_step_id", stepIds)
+    .order("occurred_at", { ascending: false });
+  if (error) throw error;
+
+  const map = new Map<string, AreaStepEventRow[]>();
+  for (const r of data ?? []) {
+    const staffRow = r.staff as { full_name: string } | null;
+    const row: AreaStepEventRow = {
+      id: r.id,
+      area_step_id: r.area_step_id,
+      status: r.status,
+      note: r.note,
+      percent_complete: r.percent_complete !== null ? Number(r.percent_complete) : null,
+      occurred_at: r.occurred_at ?? r.created_at,
+      author_name: staffRow?.full_name ?? null,
+    };
+    const bucket = map.get(r.area_step_id) ?? [];
+    bucket.push(row);
+    map.set(r.area_step_id, bucket);
+  }
+  return map;
 }
 
 /** Steps for an area plus the per-area flags (siap dimulai / perlu keputusan / blocked). */
