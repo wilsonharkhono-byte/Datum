@@ -80,10 +80,10 @@ create policy trade_steps_custom_write on public.trade_steps
   using  (project_id is not null and public.current_can_read_project(project_id))
   with check (project_id is not null and source = 'custom' and public.current_can_read_project(project_id));
 
--- Table-level write grant so the SECURITY INVOKER RPC can insert custom rows.
+-- Table-level INSERT grant so the SECURITY INVOKER RPC can insert custom rows.
 -- RLS (above) still confines writes to project-scoped custom rows; firm-standard
 -- rows (project_id is null) are unmatched by USING, so they remain protected.
-grant insert, update, delete on public.trade_steps to authenticated;
+grant insert on public.trade_steps to authenticated;
 
 -- 5a. Add a firm-standard Gate B step (one-step seed). INVOKER so RLS enforces membership.
 create or replace function public.add_catalog_area_step(p_area_id uuid, p_step_code text)

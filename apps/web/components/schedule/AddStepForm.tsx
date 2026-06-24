@@ -86,7 +86,7 @@ export function AddStepForm({ areaId, addableCatalog }: { areaId: string; addabl
         </div>
       )}
 
-      <button type="button" disabled={pending} onClick={() => { setOpen(false); setError(null); }}
+      <button type="button" disabled={pending} onClick={() => { setOpen(false); setError(null); setName(""); setCode(""); setMode(addableCatalog.length > 0 ? "catalog" : "custom"); }}
         className="mt-2 min-h-11 text-[11px] text-[var(--text-muted)] hover:text-[var(--foreground)] disabled:opacity-50 md:min-h-0">
         Batal
       </button>

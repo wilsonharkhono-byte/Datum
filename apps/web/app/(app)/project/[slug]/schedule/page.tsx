@@ -39,12 +39,14 @@ export default async function ProjectSchedulePage({
 
   const bathroomAreas = (matrix?.areas ?? []).filter((a) => a.area_type === "bathroom");
   const stepViews = await Promise.all(
-    bathroomAreas.map(async (a) => ({
-      area: a,
-      view: await getAreaStepView(supabase, a.id),
-      removedSteps: await getRemovedAreaSteps(supabase, a.id),
-      addableCatalog: await getAddableCatalogSteps(supabase, a.id),
-    })),
+    bathroomAreas.map(async (a) => {
+      const [view, removedSteps, addableCatalog] = await Promise.all([
+        getAreaStepView(supabase, a.id),
+        getRemovedAreaSteps(supabase, a.id),
+        getAddableCatalogSteps(supabase, a.id),
+      ]);
+      return { area: a, view, removedSteps, addableCatalog };
+    }),
   );
 
   // Count stale cells
