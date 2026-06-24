@@ -294,6 +294,26 @@ describe("InboxTab", () => {
     expect(mockPush).toHaveBeenCalledWith("/(tabs)/(matrix)");
   });
 
+  // ── 4b. readiness_reminder kind shows "Pengingat" chip ───────────────────
+
+  it("renders readiness_reminder notification with Pengingat chip", async () => {
+    const notif = makeNotification({
+      id:      "notif-reminder-1",
+      kind:    "readiness_reminder" as any,
+      summary: "Kamar Mandi A: Screed terlambat",
+      read_at: null,
+    });
+    mockGetNotifications.mockResolvedValue([notif]);
+    mockGetUnreadCount.mockResolvedValue(1);
+
+    wrap(<InboxTab />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Pengingat")).toBeTruthy();
+      expect(screen.getByText("Kamar Mandi A: Screed terlambat")).toBeTruthy();
+    });
+  });
+
   // ── 5. Empty state ────────────────────────────────────────────────────────
 
   it("shows empty state when no notifications are returned", async () => {

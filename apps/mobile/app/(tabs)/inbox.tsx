@@ -33,13 +33,14 @@ import type { Notification, ActivityItem } from "@datum/core";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const KIND_LABEL: Record<string, string> = {
-  mention:          "Mention",
-  watcher_event:    "Aktivitas",
-  card_status:      "Status kartu",
-  draft_pending:    "Draft menunggu",
-  draft_approved:   "Draft disetujui",
-  draft_rejected:   "Draft ditolak",
-  review_assigned:  "Review ditugaskan",
+  mention:             "Mention",
+  watcher_event:       "Aktivitas",
+  card_status:         "Status kartu",
+  draft_pending:       "Draft menunggu",
+  draft_approved:      "Draft disetujui",
+  draft_rejected:      "Draft ditolak",
+  review_assigned:     "Review ditugaskan",
+  readiness_reminder:  "Pengingat",
 };
 
 // ─── Deep-link parser ─────────────────────────────────────────────────────────
