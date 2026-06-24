@@ -124,6 +124,8 @@ export type ProjectStepSignalRow = {
   areaName: string;
   stepCode: string;
   stepName: string;
+  /** Matches trade_steps.trade_role — used by the reminder cron for recipient resolution. */
+  tradeRole: string | null;
   signal: StepSignal;
 };
 
@@ -230,8 +232,9 @@ export async function getProjectStepSignals(
 
     const signals = computeStepSignals({ steps: signalSteps, deps, today, now });
 
-    // Build a name lookup keyed by step_code for the signal rows.
+    // Build name + trade_role lookups keyed by step_code for the signal rows.
     const stepNameMap = new Map(signalSteps.map((s) => [s.step_code, s.name]));
+    const stepTradeRoleMap = new Map(signalSteps.map((s) => [s.step_code, s.trade_role]));
 
     for (const sig of signals) {
       allSignalRows.push({
@@ -239,6 +242,7 @@ export async function getProjectStepSignals(
         areaName,
         stepCode: sig.stepCode,
         stepName: stepNameMap.get(sig.stepCode) ?? sig.stepCode,
+        tradeRole: stepTradeRoleMap.get(sig.stepCode) ?? null,
         signal: sig,
       });
     }
