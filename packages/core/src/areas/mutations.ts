@@ -58,7 +58,7 @@ export async function createArea(
     .maybeSingle();
   const nextSort = (maxRow?.sort_order ?? -1) + 1;
 
-  const { error } = await sb.from("areas").insert({
+  const { data: created, error } = await sb.from("areas").insert({
     project_id: input.projectId,
     area_code: input.areaCode,
     area_name: input.areaName,
@@ -66,12 +66,18 @@ export async function createArea(
     area_type: input.areaType,
     area_sqm: input.areaSqm ?? null,
     sort_order: nextSort,
-  });
+  }).select("id").single();
   if (error) {
     if (error.code === "23505") {
       return { ok: false, error: `Kode area "${input.areaCode}" sudah ada di proyek ini` };
     }
     return { ok: false, error: error.message };
+  }
+
+  // Best-effort: seed the firm-standard A–H checklist for the new room. Never
+  // fail area creation if seeding hiccups — steps can be re-seeded (backfill).
+  if (created?.id) {
+    await sb.rpc("seed_area_steps", { p_area_id: created.id });
   }
 
   return { ok: true };
