@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addCatalogStep, addCustomStep } from "@/lib/steps/actions";
 import type { CatalogStep } from "@/lib/steps/queries";
+import { GATE_SHORT_NAME } from "@datum/core";
 
 type StepType = "decision" | "procurement" | "site_work" | "inspection";
 const TYPE_OPTIONS: { value: StepType; label: string }[] = [
@@ -21,6 +22,7 @@ export function AddStepForm({ areaId, addableCatalog }: { areaId: string; addabl
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [stepType, setStepType] = useState<StepType>("site_work");
+  const [gateCode, setGateCode] = useState("D");
   const [error, setError] = useState<string | null>(null);
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>) {
@@ -78,8 +80,14 @@ export function AddStepForm({ areaId, addableCatalog }: { areaId: string; addabl
             className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[12px] md:min-h-0">
             {TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
+          <select value={gateCode} disabled={pending} onChange={(e) => setGateCode(e.target.value)}
+            className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[12px] md:min-h-0">
+            {Object.entries(GATE_SHORT_NAME).map(([code, label]) => (
+              <option key={code} value={code}>{code} · {label}</option>
+            ))}
+          </select>
           <button type="button" disabled={pending || !name.trim()}
-            onClick={() => run(() => addCustomStep({ areaId, name: name.trim(), stepType }))}
+            onClick={() => run(() => addCustomStep({ areaId, name: name.trim(), stepType, gateCode }))}
             className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--sand-dark)] disabled:opacity-50 md:min-h-0">
             Tambah
           </button>

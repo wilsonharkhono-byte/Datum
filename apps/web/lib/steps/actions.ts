@@ -55,13 +55,14 @@ export async function addCustomStep(args: {
   areaId: string;
   name: string;
   stepType: "decision" | "procurement" | "site_work" | "inspection";
+  gateCode: string;
 }): Promise<StepActionResult> {
   const staff = await getCurrentStaff();
   if (!staff) return { ok: false, error: "Harus masuk untuk menambah langkah" };
   const supabase = await createSupabaseServerClient();
   try {
     const { error } = await supabase.rpc("add_custom_area_step", {
-      p_area_id: args.areaId, p_name: args.name, p_step_type: args.stepType,
+      p_area_id: args.areaId, p_name: args.name, p_step_type: args.stepType, p_gate_code: args.gateCode,
     });
     if (error) throw error;
     return { ok: true };

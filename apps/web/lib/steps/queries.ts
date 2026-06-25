@@ -311,20 +311,26 @@ export async function getRemovedAreaSteps(
   });
 }
 
-/** Firm-standard Gate B steps not yet instantiated on this area (the catalog picker). */
+/** Firm-standard steps not yet instantiated on this area, filtered to those applicable to the area's type. */
 export async function getAddableCatalogSteps(
   supabase: SupabaseClient<Database>,
   areaId: string,
 ): Promise<CatalogStep[]> {
+  const { data: area } = await supabase.from("areas").select("area_type").eq("id", areaId).single();
+  const areaType = area?.area_type ?? null;
   const [{ data: existing, error: e1 }, { data: catalog, error: e2 }] = await Promise.all([
     supabase.from("area_steps").select("step_code").eq("area_id", areaId),
-    supabase.from("trade_steps").select("code, name")
-      .eq("gate_code", "B").eq("active", true).is("project_id", null).order("sort_order"),
+    supabase.from("trade_steps").select("code, name, applies_to_area_types")
+      .eq("active", true).is("project_id", null).order("gate_code").order("sort_order"),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
+  const applicable = (catalog ?? []).filter((c) => {
+    const types = (c.applies_to_area_types as string[] | null) ?? null;
+    return types === null || (areaType !== null && types.includes(areaType));
+  });
   return addableCatalog(
-    (catalog ?? []) as CatalogStep[],
+    applicable.map((c) => ({ code: c.code, name: c.name })),
     (existing ?? []).map((r) => r.step_code),
   );
 }
