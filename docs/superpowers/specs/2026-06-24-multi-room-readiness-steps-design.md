@@ -102,10 +102,12 @@ Columns: **code · name · type · trade · dur(d) · lead(d) · preds · rooms 
 ### Gate B — Pekerjaan Basah / Waterproofing (wet rooms) — REFRAMED
 | code | name | type | trade | dur | lead | preds | rooms | note |
 |--|--|--|--|--|--|--|--|--|
-|B1|Booking aplikator waterproofing|proc|aplikator_wp|1|7|—|bath,kit,gen|secures specialist (was B11)|
-|B2|Aplikasi waterproofing membrane (lapis kedap)|work|aplikator_wp|3|0|B1|bath,kit,gen|after rough-in (was B4)|
-|B3|Flood test / uji genang 24 jam|insp|site_manager|2|0|B2|bath,kit,gen|wet QC before covering — NEW|
-|B4|Screeding + slope ke floor drain|work|tukang_sipil|2|0|B3|bath,kit,gen|wet-floor slope (was B5)|
+|BW1|Booking aplikator waterproofing|proc|aplikator_wp|1|7|—|bath,kit,gen|secures specialist (was B11)|
+|BW2|Aplikasi waterproofing membrane (lapis kedap)|work|aplikator_wp|3|0|BW1|bath,kit,gen|after rough-in (was B4)|
+|BW3|Flood test / uji genang 24 jam|insp|site_manager|2|0|BW2|bath,kit,gen|wet QC before covering — NEW|
+|BW4|Screeding + slope ke floor drain|work|tukang_sipil|2|0|BW3|bath,kit,gen|wet-floor slope (was B5)|
+
+> Codes `BW1–BW4` (not `B1–B4`): the old bathroom `B1–B11` are deactivated, not deleted, so the wet-works codes must not collide. All still live under `gate_code = 'B'`.
 
 ### Gate C — Plafon & Penutupan Selubung (+ bathroom)
 | code | name | type | trade | dur | lead | preds | rooms | note |
