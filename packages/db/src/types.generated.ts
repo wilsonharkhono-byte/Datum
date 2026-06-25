@@ -2646,6 +2646,7 @@ export type Database = {
         Row: {
           active: boolean
           applicability: Json
+          applies_to_area_types: string[] | null
           code: string
           created_at: string
           created_by: string | null
@@ -2662,6 +2663,7 @@ export type Database = {
         Insert: {
           active?: boolean
           applicability?: Json
+          applies_to_area_types?: string[] | null
           code: string
           created_at?: string
           created_by?: string | null
@@ -2678,6 +2680,7 @@ export type Database = {
         Update: {
           active?: boolean
           applicability?: Json
+          applies_to_area_types?: string[] | null
           code?: string
           created_at?: string
           created_by?: string | null
@@ -2851,7 +2854,12 @@ export type Database = {
         Returns: string
       }
       add_custom_area_step: {
-        Args: { p_area_id: string; p_name: string; p_step_type: string }
+        Args: {
+          p_area_id: string
+          p_name: string
+          p_step_type: string
+          p_gate_code?: string
+        }
         Returns: string
       }
       claim_attachments_for_analysis: {
