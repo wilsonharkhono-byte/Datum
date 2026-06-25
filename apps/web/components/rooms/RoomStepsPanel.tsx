@@ -70,7 +70,7 @@ export function RoomStepsPanel({ areaId, areaName, view }: { areaId: string; are
       ) : (
         <>
           {view.grouped.map((g) => (
-            <details key={g.gate} className="border-t border-[var(--border)]" open={g.steps.some((s) => view.active.includes(s))}>
+            <details key={g.gate} className="border-t border-[var(--border)]" open={g.steps.some((s) => view.active.some((a) => a.id === s.id))}>
               <summary className="min-h-11 cursor-pointer px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] md:min-h-0">
                 {g.gate} · {g.gateName} — {g.done}/{g.steps.length}
               </summary>
