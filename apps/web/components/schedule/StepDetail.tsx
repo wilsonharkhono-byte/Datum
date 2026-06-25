@@ -106,7 +106,7 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
   }
 
   function remove() {
-    if (!window.confirm("Hapus langkah ini dari kamar mandi? Bisa dipulihkan nanti.")) return;
+    if (!window.confirm("Hapus langkah ini dari ruang ini? Bisa dipulihkan nanti.")) return;
     run(() => removeStep({ areaStepId: step.id }));
   }
 
