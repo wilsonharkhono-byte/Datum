@@ -26,6 +26,7 @@
 | `packages/db/supabase/migrations/<ts>_uniform_room_steps.sql` | rename gate B; `trade_steps.applies_to_area_types`; deactivate old B1–B11; seed reconciled library + deps; generalize `seed_area_steps`, `add_catalog_area_step`, `add_custom_area_step` (gains `p_gate_code`) |
 | `packages/db/src/types.generated.ts` | regenerated |
 | `packages/core/src/gates/labels.ts` | `GATE_SHORT_NAME.B: "Kamar Mandi"` → `"Pekerjaan Basah"` (matrix label follows) |
+| `packages/core/src/areas/mutations.ts` | `createArea` seeds the new area's steps (shared web+mobile path) |
 | `apps/web/lib/steps/queries.ts` | generalize `getAddableCatalogSteps` off Gate B; add `gate_code` to `getAreaSteps`/`AreaStepRow`; add `groupStepsByGate`/`activeSteps`/`getRoomStepView` |
 | `apps/web/lib/steps/mutations.ts` | generalize `writePlannedDates` to all gates |
 | `apps/web/lib/steps/actions.ts` | `addCustomStep` gains `gateCode`; calls now hit the generalized RPCs |
@@ -357,6 +358,59 @@ Run: `pnpm -C packages/core typecheck && pnpm -C apps/web typecheck` → PASS.
 ```bash
 git add packages/core/src/gates/labels.ts apps/web/lib/steps/queries.ts apps/web/lib/steps/mutations.ts apps/web/lib/steps/actions.ts apps/web/components/schedule/AddStepForm.tsx
 git commit -m "feat(steps): reframe Gate-B label + generalize catalog/planned-dates + custom-step phase picker"
+```
+
+---
+
+## Task 2b: Seed steps when an area is created
+
+Today nothing seeds an area's steps on creation — `seed_area_steps` has no trigger and `createArea` just inserts (the pilot bathroom was backfilled manually). Wire seeding into the shared `createArea` so every new room (web **and** mobile both call this) gets its checklist.
+
+**Files:**
+- Modify: `packages/core/src/areas/mutations.ts` (`createArea`)
+
+**Interfaces:**
+- Consumes — `seed_area_steps` RPC (generalized in Task 1).
+- Produces — `createArea` best-effort seeds the firm-standard checklist for the new area (all room types).
+
+- [ ] **Step 1: Seed after insert (best-effort)**
+
+In `createArea`, change the insert to return the new id and call the RPC before the final `return { ok: true }`. The existing `if (error)` block (with the `23505` duplicate-code branch) is unchanged; only add `.select("id").single()` and the seeding call:
+```ts
+  const { data: created, error } = await sb.from("areas").insert({
+    project_id: input.projectId,
+    area_code: input.areaCode,
+    area_name: input.areaName,
+    floor: input.floor ?? null,
+    area_type: input.areaType,
+    area_sqm: input.areaSqm ?? null,
+    sort_order: nextSort,
+  }).select("id").single();
+  if (error) {
+    if (error.code === "23505") {
+      return { ok: false, error: `Kode area "${input.areaCode}" sudah ada di proyek ini` };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  // Best-effort: seed the firm-standard A–H checklist for the new room. Never
+  // fail area creation if seeding hiccups — steps can be re-seeded (backfill).
+  if (created?.id) {
+    await sb.rpc("seed_area_steps", { p_area_id: created.id });
+  }
+
+  return { ok: true };
+```
+
+- [ ] **Step 2: Typecheck + tests**
+
+Run: `pnpm -C packages/core typecheck && pnpm -C packages/core test`. If a `createArea` unit test mocks the insert without `.select().single()`, update the mock to resolve `{ data: { id: "area-x" }, error: null }` and stub `sb.rpc` to resolve `{ error: null }`. Expected: PASS.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add packages/core/src/areas/mutations.ts
+git commit -m "feat(areas): seed the firm-standard checklist when an area is created"
 ```
 
 ---
@@ -765,7 +819,7 @@ end $$;
 
 ## Self-review checklist (plan author)
 
-- **Spec coverage:** Part 0 reframe → Task 1 (rename + retire + re-seed) + Task 2 (label + pins); §1 schema/seeding → Task 1; §2 content → Task 1 (Appendix A); §3 screen → Tasks 4 (panel) + 6 (wiring) + 7 (schedule cleanup) + 5 (AI); §4 reuse → Tasks 2/3 (generalized catalog) + 8 (backfill); rule-engine-unchanged honored (no rule task).
+- **Spec coverage:** Part 0 reframe → Task 1 (rename + retire + re-seed) + Task 2 (label + pins); §1 schema/seeding → Task 1 (`applies_to_area_types`, generalized `seed_area_steps`) + Task 2b (`createArea` seeds new rooms) + Task 8 (backfill existing); §2 content → Task 1 (Appendix A); §3 screen → Tasks 4 (panel) + 6 (wiring) + 7 (schedule cleanup) + 5 (AI); §4 reuse → Tasks 2/3 (generalized catalog) + 8 (backfill); rule-engine-unchanged honored (no rule task).
 - **Type consistency:** `getRoomStepView` (Task 3) consumed by Tasks 4/5/6; `groupStepsByGate`/`activeSteps` defined Task 3, used Task 4; `AreaStepRow.gate_code` added Task 3, drives grouping; `applies_to_area_types` defined Task 1, consumed Tasks 2/3; `gateShortName`/`GATE_SHORT_NAME` confirmed exported (`packages/core/src/index.ts:265`); `addCustomStep({…, gateCode})` (Task 2) matches `add_custom_area_step(…, p_gate_code)` (Task 1).
 - **Grounded against source:** `AreaStepRow`/`AreaFlags`/`StepStatus`/`restoreStep`/`StepDetail`(`{step, events?}`)/`AddStepForm`(`{areaId, addableCatalog}`)/`backScheduleSteps` all verified in code; custom steps are `cst_<uuid>` (so grouping is by `gate_code`, not code-prefix).
 - **Known follow-ups:** AI deep scheduling intelligence + the firm-standard library management UI (Piece B, incl. drag-reorder) are out of scope; per-step checkpoints deferred; per-room step history (events) omitted from the Rooms panel for load (StepDetail renders `events=[]`).
