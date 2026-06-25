@@ -4,6 +4,7 @@ import { computeAreaFlags, type AreaFlags } from "@/lib/steps/flags";
 import type { TradeStepDep } from "@/lib/steps/types";
 import { computeStepSignals } from "@/lib/steps/signals";
 import type { StepSignal } from "@/lib/steps/signals";
+import { gateShortName } from "@datum/core";
 
 export type AreaStepEventRow = {
   id: string;
@@ -28,6 +29,7 @@ export type AreaStepRow = {
   step_code: string;
   name: string;
   step_type: string;
+  gate_code: string;
   status: string;
   planned_start: string | null;
   planned_end: string | null;
@@ -56,7 +58,7 @@ export async function getAreaSteps(
     .select(`
       id, step_code, status, planned_start, planned_end,
       assigned_trade, blocking_reason, last_progress_at, created_at,
-      trade_steps:step_code (sort_order, step_type, name),
+      trade_steps:step_code (sort_order, step_type, name, gate_code),
       area_step_checkpoints (id, item_text, severity, required, result, sort_order)
     `)
     .eq("area_id", areaId)
@@ -65,7 +67,7 @@ export async function getAreaSteps(
 
   return (data ?? [])
     .map((r) => {
-      const tmpl = r.trade_steps as { sort_order: number; step_type: string; name: string } | null;
+      const tmpl = r.trade_steps as { sort_order: number; step_type: string; name: string; gate_code: string } | null;
       const cps = (r.area_step_checkpoints as Array<AreaStepCheckpoint & { sort_order: number }> | null) ?? [];
       return {
         _sort: tmpl?.sort_order ?? 0,
@@ -74,6 +76,7 @@ export async function getAreaSteps(
         step_code: r.step_code,
         name: tmpl?.name ?? r.step_code,
         step_type: tmpl?.step_type ?? "site_work",
+        gate_code: tmpl?.gate_code ?? "?",
         status: r.status,
         planned_start: r.planned_start,
         planned_end: r.planned_end,
@@ -333,4 +336,37 @@ export async function getAddableCatalogSteps(
     applicable.map((c) => ({ code: c.code, name: c.name })),
     (existing ?? []).map((r) => r.step_code),
   );
+}
+
+/** Group steps by their real gate_code, in A→H order, with done counts. */
+export function groupStepsByGate(steps: AreaStepRow[]): { gate: string; gateName: string; steps: AreaStepRow[]; done: number }[] {
+  const order: string[] = [];
+  const byGate = new Map<string, AreaStepRow[]>();
+  for (const s of steps) {
+    const gate = s.gate_code || "?";
+    if (!byGate.has(gate)) { byGate.set(gate, []); order.push(gate); }
+    byGate.get(gate)!.push(s);
+  }
+  order.sort((a, b) => a.localeCompare(b)); // A→H
+  return order.map((gate) => {
+    const gs = byGate.get(gate)!;
+    const done = gs.filter((s) => s.status === "accepted" || s.status === "done_with_defects").length;
+    return { gate, gateName: gateShortName(gate), steps: gs, done };
+  });
+}
+
+/** The steps worth acting on now: in_progress/blocked/stalled + the readyToStart step. */
+export function activeSteps(steps: AreaStepRow[], flags: AreaFlags): AreaStepRow[] {
+  return steps.filter((s) =>
+    s.status === "in_progress" || s.status === "blocked" || s.status === "stalled" || s.step_code === flags.readyToStart);
+}
+
+/** Everything the Rooms-page per-room panel needs. */
+export async function getRoomStepView(supabase: SupabaseClient<Database>, areaId: string) {
+  const [view, addableCatalog, removedSteps] = await Promise.all([
+    getAreaStepView(supabase, areaId),
+    getAddableCatalogSteps(supabase, areaId),
+    getRemovedAreaSteps(supabase, areaId),
+  ]);
+  return { ...view, addableCatalog, removedSteps, grouped: groupStepsByGate(view.steps), active: activeSteps(view.steps, view.flags) };
 }
