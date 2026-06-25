@@ -124,6 +124,14 @@ values
   ('H11','H','Serahkan dokumen handover (as-built/manual/garansi)','inspection','site_manager',2,0,11,'{}'::jsonb,'{general}',true,null,'standard')
 on conflict (code) do nothing;
 
+-- Ensure dining / circulation / utility rooms get a usable checklist: give them
+-- the same coverage as a 'general' room (over-inclusive steps are prunable per-area).
+update public.trade_steps
+  set applies_to_area_types = applies_to_area_types || array['dining','circulation','utility']::text[]
+  where project_id is null and source = 'standard'
+    and 'general' = any(applies_to_area_types)
+    and not ('dining' = any(applies_to_area_types));
+
 -- ─── 5. Dependencies (within-gate predecessors) ───────────────────────────────
 insert into public.trade_step_deps (step_code, predecessor_code) values
   -- A
@@ -229,6 +237,10 @@ begin
   if v_project_id is null then raise exception 'area not found'; end if;
   if not exists (select 1 from public.gates where code = p_gate_code) then
     raise exception 'unknown gate: %', p_gate_code;
+  end if;
+  if coalesce(btrim(p_name), '') = '' then raise exception 'name required'; end if;
+  if p_step_type not in ('decision','procurement','site_work','inspection') then
+    raise exception 'invalid step_type: %', p_step_type;
   end if;
   v_code := 'cst_' || replace(gen_random_uuid()::text, '-', '');
   insert into public.trade_steps

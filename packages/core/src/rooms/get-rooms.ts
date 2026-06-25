@@ -85,6 +85,7 @@ export async function getProjectRooms(
       areaId: area.id,
       areaCode: area.area_code,
       areaName: area.area_name,
+      areaType: area.area_type,
       floor: area.floor,
       sortOrder: area.sort_order,
       stage,
