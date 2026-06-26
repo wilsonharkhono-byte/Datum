@@ -2,7 +2,7 @@ import type { GateCode } from "@datum/types";
 
 export const GATE_SHORT_NAME: Record<GateCode, string> = {
   A: "MEP Rough-in",
-  B: "Kamar Mandi",
+  B: "Pekerjaan Basah",
   C: "Plafon",
   D: "Lantai & Kusen",
   E: "Cat & Ironwork",

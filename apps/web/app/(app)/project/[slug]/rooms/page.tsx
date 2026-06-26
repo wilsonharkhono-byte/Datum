@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getProjectRooms } from "@/lib/rooms/queries";
+import { getRoomStepViews } from "@/lib/steps/queries";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { RoomsView } from "@/components/rooms/RoomsView";
 
 export default async function ProjectRoomsPage({
@@ -26,5 +28,12 @@ export default async function ProjectRoomsPage({
     );
   }
 
-  return <RoomsView data={data} now={Date.now()} />;
+  const supabase = await createSupabaseServerClient();
+  const stepViews = await getRoomStepViews(
+    supabase,
+    data.projectId,
+    data.rooms.map((r) => ({ areaId: r.areaId, areaType: r.areaType })),
+  );
+
+  return <RoomsView data={data} now={Date.now()} stepViews={stepViews} />;
 }

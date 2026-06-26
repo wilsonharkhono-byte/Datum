@@ -126,6 +126,7 @@ describe("sortRoomsByUrgency", () => {
       areaId: partial.areaId ?? "x",
       areaCode: "AX",
       areaName: "Area",
+      areaType: "general",
       floor: null,
       sortOrder: partial.sortOrder ?? 0,
       stage: partial.stage ?? { kind: "none" },

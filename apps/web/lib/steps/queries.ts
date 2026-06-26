@@ -4,6 +4,7 @@ import { computeAreaFlags, type AreaFlags } from "@/lib/steps/flags";
 import type { TradeStepDep } from "@/lib/steps/types";
 import { computeStepSignals } from "@/lib/steps/signals";
 import type { StepSignal } from "@/lib/steps/signals";
+import { gateShortName } from "@datum/core";
 
 export type AreaStepEventRow = {
   id: string;
@@ -28,6 +29,7 @@ export type AreaStepRow = {
   step_code: string;
   name: string;
   step_type: string;
+  gate_code: string;
   status: string;
   planned_start: string | null;
   planned_end: string | null;
@@ -46,6 +48,46 @@ export function addableCatalog(catalog: CatalogStep[], existingCodes: string[]):
   return catalog.filter((c) => !have.has(c.code));
 }
 
+// ─── Private row-mapping helper (DRY: used by getAreaSteps + getRoomStepViews) ──
+
+type RawAreaStepRow = {
+  id: string;
+  step_code: string;
+  status: string;
+  planned_start: string | null;
+  planned_end: string | null;
+  assigned_trade: string | null;
+  blocking_reason: string | null;
+  last_progress_at: string | null;
+  created_at: string;
+  trade_steps: { sort_order: number; step_type: string; name: string; gate_code: string } | null;
+  area_step_checkpoints: Array<AreaStepCheckpoint & { sort_order: number }> | null;
+};
+
+type SortableAreaStepRow = AreaStepRow & { _sort: number; _created: string };
+
+function mapAreaStepRow(r: RawAreaStepRow): SortableAreaStepRow {
+  const tmpl = r.trade_steps;
+  const cps = r.area_step_checkpoints ?? [];
+  return {
+    _sort: tmpl?.sort_order ?? 0,
+    _created: r.created_at,
+    id: r.id,
+    step_code: r.step_code,
+    name: tmpl?.name ?? r.step_code,
+    step_type: tmpl?.step_type ?? "site_work",
+    gate_code: tmpl?.gate_code ?? "?",
+    status: r.status,
+    planned_start: r.planned_start,
+    planned_end: r.planned_end,
+    assigned_trade: r.assigned_trade,
+    blocking_reason: r.blocking_reason,
+    last_progress_at: r.last_progress_at,
+    checkpoints: [...cps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((c) => ({ id: c.id, item_text: c.item_text, severity: c.severity, required: c.required, result: c.result })),
+  };
+}
+
 /** Active trade steps instantiated for one area, ordered by template sort_order then created_at, with checkpoints. */
 export async function getAreaSteps(
   supabase: SupabaseClient<Database>,
@@ -56,7 +98,7 @@ export async function getAreaSteps(
     .select(`
       id, step_code, status, planned_start, planned_end,
       assigned_trade, blocking_reason, last_progress_at, created_at,
-      trade_steps:step_code (sort_order, step_type, name),
+      trade_steps:step_code (sort_order, step_type, name, gate_code),
       area_step_checkpoints (id, item_text, severity, required, result, sort_order)
     `)
     .eq("area_id", areaId)
@@ -64,26 +106,7 @@ export async function getAreaSteps(
   if (error) throw error;
 
   return (data ?? [])
-    .map((r) => {
-      const tmpl = r.trade_steps as { sort_order: number; step_type: string; name: string } | null;
-      const cps = (r.area_step_checkpoints as Array<AreaStepCheckpoint & { sort_order: number }> | null) ?? [];
-      return {
-        _sort: tmpl?.sort_order ?? 0,
-        _created: r.created_at as string,
-        id: r.id,
-        step_code: r.step_code,
-        name: tmpl?.name ?? r.step_code,
-        step_type: tmpl?.step_type ?? "site_work",
-        status: r.status,
-        planned_start: r.planned_start,
-        planned_end: r.planned_end,
-        assigned_trade: r.assigned_trade,
-        blocking_reason: r.blocking_reason,
-        last_progress_at: r.last_progress_at,
-        checkpoints: [...cps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-          .map((c) => ({ id: c.id, item_text: c.item_text, severity: c.severity, required: c.required, result: c.result })),
-      };
-    })
+    .map((r) => mapAreaStepRow(r as unknown as RawAreaStepRow))
     .sort((a, b) => a._sort - b._sort || a._created.localeCompare(b._created))
     .map(({ _sort, _created, ...rest }) => rest as AreaStepRow);
 }
@@ -311,20 +334,165 @@ export async function getRemovedAreaSteps(
   });
 }
 
-/** Firm-standard Gate B steps not yet instantiated on this area (the catalog picker). */
+/** Firm-standard steps not yet instantiated on this area, filtered to those applicable to the area's type. */
 export async function getAddableCatalogSteps(
   supabase: SupabaseClient<Database>,
   areaId: string,
 ): Promise<CatalogStep[]> {
+  const { data: area } = await supabase.from("areas").select("area_type").eq("id", areaId).single();
+  const areaType = area?.area_type ?? null;
   const [{ data: existing, error: e1 }, { data: catalog, error: e2 }] = await Promise.all([
     supabase.from("area_steps").select("step_code").eq("area_id", areaId),
-    supabase.from("trade_steps").select("code, name")
-      .eq("gate_code", "B").eq("active", true).is("project_id", null).order("sort_order"),
+    supabase.from("trade_steps").select("code, name, applies_to_area_types")
+      .eq("active", true).is("project_id", null).order("gate_code").order("sort_order"),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
+  const applicable = (catalog ?? []).filter((c) => {
+    const types = (c.applies_to_area_types as string[] | null) ?? null;
+    return types === null || (areaType !== null && types.includes(areaType));
+  });
   return addableCatalog(
-    (catalog ?? []) as CatalogStep[],
+    applicable.map((c) => ({ code: c.code, name: c.name })),
     (existing ?? []).map((r) => r.step_code),
   );
+}
+
+/** Group steps by their real gate_code, in A→H order, with done counts. */
+export function groupStepsByGate(steps: AreaStepRow[]): { gate: string; gateName: string; steps: AreaStepRow[]; done: number }[] {
+  const order: string[] = [];
+  const byGate = new Map<string, AreaStepRow[]>();
+  for (const s of steps) {
+    const gate = s.gate_code || "?";
+    if (!byGate.has(gate)) { byGate.set(gate, []); order.push(gate); }
+    byGate.get(gate)!.push(s);
+  }
+  order.sort((a, b) => a.localeCompare(b)); // A→H
+  return order.map((gate) => {
+    const gs = byGate.get(gate)!;
+    const done = gs.filter((s) => s.status === "accepted" || s.status === "done_with_defects").length;
+    return { gate, gateName: gateShortName(gate), steps: gs, done };
+  });
+}
+
+/** The steps worth acting on now: in_progress/blocked/stalled + the readyToStart step. */
+export function activeSteps(steps: AreaStepRow[], flags: AreaFlags): AreaStepRow[] {
+  return steps.filter((s) =>
+    s.status === "in_progress" || s.status === "blocked" || s.status === "stalled" || s.step_code === flags.readyToStart);
+}
+
+/** Everything the Rooms-page per-room panel needs. */
+export async function getRoomStepView(supabase: SupabaseClient<Database>, areaId: string) {
+  const [view, addableCatalog, removedSteps] = await Promise.all([
+    getAreaStepView(supabase, areaId),
+    getAddableCatalogSteps(supabase, areaId),
+    getRemovedAreaSteps(supabase, areaId),
+  ]);
+  return { ...view, addableCatalog, removedSteps, grouped: groupStepsByGate(view.steps), active: activeSteps(view.steps, view.flags) };
+}
+
+/**
+ * Batched variant of getRoomStepView for the Rooms page.
+ * Issues a fixed number of queries regardless of room count (4 round-trips total):
+ *   1. All non-removed area_steps for the project (with template join + checkpoints).
+ *   2. All removed area_steps for the project (for the restore list).
+ *   3. trade_step_deps once (shared dep graph).
+ *   4. Firm-standard catalog once (addable steps).
+ * Per-room views are assembled in memory from those 4 fetches.
+ */
+export async function getRoomStepViews(
+  supabase: SupabaseClient<Database>,
+  projectId: string,
+  rooms: { areaId: string; areaType: string }[],
+): Promise<Map<string, Awaited<ReturnType<typeof getRoomStepView>>>> {
+  const [rawStepsRes, removedRes, depsRes, catalogRes] = await Promise.all([
+    // 1. All non-removed area_steps for the project
+    supabase
+      .from("area_steps")
+      .select(`
+        id, step_code, status, planned_start, planned_end,
+        assigned_trade, blocking_reason, last_progress_at, created_at,
+        area_id,
+        trade_steps:step_code (sort_order, step_type, name, gate_code),
+        area_step_checkpoints (id, item_text, severity, required, result, sort_order)
+      `)
+      .eq("project_id", projectId)
+      .is("removed_at", null),
+    // 2. All removed area_steps for the project
+    supabase
+      .from("area_steps")
+      .select("id, area_id, step_code, trade_steps:step_code (name)")
+      .eq("project_id", projectId)
+      .not("removed_at", "is", null),
+    // 3. trade_step_deps once
+    supabase
+      .from("trade_step_deps")
+      .select("step_code, predecessor_code"),
+    // 4. Firm-standard catalog once
+    supabase
+      .from("trade_steps")
+      .select("code, name, applies_to_area_types")
+      .eq("active", true)
+      .is("project_id", null)
+      .order("gate_code")
+      .order("sort_order"),
+  ]);
+
+  if (rawStepsRes.error) throw rawStepsRes.error;
+  if (removedRes.error) throw removedRes.error;
+  if (depsRes.error) throw depsRes.error;
+  if (catalogRes.error) throw catalogRes.error;
+
+  const deps = (depsRes.data ?? []) as TradeStepDep[];
+  const catalogAll = catalogRes.data ?? [];
+
+  // Group non-removed steps by area_id, sorted
+  const stepsByArea = new Map<string, AreaStepRow[]>();
+  const rawByArea = new Map<string, RawAreaStepRow[]>();
+  for (const r of rawStepsRes.data ?? []) {
+    const areaId = (r as { area_id: string }).area_id;
+    const bucket = rawByArea.get(areaId) ?? [];
+    bucket.push(r as unknown as RawAreaStepRow);
+    rawByArea.set(areaId, bucket);
+  }
+  for (const [areaId, raws] of rawByArea) {
+    const sorted = raws
+      .map((r) => mapAreaStepRow(r))
+      .sort((a, b) => a._sort - b._sort || a._created.localeCompare(b._created))
+      .map(({ _sort, _created, ...rest }) => rest as AreaStepRow);
+    stepsByArea.set(areaId, sorted);
+  }
+
+  // Group removed steps by area_id
+  const removedByArea = new Map<string, RemovedStep[]>();
+  for (const r of removedRes.data ?? []) {
+    const areaId = (r as { area_id: string }).area_id;
+    const tmpl = r.trade_steps as { name: string } | null;
+    const bucket = removedByArea.get(areaId) ?? [];
+    bucket.push({ id: r.id, step_code: r.step_code, name: tmpl?.name ?? r.step_code });
+    removedByArea.set(areaId, bucket);
+  }
+
+  // Build per-room views in memory
+  const result = new Map<string, Awaited<ReturnType<typeof getRoomStepView>>>();
+  for (const room of rooms) {
+    const steps = stepsByArea.get(room.areaId) ?? [];
+    const flags = computeAreaFlags(
+      steps.map((s) => ({ step_code: s.step_code, step_type: s.step_type, status: s.status })),
+      deps,
+    );
+    const grouped = groupStepsByGate(steps);
+    const active = activeSteps(steps, flags);
+    const removedSteps = removedByArea.get(room.areaId) ?? [];
+    const applicableCatalog = catalogAll.filter((c) => {
+      const types = (c.applies_to_area_types as string[] | null) ?? null;
+      return types === null || types.includes(room.areaType);
+    });
+    const roomAddableCatalog = addableCatalog(
+      applicableCatalog.map((c) => ({ code: c.code, name: c.name })),
+      steps.map((s) => s.step_code),
+    );
+    result.set(room.areaId, { steps, flags, addableCatalog: roomAddableCatalog, removedSteps, grouped, active });
+  }
+  return result;
 }

@@ -1,13 +1,16 @@
 import Link from "next/link";
 import type { ProjectRooms } from "@/lib/rooms/queries";
+import type { getRoomStepView } from "@/lib/steps/queries";
 import { RoomRow } from "./RoomRow";
+
+type StepViews = Map<string, Awaited<ReturnType<typeof getRoomStepView>>>;
 
 /**
  * The "Ruangan" surface: one row per area, sorted by urgency, as the primary
  * daily glance for a project. Read-only. `now` is passed from the server
  * component so relative times render deterministically per request.
  */
-export function RoomsView({ data, now }: { data: ProjectRooms; now: number }) {
+export function RoomsView({ data, now, stepViews }: { data: ProjectRooms; now: number; stepViews?: StepViews }) {
   const count = data.rooms.length;
 
   return (
@@ -44,7 +47,7 @@ export function RoomsView({ data, now }: { data: ProjectRooms; now: number }) {
       {count === 0 ? <EmptyState projectCode={data.projectCode} /> : (
         <div className="overflow-hidden rounded-lg border border-[var(--border)]">
           {data.rooms.map((room) => (
-            <RoomRow key={room.areaId} room={room} projectCode={data.projectCode} now={now} />
+            <RoomRow key={room.areaId} room={room} projectCode={data.projectCode} now={now} stepView={stepViews?.get(room.areaId)} />
           ))}
         </div>
       )}

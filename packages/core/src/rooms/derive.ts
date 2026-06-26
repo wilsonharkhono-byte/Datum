@@ -124,6 +124,7 @@ export type Room = {
   areaId: string;
   areaCode: string;
   areaName: string;
+  areaType: string;
   floor: string | null;
   sortOrder: number;
   stage: RoomStage;

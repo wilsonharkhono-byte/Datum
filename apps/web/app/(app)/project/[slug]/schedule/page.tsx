@@ -8,8 +8,7 @@ import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
-import { getAreaStepView, getRemovedAreaSteps, getAddableCatalogSteps, getAreaStepEvents, getProjectStepSignals } from "@/lib/steps/queries";
-import { AreaStepsPanel } from "@/components/schedule/AreaStepsPanel";
+import { getProjectStepSignals } from "@/lib/steps/queries";
 import { SignalSummaryPanel } from "@/components/schedule/SignalSummaryPanel";
 
 export default async function ProjectSchedulePage({
@@ -44,22 +43,6 @@ export default async function ProjectSchedulePage({
 
   // Fetch project-wide signals (one round-trip for steps, one for deps, one for area names).
   const projectSignals = await getProjectStepSignals(supabase, project.id, jakartaToday, nowIso);
-
-  const bathroomAreas = (matrix?.areas ?? []).filter((a) => a.area_type === "bathroom");
-  const stepViews = await Promise.all(
-    bathroomAreas.map(async (a) => {
-      const [view, removedSteps, addableCatalog] = await Promise.all([
-        getAreaStepView(supabase, a.id),
-        getRemovedAreaSteps(supabase, a.id),
-        getAddableCatalogSteps(supabase, a.id),
-      ]);
-      return { area: a, view, removedSteps, addableCatalog };
-    }),
-  );
-
-  // Fetch all step events for all bathroom areas in one query (keyed by step id).
-  const allStepIds = stepViews.flatMap(({ view }) => view.steps.map((s) => s.id));
-  const stepEventsMap = await getAreaStepEvents(supabase, allStepIds);
 
   // Count stale cells
   const { count: staleCount } = await supabase
@@ -165,28 +148,6 @@ export default async function ProjectSchedulePage({
       ) : null}
 
       <SignalSummaryPanel signals={projectSignals} />
-
-      {stepViews.length > 0 ? (
-        <section className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
-            Langkah pekerjaan — kamar mandi
-          </h2>
-          <div className="flex flex-col gap-2">
-            {stepViews.map(({ area, view, removedSteps, addableCatalog }) => (
-              <AreaStepsPanel
-                key={area.id}
-                areaId={area.id}
-                areaName={area.area_name}
-                steps={view.steps}
-                flags={view.flags}
-                addableCatalog={addableCatalog}
-                removedSteps={removedSteps}
-                stepEventsMap={stepEventsMap}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       <section className="mb-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">

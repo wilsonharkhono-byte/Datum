@@ -127,6 +127,7 @@ function makeRoom(overrides: Partial<Room> = {}): Room {
     areaId: "area-001",
     areaCode: "L1-KM",
     areaName: "Kamar Mandi L1",
+    areaType: "bathroom",
     floor: "L1",
     sortOrder: 0,
     stage: { kind: "active", gate: "B", status: "in_progress" },
