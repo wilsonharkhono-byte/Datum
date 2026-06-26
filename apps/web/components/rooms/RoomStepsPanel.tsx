@@ -17,7 +17,7 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   done_with_defects: { label: "Selesai (ada defect)", cls: "bg-amber-100 text-amber-800" },
 };
 
-export function RoomStepsPanel({ areaId, areaName, view }: { areaId: string; areaName: string; view: View }) {
+export function RoomStepsPanel({ areaId, view }: { areaId: string; view: View }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showAll, setShowAll] = useState(false);
