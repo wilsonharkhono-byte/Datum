@@ -91,9 +91,11 @@ function GateSection({ g }: { g: StandardLibraryGate }) {
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>) {
-    startTransition(async () => { const r = await fn(); if (r.ok) router.refresh(); });
+    setError(null);
+    startTransition(async () => { const r = await fn(); if (r.ok) router.refresh(); else setError(r.error); });
   }
   function move(idx: number, dir: -1 | 1) {
     const codes = g.active.map((s) => s.code);
@@ -108,12 +110,13 @@ function GateSection({ g }: { g: StandardLibraryGate }) {
       <summary className="min-h-11 cursor-pointer px-4 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-[var(--foreground)] md:min-h-0">
         {g.gate} · {g.gateName} <span className="text-[var(--text-muted)]">({g.active.length})</span>
       </summary>
+      {error ? <p className="border-t border-[var(--border)] px-4 py-1.5 text-[11px] text-[var(--flag-critical)]">{error}</p> : null}
       {g.active.map((s, i) => (
         <div key={s.code}>
           <div className="flex items-center gap-2 border-t border-[var(--border)] px-4 py-2 text-[13px]">
             <div className="flex flex-col">
-              <button type="button" disabled={pending || i === 0} onClick={() => move(i, -1)} className="text-[10px] leading-none text-[var(--text-muted)] disabled:opacity-30">▲</button>
-              <button type="button" disabled={pending || i === g.active.length - 1} onClick={() => move(i, 1)} className="text-[10px] leading-none text-[var(--text-muted)] disabled:opacity-30">▼</button>
+              <button type="button" disabled={pending || i === 0} onClick={() => move(i, -1)} className="min-h-11 text-[10px] leading-none text-[var(--text-muted)] disabled:opacity-30 md:min-h-0">▲</button>
+              <button type="button" disabled={pending || i === g.active.length - 1} onClick={() => move(i, 1)} className="min-h-11 text-[10px] leading-none text-[var(--text-muted)] disabled:opacity-30 md:min-h-0">▼</button>
             </div>
             <span className="rounded bg-[var(--sand-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">{TYPE_LABEL[s.step_type] ?? s.step_type}</span>
             <span className="flex-1 text-[var(--foreground)]">{s.name}</span>

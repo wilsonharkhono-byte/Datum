@@ -2,6 +2,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentStaff, canManageAccess } from "@/lib/auth/require-role";
+import type { Json } from "@datum/db";
 
 export type LibraryActionResult = { ok: true } | { ok: false; error: string };
 
@@ -27,8 +28,7 @@ export async function updateStandardStep(args: {
     const { error } = await supabase.rpc("update_standard_step", {
       p_code: args.code, p_name: args.name, p_step_type: args.stepType, p_trade_role: args.tradeRole as string,
       p_typical_duration_days: args.typicalDurationDays, p_lead_time_days: args.leadTimeDays,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      p_applicability: args.applicability as any, p_applies_to_area_types: args.appliesToAreaTypes ?? [],
+      p_applicability: args.applicability as unknown as Json, p_applies_to_area_types: args.appliesToAreaTypes ?? [],
     });
     if (error) throw error;
     return { ok: true };
