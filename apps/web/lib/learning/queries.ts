@@ -16,6 +16,7 @@ export async function getDurationLearning(
       .from("area_steps")
       .select("step_code, actual_start, actual_end")
       .in("status", ["accepted", "done_with_defects"])
+      .is("removed_at", null)
       .not("actual_start", "is", null).not("actual_end", "is", null),
   ]);
   if (e1) throw e1;
