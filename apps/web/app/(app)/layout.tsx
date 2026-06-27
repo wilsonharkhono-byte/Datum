@@ -21,9 +21,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                 <Link
                   href="/"
                   aria-label="DATUM — kembali ke beranda"
-                  className="inline-block rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#141210]/40"
+                  className="-m-1 inline-block rounded-sm p-1 transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#141210]/40"
                 >
-                  <DatumWordmark className="h-5 w-auto text-[#141210] sm:h-6" />
+                  {/* pointer-events-none so the whole link box is clickable —
+                      an inline SVG only registers clicks on its painted glyphs,
+                      leaving the gaps around the letters dead. */}
+                  <DatumWordmark className="pointer-events-none h-5 w-auto text-[#141210] sm:h-6" />
                 </Link>
                 {/* The name/role line wraps to two lines on phones and isn't
                     needed while working a board — show it from sm+ only. */}
