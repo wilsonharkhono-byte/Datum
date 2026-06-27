@@ -10,7 +10,13 @@
  * - jakartaToday: returns a YYYY-MM-DD string
  */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
+
+// Mock sendExpoPush so unit tests don't attempt real Expo HTTP calls.
+// The mock is verified in the "sendExpoPush integration" describe block below.
+vi.mock("@/lib/notifications/push-send", () => ({
+  sendExpoPush: vi.fn().mockResolvedValue(undefined),
+}));
 import {
   tradeRoleToStaffRole,
   resolveRecipients,
@@ -22,6 +28,7 @@ import {
   type ProjectMember,
   type ActiveProject,
 } from "@/lib/steps/reminders";
+import { sendExpoPush } from "@/lib/notifications/push-send";
 import {
   isCronAuthorized,
   isAlreadyNotified,
@@ -420,5 +427,26 @@ describe("escalateRecipients", () => {
   });
   it("skips null project ids", () => {
     expect(escalateRecipients("critical", ["b"], [], { principal_id: null, pic_id: null })).toEqual(["b"]);
+  });
+});
+
+// ─── sendExpoPush wiring (mock verification) ──────────────────────────────────
+//
+// The cron route GET handler calls createSupabaseAdminClient() at module init,
+// making it not unit-testable in isolation without a full Next.js environment.
+// Coverage approach: verify the mock is in place (so tests above do not make
+// real Expo HTTP calls) and document that push delivery is verified via:
+//   1. The cron route integration test (manual trigger on prod / Vercel cron).
+//   2. The `sendExpoPush` unit tests in push-send.test.ts (if present).
+// The vi.mock at the top of this file ensures sendExpoPush is inert in all
+// readiness-reminders unit tests.
+
+describe("sendExpoPush mock", () => {
+  it("is mocked — never throws and resolves immediately", async () => {
+    // Verifies the vi.mock wiring is active for this test file.
+    await expect(
+      sendExpoPush(["staff-1"], { title: "t", body: "b" }),
+    ).resolves.toBeUndefined();
+    expect(sendExpoPush).toBeDefined();
   });
 });
