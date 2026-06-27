@@ -2659,6 +2659,8 @@ export type Database = {
           step_type: string
           trade_role: string | null
           typical_duration_days: number
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           active?: boolean
@@ -2676,6 +2678,8 @@ export type Database = {
           step_type: string
           trade_role?: string | null
           typical_duration_days?: number
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           active?: boolean
@@ -2693,6 +2697,8 @@ export type Database = {
           step_type?: string
           trade_role?: string | null
           typical_duration_days?: number
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -2861,6 +2867,10 @@ export type Database = {
           p_gate_code?: string
         }
         Returns: string
+      }
+      apply_learned_duration: {
+        Args: { p_code: string; p_typical_duration_days: number }
+        Returns: undefined
       }
       claim_attachments_for_analysis: {
         Args: { p_limit?: number }
