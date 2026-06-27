@@ -8,14 +8,11 @@
  * The cron route (`/api/cron/readiness-reminders`) calls this function
  * and then deduplicates + persists the intents as `notifications` rows.
  *
- * NOTE ON KIND: `notification_kind` is a DB enum. It does not include a
- * `readiness_reminder` value. We reuse `"watcher_event"` (the closest
- * general-purpose kind) to avoid a migration in this task. A follow-up
- * can add `readiness_reminder` to the enum + migrate.
+ * NOTE ON KIND: Uses the dedicated `readiness_reminder` notification_kind
+ * (DB enum value added via migration 20260623000002).
  *
- * NOTE ON PUSH: Expo sendExpoPush lives on the mobile branch (not yet
- * merged). Once it merges, the cron can fan-out push notifications by
- * calling sendExpoPush on each written intent.
+ * NOTE ON PUSH: The cron route fans out Expo push notifications via
+ * sendExpoPush for each newly-inserted (non-deduped) intent.
  */
 
 import "server-only";
@@ -28,8 +25,8 @@ type Supa = SupabaseClient<Database>;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** The DB notification_kind we reuse for readiness reminders (see note above). */
-export const READINESS_REMINDER_KIND = "watcher_event" as const;
+/** The dedicated DB notification_kind for readiness reminders (migration 20260623000002). */
+export const READINESS_REMINDER_KIND = "readiness_reminder" as const;
 
 export type ReminderIntent = {
   recipientStaffId: string;
