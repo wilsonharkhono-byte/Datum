@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { getCurrentStaff } from "@/lib/auth/get-current-user";
+import { canManageAccess } from "@/lib/auth/require-role";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
 import { NotificationBadge } from "@/components/notifications/NotificationBadge";
@@ -27,6 +29,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {canManageAccess(staff) && (
+                <Link
+                  href="/library/steps"
+                  className="hidden rounded border border-[#B5AFA8] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56] sm:inline-flex"
+                >
+                  Pustaka Langkah
+                </Link>
+              )}
               <NotificationBadge />
               <LogoutButton />
             </div>
