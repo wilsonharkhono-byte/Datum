@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildReadinessReminders, READINESS_REMINDER_KIND } from "@/lib/steps/reminders";
 import type { ReminderIntent } from "@/lib/steps/reminders";
+import { sendExpoPush } from "@/lib/notifications/push-send";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -148,6 +149,11 @@ export async function GET(req: Request) {
         failed++;
       } else {
         written++;
+        await sendExpoPush([intent.recipientStaffId], {
+          title: "Pengingat kesiapan",
+          body: intent.message,
+          data: { link: intent.link },
+        });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

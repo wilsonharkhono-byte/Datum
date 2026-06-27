@@ -8,27 +8,25 @@
  * The cron route (`/api/cron/readiness-reminders`) calls this function
  * and then deduplicates + persists the intents as `notifications` rows.
  *
- * NOTE ON KIND: `notification_kind` is a DB enum. It does not include a
- * `readiness_reminder` value. We reuse `"watcher_event"` (the closest
- * general-purpose kind) to avoid a migration in this task. A follow-up
- * can add `readiness_reminder` to the enum + migrate.
+ * NOTE ON KIND: Uses the dedicated `readiness_reminder` notification_kind
+ * (DB enum value added via migration 20260623000002).
  *
- * NOTE ON PUSH: Expo sendExpoPush lives on the mobile branch (not yet
- * merged). Once it merges, the cron can fan-out push notifications by
- * calling sendExpoPush on each written intent.
+ * NOTE ON PUSH: The cron route fans out Expo push notifications via
+ * sendExpoPush for each newly-inserted (non-deduped) intent.
  */
 
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 import { getProjectStepSignals } from "@/lib/steps/queries";
+import type { StepSignalSeverity } from "@/lib/steps/signals";
 
 type Supa = SupabaseClient<Database>;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** The DB notification_kind we reuse for readiness reminders (see note above). */
-export const READINESS_REMINDER_KIND = "watcher_event" as const;
+/** The dedicated DB notification_kind for readiness reminders (migration 20260623000002). */
+export const READINESS_REMINDER_KIND = "readiness_reminder" as const;
 
 export type ReminderIntent = {
   recipientStaffId: string;
@@ -169,6 +167,34 @@ export function resolveRecipients(
   return [...new Set(finals)];
 }
 
+/**
+ * Widen the recipient set by signal severity (escalation ladder):
+ *  - info/warning: base only
+ *  - high:     + supervision tier (site_supervisor, pic) + project.pic_id
+ *  - critical: + that tier + principals + project.principal_id
+ * De-dupes by staff id (first-seen order), drops null/empty.
+ */
+export function escalateRecipients(
+  severity: StepSignalSeverity,
+  base: string[],
+  members: ProjectMember[],
+  project: Pick<ActiveProject, "principal_id" | "pic_id">,
+): string[] {
+  const out = [...base];
+  const add = (ids: (string | null | undefined)[]) => {
+    for (const id of ids) if (id && !out.includes(id)) out.push(id);
+  };
+  if (severity === "high" || severity === "critical") {
+    add(members.filter((m) => m.staff_role === "site_supervisor" || m.staff_role === "pic").map((m) => m.staff_id));
+    add([project.pic_id]);
+  }
+  if (severity === "critical") {
+    add(members.filter((m) => m.staff_role === "principal").map((m) => m.staff_id));
+    add([project.principal_id]);
+  }
+  return out;
+}
+
 // ─── Main builder ─────────────────────────────────────────────────────────────
 
 /**
@@ -204,7 +230,8 @@ export async function buildReadinessReminders(
 
     for (const row of signals) {
       // Use the trade_role from the signal row (added to ProjectStepSignalRow).
-      const recipients = resolveRecipients(row.tradeRole, members, project);
+      const base = resolveRecipients(row.tradeRole, members, project);
+      const recipients = escalateRecipients(row.signal.severity, base, members, project);
 
       for (const recipientStaffId of recipients) {
         const dedupeKey = [
