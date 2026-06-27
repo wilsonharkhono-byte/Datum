@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { getCurrentStaff } from "@/lib/auth/get-current-user";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
@@ -17,7 +18,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2 sm:px-8 sm:py-4">
             <div className="flex items-center gap-4">
               <div>
-                <DatumWordmark className="h-5 w-auto text-[#141210] sm:h-6" />
+                <Link
+                  href="/"
+                  aria-label="DATUM — kembali ke beranda"
+                  className="inline-block rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#141210]/40"
+                >
+                  <DatumWordmark className="h-5 w-auto text-[#141210] sm:h-6" />
+                </Link>
                 {/* The name/role line wraps to two lines on phones and isn't
                     needed while working a board — show it from sm+ only. */}
                 <div className="mt-1.5 hidden text-xs font-medium text-[#524E49] sm:block">
