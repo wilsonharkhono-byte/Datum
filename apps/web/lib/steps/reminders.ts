@@ -22,6 +22,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 import { getProjectStepSignals } from "@/lib/steps/queries";
+import type { StepSignalSeverity } from "@/lib/steps/signals";
 
 type Supa = SupabaseClient<Database>;
 
@@ -169,6 +170,34 @@ export function resolveRecipients(
   return [...new Set(finals)];
 }
 
+/**
+ * Widen the recipient set by signal severity (escalation ladder):
+ *  - info/warning: base only
+ *  - high:     + supervision tier (site_supervisor, pic) + project.pic_id
+ *  - critical: + that tier + principals + project.principal_id
+ * De-dupes by staff id (first-seen order), drops null/empty.
+ */
+export function escalateRecipients(
+  severity: StepSignalSeverity,
+  base: string[],
+  members: ProjectMember[],
+  project: Pick<ActiveProject, "principal_id" | "pic_id">,
+): string[] {
+  const out = [...base];
+  const add = (ids: (string | null | undefined)[]) => {
+    for (const id of ids) if (id && !out.includes(id)) out.push(id);
+  };
+  if (severity === "high" || severity === "critical") {
+    add(members.filter((m) => m.staff_role === "site_supervisor" || m.staff_role === "pic").map((m) => m.staff_id));
+    add([project.pic_id]);
+  }
+  if (severity === "critical") {
+    add(members.filter((m) => m.staff_role === "principal").map((m) => m.staff_id));
+    add([project.principal_id]);
+  }
+  return out;
+}
+
 // ─── Main builder ─────────────────────────────────────────────────────────────
 
 /**
@@ -204,7 +233,8 @@ export async function buildReadinessReminders(
 
     for (const row of signals) {
       // Use the trade_role from the signal row (added to ProjectStepSignalRow).
-      const recipients = resolveRecipients(row.tradeRole, members, project);
+      const base = resolveRecipients(row.tradeRole, members, project);
+      const recipients = escalateRecipients(row.signal.severity, base, members, project);
 
       for (const recipientStaffId of recipients) {
         const dedupeKey = [

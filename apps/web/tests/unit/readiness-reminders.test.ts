@@ -18,6 +18,7 @@ import {
   getActiveProjects,
   getProjectMembers,
   READINESS_REMINDER_KIND,
+  escalateRecipients,
   type ProjectMember,
   type ActiveProject,
 } from "@/lib/steps/reminders";
@@ -394,5 +395,30 @@ describe("jakartaToday", () => {
   it("returns a YYYY-MM-DD string", () => {
     const today = jakartaToday();
     expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+// ─── escalateRecipients ───────────────────────────────────────────────────────
+
+describe("escalateRecipients", () => {
+  const members = [
+    { staff_id: "trade1", role_on_project: "x", staff_role: "site_supervisor" },
+    { staff_id: "pic1", role_on_project: "x", staff_role: "pic" },
+    { staff_id: "prin1", role_on_project: "x", staff_role: "principal" },
+  ];
+  const project = { principal_id: "prinP", pic_id: "picP" };
+
+  it("info/warning → base unchanged", () => {
+    expect(escalateRecipients("info", ["base1"], members, project)).toEqual(["base1"]);
+    expect(escalateRecipients("warning", ["base1"], members, project)).toEqual(["base1"]);
+  });
+  it("high → base + supervision tier (site_supervisor, pic) + project.pic_id, deduped", () => {
+    expect(escalateRecipients("high", ["trade1"], members, project)).toEqual(["trade1", "pic1", "picP"]);
+  });
+  it("critical → also principal members + project.principal_id", () => {
+    expect(escalateRecipients("critical", ["base1"], members, project)).toEqual(["base1", "trade1", "pic1", "picP", "prin1", "prinP"]);
+  });
+  it("skips null project ids", () => {
+    expect(escalateRecipients("critical", ["b"], [], { principal_id: null, pic_id: null })).toEqual(["b"]);
   });
 });
