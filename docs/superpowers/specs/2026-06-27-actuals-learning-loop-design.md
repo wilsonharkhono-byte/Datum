@@ -30,7 +30,7 @@ Turn the actuals already captured per step into a **learning loop**: aggregate r
 A pure module `apps/web/lib/learning/durations.ts`:
 
 - `durationDays(start: string, end: string): number` — `max(1, wholeDaysBetween(startDate, endDate))` where `wholeDaysBetween = Math.floor((endMidnight - startMidnight) / 86_400_000)` on the date portions. Calendar days, matching `back-schedule.ts`'s `addDays`-offset model (verified calendar-day, not working-day). Same-day = 1.
-- `summarizeDurations(samples: number[]): { median: number; min: number; max: number; n: number }` — median (lower-mid for even n, rounded to whole days), min, max, count.
+- `summarizeDurations(samples: number[]): { median: number; min: number; max: number; n: number }` — median (for even n, the **rounded mean of the two middle values**, e.g. `[1,2,3,6] → round(2.5) = 3`), min, max, count.
 - `learnedDurationRows(instances: DurationInstance[], steps: StandardStepRow[]): LearnedRow[]` — per firm-standard step: collect the working-day durations of its completed instances, summarize, and produce `{ code, gate_code, name, estimate, stats | null, suggest: number | null }`. `suggest` is the median **only when** `n ≥ 5` **and** `median !== estimate`; otherwise null. `stats` is null when `n === 0`.
 
 Types:
