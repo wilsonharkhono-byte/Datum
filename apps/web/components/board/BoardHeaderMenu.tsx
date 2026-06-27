@@ -62,6 +62,9 @@ export function BoardHeaderMenu({
           <Link href={`/project/${projectCode}/schedule`} className={item} role="menuitem" onClick={() => setOpen(false)}>
             Jadwal &amp; Readiness
           </Link>
+          <Link href={`/project/${projectCode}/activity`} className={item} role="menuitem" onClick={() => setOpen(false)}>
+            Aktivitas
+          </Link>
           {showSettings ? (
             <Link
               href={`/project/${projectCode}/settings`}

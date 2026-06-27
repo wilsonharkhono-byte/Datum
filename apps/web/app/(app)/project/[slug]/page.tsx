@@ -74,6 +74,12 @@ export default async function ProjectBoardPage({
                 Ruangan →
               </Link>
               <Link
+                href={`/project/${board.project.project_code}/activity`}
+                className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+              >
+                Aktivitas →
+              </Link>
+              <Link
                 href={`/project/${board.project.project_code}/schedule`}
                 className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
               >
