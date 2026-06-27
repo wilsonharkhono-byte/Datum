@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { getCurrentStaff } from "@/lib/auth/get-current-user";
+import { canManageRole } from "@datum/core";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
 import { NotificationBadge } from "@/components/notifications/NotificationBadge";
@@ -25,6 +27,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                   {staff.cost_visible && " · cost-visible"}
                 </div>
               </div>
+              {canManageRole(staff.role) && (
+                <Link
+                  href="/library/durations"
+                  className="hidden text-xs font-medium text-[#524E49] hover:text-[#141210] sm:block"
+                >
+                  Analisa Durasi
+                </Link>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <NotificationBadge />
