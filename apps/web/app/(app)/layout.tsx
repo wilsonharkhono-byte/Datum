@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { getCurrentStaff } from "@/lib/auth/get-current-user";
-import { canManageRole } from "@datum/core";
+import { canManageAccess } from "@/lib/auth/require-role";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
 import { NotificationBadge } from "@/components/notifications/NotificationBadge";
@@ -19,7 +19,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2 sm:px-8 sm:py-4">
             <div className="flex items-center gap-4">
               <div>
-                <DatumWordmark className="h-5 w-auto text-[#141210] sm:h-6" />
+                <Link
+                  href="/"
+                  aria-label="DATUM — kembali ke beranda"
+                  className="inline-block rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#141210]/40"
+                >
+                  <DatumWordmark className="h-5 w-auto text-[#141210] sm:h-6" />
+                </Link>
                 {/* The name/role line wraps to two lines on phones and isn't
                     needed while working a board — show it from sm+ only. */}
                 <div className="mt-1.5 hidden text-xs font-medium text-[#524E49] sm:block">
@@ -27,7 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                   {staff.cost_visible && " · cost-visible"}
                 </div>
               </div>
-              {canManageRole(staff.role) && (
+              {canManageAccess(staff) && (
                 <Link
                   href="/library/durations"
                   className="hidden text-xs font-medium text-[#524E49] hover:text-[#141210] sm:block"
@@ -37,6 +43,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               )}
             </div>
             <div className="flex items-center gap-2">
+              {canManageAccess(staff) && (
+                <Link
+                  href="/library/steps"
+                  className="hidden rounded border border-[#B5AFA8] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56] sm:inline-flex"
+                >
+                  Pustaka Langkah
+                </Link>
+              )}
               <NotificationBadge />
               <LogoutButton />
             </div>

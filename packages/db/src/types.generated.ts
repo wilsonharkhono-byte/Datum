@@ -2868,6 +2868,18 @@ export type Database = {
         }
         Returns: string
       }
+      add_standard_step: {
+        Args: {
+          p_gate_code: string
+          p_name: string
+          p_step_type: string
+          p_trade_role: string
+          p_typical_duration_days: number
+          p_lead_time_days: number
+          p_applies_to_area_types: string[]
+        }
+        Returns: string
+      }
       apply_learned_duration: {
         Args: { p_code: string; p_typical_duration_days: number }
         Returns: undefined
@@ -2920,6 +2932,10 @@ export type Database = {
         Args: { p_area_ids: string[]; p_project_id: string }
         Returns: undefined
       }
+      reorder_standard_steps: {
+        Args: { p_gate_code: string; p_codes: string[] }
+        Returns: undefined
+      }
       resolve_card_event: {
         Args: { p_event_id: string; p_new_status: string; p_reason?: string }
         Returns: undefined
@@ -2929,8 +2945,25 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: undefined
       }
+      set_standard_step_active: {
+        Args: { p_code: string; p_active: boolean }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      update_standard_step: {
+        Args: {
+          p_code: string
+          p_name: string
+          p_step_type: string
+          p_trade_role: string
+          p_typical_duration_days: number
+          p_lead_time_days: number
+          p_applicability: Json
+          p_applies_to_area_types: string[]
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       area_type:
