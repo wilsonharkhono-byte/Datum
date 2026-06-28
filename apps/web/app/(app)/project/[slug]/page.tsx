@@ -6,7 +6,6 @@ import { getCurrentStaff } from "@/lib/auth/require-role";
 import { Board } from "@/components/board/Board";
 import { ProjectAdvisorStrip } from "@/components/board/ProjectAdvisorStrip";
 import { BoardHeaderMenu } from "@/components/board/BoardHeaderMenu";
-import { ChatDock } from "@/components/chat/ChatDock";
 import { GearIcon } from "@/components/icons/Icon";
 
 export default async function ProjectBoardPage({
@@ -105,7 +104,6 @@ export default async function ProjectBoardPage({
       <div className="flex-1 overflow-hidden">
         <Board initialBoard={board} />
       </div>
-      <ChatDock projectId={board.project.id} projectCode={board.project.project_code} />
     </div>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
 import { useAssistant } from "@/components/chat/AssistantProvider";
 import type { getRoomStepView } from "@/lib/steps/queries";
 
@@ -34,13 +33,9 @@ export function RoomAssistantButton({
   areaName: string;
   view: View;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const { openAndAsk } = useAssistant();
   function open() {
     openAndAsk(buildPrompt(areaName, view));
-    // The rooms path is /project/<CODE>/rooms → the board is /project/<CODE>.
-    router.push(`/project/${pathname.split("/")[2]}`);
   }
   return (
     <button
