@@ -4,7 +4,6 @@ import { MessageList, type Message } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { SparkIcon, XIcon } from "@/components/icons/Icon";
 import { drain, enqueue, readQueue, remove } from "@/lib/assistant/offline-queue";
-import { takeAssistantSeed } from "@/lib/assistant/seed";
 
 type Mode = "tanya" | "catat";
 
@@ -417,15 +416,6 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
   }, [hydrated, projectId]);
-
-  useEffect(() => {
-    const seed = takeAssistantSeed();
-    if (seed) {
-      setMobileOpen(true);
-      void send(seed, null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const pending = pendingLabel !== null;
   const hasContent = messages.length > 0 || pending;

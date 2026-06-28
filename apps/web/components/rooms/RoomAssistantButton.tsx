@@ -1,8 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { getRoomStepView } from "@/lib/steps/queries";
-import { setAssistantSeed } from "@/lib/assistant/seed";
 
 type View = Awaited<ReturnType<typeof getRoomStepView>>;
 
@@ -30,17 +28,16 @@ function buildPrompt(areaName: string, view: View): string {
 export function RoomAssistantButton({
   areaName,
   view,
-  projectCode,
 }: {
   areaName: string;
   view: View;
-  projectCode: string;
 }) {
-  const router = useRouter();
   function open() {
     const prompt = buildPrompt(areaName, view);
-    setAssistantSeed(prompt);
-    router.push(`/project/${projectCode}`);
+    // ChatDock has no exported seeded-open mechanism (all state is internal
+    // React state; no store, no window hook, no URL param). Clipboard fallback
+    // until a programmatic open is added to ChatDock.
+    void navigator.clipboard?.writeText(prompt);
   }
   return (
     <button
