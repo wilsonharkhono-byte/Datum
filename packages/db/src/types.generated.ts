@@ -2880,6 +2880,10 @@ export type Database = {
         }
         Returns: string
       }
+      apply_learned_duration: {
+        Args: { p_code: string; p_typical_duration_days: number }
+        Returns: undefined
+      }
       claim_attachments_for_analysis: {
         Args: { p_limit?: number }
         Returns: {

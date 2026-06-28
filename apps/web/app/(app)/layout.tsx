@@ -33,6 +33,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                   {staff.cost_visible && " · cost-visible"}
                 </div>
               </div>
+              {canManageAccess(staff) && (
+                <Link
+                  href="/library/durations"
+                  className="hidden text-xs font-medium text-[#524E49] hover:text-[#141210] sm:block"
+                >
+                  Analisa Durasi
+                </Link>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {canManageAccess(staff) && (
