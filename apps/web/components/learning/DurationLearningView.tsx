@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { applyLearnedDuration } from "@/lib/learning/actions";
+import { applyLearnedDuration, applyLearnedLeadTime } from "@/lib/learning/actions";
 import type { getDurationLearning } from "@/lib/learning/queries";
 
 type Groups = Awaited<ReturnType<typeof getDurationLearning>>;
@@ -12,10 +12,12 @@ function GateSection({ g }: { g: Groups[number] }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  function apply(code: string, days: number) {
+  function apply(code: string, days: number, metric: "duration" | "lead_time") {
     setError(null);
     startTransition(async () => {
-      const r = await applyLearnedDuration({ code, days });
+      const r = metric === "lead_time"
+        ? await applyLearnedLeadTime({ code, days })
+        : await applyLearnedDuration({ code, days });
       if (r.ok) router.refresh(); else setError(r.error);
     });
   }
@@ -28,7 +30,9 @@ function GateSection({ g }: { g: Groups[number] }) {
       {g.rows.map((r) => (
         <div key={r.code} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--border)] px-4 py-2 text-[13px]">
           <span className="min-w-0 flex-1 truncate text-[var(--foreground)]">{r.name}</span>
-          <span className="text-[11px] text-[var(--text-muted)]">Estimasi {r.estimate}h</span>
+          <span className="text-[11px] text-[var(--text-muted)]">
+            Estimasi {r.estimate}h {r.metric === "lead_time" ? "lead time" : "durasi"}
+          </span>
           {r.stats ? (
             <span className="text-[11px] text-[var(--text-muted)]">
               Aktual median {r.stats.median}h (n={r.stats.n}) · {r.stats.min}–{r.stats.max}h
@@ -37,7 +41,7 @@ function GateSection({ g }: { g: Groups[number] }) {
             <span className="text-[11px] text-[var(--text-muted)]">Belum cukup data</span>
           )}
           {r.suggest !== null ? (
-            <button type="button" disabled={pending} onClick={() => apply(r.code, r.suggest!)}
+            <button type="button" disabled={pending} onClick={() => apply(r.code, r.suggest!, r.metric)}
               className="min-h-11 rounded border border-[var(--sand-dark)] bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--sand-dark)] disabled:opacity-50 md:min-h-0">
               Terapkan {r.suggest}h
             </button>

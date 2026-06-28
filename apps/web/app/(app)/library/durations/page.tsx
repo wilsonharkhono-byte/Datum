@@ -15,11 +15,12 @@ export default async function DurationLearningPage() {
     <div className="mx-auto w-full max-w-4xl p-4">
       <header className="mb-3">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">Pengaturan firma</p>
-        <h1 className="text-2xl font-semibold text-[#141210]">Analisa Durasi</h1>
+        <h1 className="text-2xl font-semibold text-[#141210]">Analisa Durasi &amp; Lead Time</h1>
       </header>
       <div className="mb-4 rounded border border-[var(--sand)] bg-[var(--sand-tint)] px-3 py-2 text-xs text-[var(--sand-dark)]">
-        Durasi aktual dihitung dari langkah yang sudah selesai (kalender hari, start → selesai). Menerapkan saran
-        hanya memengaruhi seeding ruangan BARU; checklist yang sudah ada tidak berubah.
+        Durasi aktual dihitung dari langkah yang sudah selesai (kalender hari, start → selesai). Langkah pengadaan
+        mencerminkan lead time aktual (order → tiba). Menerapkan saran hanya memengaruhi seeding ruangan BARU;
+        checklist yang sudah ada tidak berubah.
       </div>
       <DurationLearningView groups={groups} />
     </div>
