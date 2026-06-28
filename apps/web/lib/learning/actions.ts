@@ -17,3 +17,14 @@ export async function applyLearnedDuration(args: { code: string; days: number })
     return { ok: true };
   } catch (e) { return { ok: false, error: (e as Error).message }; }
 }
+
+export async function applyLearnedLeadTime(args: { code: string; days: number }): Promise<LearningActionResult> {
+  const staff = await getCurrentStaff();
+  if (!staff || !canManageAccess(staff)) return { ok: false, error: "Tidak berwenang" };
+  const supabase = await createSupabaseServerClient();
+  try {
+    const { error } = await supabase.rpc("apply_learned_lead_time", { p_code: args.code, p_lead_time_days: args.days });
+    if (error) throw error;
+    return { ok: true };
+  } catch (e) { return { ok: false, error: (e as Error).message }; }
+}
