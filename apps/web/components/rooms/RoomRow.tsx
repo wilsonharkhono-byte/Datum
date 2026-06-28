@@ -101,7 +101,7 @@ export function RoomRow({
         <div>
           <RoomStepsPanel areaId={room.areaId} view={stepView} />
           <div className="flex justify-end border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2">
-            <RoomAssistantButton areaName={room.areaName} view={stepView} projectCode={projectCode} />
+            <RoomAssistantButton areaName={room.areaName} view={stepView} />
           </div>
         </div>
       ) : expanded && stepView && !hasSteps ? (

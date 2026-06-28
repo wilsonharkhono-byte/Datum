@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useAssistant } from "./AssistantProvider";
 import { MessageList, type Message } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { SparkIcon, XIcon } from "@/components/icons/Icon";
 import { drain, enqueue, readQueue, remove } from "@/lib/assistant/offline-queue";
-import { takeAssistantSeed } from "@/lib/assistant/seed";
 
 type Mode = "tanya" | "catat";
 
@@ -131,6 +131,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   const [hydrated, setHydrated] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
 
+  const { pendingPrompt, clearPending } = useAssistant();
+
   // Offline-queue guards. busyRef mirrors `busy` so the window "online"
   // listener can tell whether a send is in progress without a fresh render;
   // drainingRef serializes drains; inFlightIds prevents a double-send when
@@ -168,6 +170,19 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
       );
     } catch { /* quota exceeded / private mode — non-fatal */ }
   }, [messages, sessionId, hydrated, storageKey]);
+
+  // A seeded prompt (e.g. from the room "Tanya asisten" button, carried across
+  // navigation by AssistantProvider) opens the dock and auto-asks in tanya mode.
+  useEffect(() => {
+    if (!pendingPrompt) return;
+    setMobileOpen(true);
+    setMode("tanya");
+    setMessages((m) => [...m, { role: "user", content: pendingPrompt }]);
+    void run("tanya", pendingPrompt, null);
+    clearPending();
+    // Fire only when a new prompt arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPrompt]);
 
   function resetChat() {
     try { window.localStorage.removeItem(storageKey); } catch { /* ignore */ }
@@ -417,15 +432,6 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
   }, [hydrated, projectId]);
-
-  useEffect(() => {
-    const seed = takeAssistantSeed();
-    if (seed) {
-      setMobileOpen(true);
-      void send(seed, null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const pending = pendingLabel !== null;
   const hasContent = messages.length > 0 || pending;

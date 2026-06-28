@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAssistant } from "@/components/chat/AssistantProvider";
 import type { getRoomStepView } from "@/lib/steps/queries";
-import { setAssistantSeed } from "@/lib/assistant/seed";
 
 type View = Awaited<ReturnType<typeof getRoomStepView>>;
 
@@ -30,17 +30,17 @@ function buildPrompt(areaName: string, view: View): string {
 export function RoomAssistantButton({
   areaName,
   view,
-  projectCode,
 }: {
   areaName: string;
   view: View;
-  projectCode: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const { openAndAsk } = useAssistant();
   function open() {
-    const prompt = buildPrompt(areaName, view);
-    setAssistantSeed(prompt);
-    router.push(`/project/${projectCode}`);
+    openAndAsk(buildPrompt(areaName, view));
+    // The rooms path is /project/<CODE>/rooms → the board is /project/<CODE>.
+    router.push(`/project/${pathname.split("/")[2]}`);
   }
   return (
     <button
