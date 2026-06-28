@@ -3108,6 +3108,7 @@ export type Database = {
         | "draft_approved"
         | "draft_rejected"
         | "review_assigned"
+        | "readiness_reminder"
       project_status:
         | "design"
         | "construction"
@@ -3445,6 +3446,7 @@ export const Constants = {
         "draft_approved",
         "draft_rejected",
         "review_assigned",
+        "readiness_reminder",
       ],
       project_status: [
         "design",
