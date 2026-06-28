@@ -200,19 +200,30 @@ export function AreaSetup({
       .filter((a) => a.include && includedCodes.has(a.areaCode))
       .map((a) => ({ cardId: a.cardId, areaCode: a.areaCode }));
 
-    const res = await applyAreaProposal({
-      projectId,
-      projectCode,
-      areas: areasPayload,
-      assignments: assignmentsPayload,
-    });
-    if (!aliveRef.current) return;
-    setResult(res);
-    if (res.ok) {
-      setPhase("done");
-      onApplied?.();
-    } else {
-      setError(res.error);
+    try {
+      const res = await applyAreaProposal({
+        projectId,
+        projectCode,
+        areas: areasPayload,
+        assignments: assignmentsPayload,
+      });
+      if (!aliveRef.current) return;
+      setResult(res);
+      if (res.ok) {
+        setPhase("done");
+        onApplied?.();
+      } else {
+        setError(res.error);
+        setPhase("error");
+      }
+    } catch (err) {
+      // Server action threw (unhandled exception / network failure). Never
+      // leave the modal frozen in "applying" — recover into the error phase so
+      // the buttons re-enable and the user can retry or cancel. Surface the real
+      // message so a failing apply is diagnosable instead of opaque.
+      if (!aliveRef.current) return;
+      const detail = err instanceof Error ? err.message : String(err);
+      setError(`Gagal menerapkan usulan: ${detail}. Coba lagi.`);
       setPhase("error");
     }
   }
