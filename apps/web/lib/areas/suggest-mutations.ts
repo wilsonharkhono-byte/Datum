@@ -23,21 +23,32 @@ export type ApplyAreaProposalInput = ApplyAreaProposalInputType & { projectCode:
 export async function applyAreaProposal(
   rawInput: ApplyAreaProposalInput,
 ): Promise<ApplyAreaProposalResult> {
-  // Auth.
-  const caller = await getCurrentStaff();
-  if (!caller) {
-    return { ok: false, error: "Harus masuk untuk menerapkan usulan area" };
+  try {
+    // Auth.
+    const caller = await getCurrentStaff();
+    if (!caller) {
+      return { ok: false, error: "Harus masuk untuk menerapkan usulan area" };
+    }
+
+    const { projectCode, ...coreInput } = rawInput;
+    const supabase = await createSupabaseServerClient();
+
+    const result = await coreApplyAreaProposal(supabase, coreInput);
+
+    if (result.ok) {
+      revalidatePath(`/project/${projectCode}`);
+      revalidatePath(`/project/${projectCode}/schedule`);
+      revalidatePath(`/project/${projectCode}/settings`);
+    }
+    return result;
+  } catch (err) {
+    // A thrown exception (vs. a handled {ok:false}) reaches Next's server-action
+    // boundary, which REDACTS the message in production. Catch it here so the
+    // real reason reaches the UI instead of the opaque "error occurred in the
+    // Server Components render" digest. Internal staff tool — surfacing the
+    // detail to the signed-in principal is intended.
+    console.error("[applyAreaProposal] unhandled error:", err);
+    const detail = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Kesalahan server: ${detail}` };
   }
-
-  const { projectCode, ...coreInput } = rawInput;
-  const supabase = await createSupabaseServerClient();
-
-  const result = await coreApplyAreaProposal(supabase, coreInput);
-
-  if (result.ok) {
-    revalidatePath(`/project/${projectCode}`);
-    revalidatePath(`/project/${projectCode}/schedule`);
-    revalidatePath(`/project/${projectCode}/settings`);
-  }
-  return result;
 }
