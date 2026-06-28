@@ -1,11 +1,12 @@
 export type DurationInstance = { step_code: string; actual_start: string; actual_end: string };
-export type StandardStepRow = { code: string; gate_code: string; name: string; typical_duration_days: number };
+export type StandardStepRow = { code: string; gate_code: string; name: string; typical_duration_days: number; lead_time_days: number; step_type: string };
 export type DurationStats = { median: number; min: number; max: number; n: number };
 export type LearnedRow = {
   code: string;
   gate_code: string;
   gateName: string;
   name: string;
+  metric: "duration" | "lead_time";
   estimate: number;
   stats: DurationStats | null;
   suggest: number | null;
@@ -45,9 +46,11 @@ export function learnedDurationRows(
     byCode.set(i.step_code, arr);
   }
   return steps.map((s) => {
+    const metric: "duration" | "lead_time" = s.step_type === "procurement" ? "lead_time" : "duration";
+    const estimate = metric === "lead_time" ? s.lead_time_days : s.typical_duration_days;
     const samples = byCode.get(s.code) ?? [];
     const stats = samples.length ? summarizeDurations(samples) : null;
-    const suggest = stats && stats.n >= MIN_SAMPLE && stats.median !== s.typical_duration_days ? stats.median : null;
-    return { code: s.code, gate_code: s.gate_code, gateName: gateName(s.gate_code), name: s.name, estimate: s.typical_duration_days, stats, suggest };
+    const suggest = stats && stats.n >= MIN_SAMPLE && stats.median !== estimate ? stats.median : null;
+    return { code: s.code, gate_code: s.gate_code, gateName: gateName(s.gate_code), name: s.name, metric, estimate, stats, suggest };
   });
 }
