@@ -9,8 +9,6 @@ import {
   type ApplyAreaProposalResult,
 } from "@datum/core";
 
-export type { ApplyAreaProposalResult };
-
 // Re-export the input type for callers that need it.
 export type ApplyAreaProposalInput = ApplyAreaProposalInputType & { projectCode: string };
 

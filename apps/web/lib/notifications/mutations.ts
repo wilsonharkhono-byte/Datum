@@ -9,8 +9,6 @@ import {
   type NotificationResult,
 } from "@datum/core";
 
-export type { NotificationResult };
-
 const MarkReadFormInput = z.object({
   notificationId: z.string().uuid(),
 });

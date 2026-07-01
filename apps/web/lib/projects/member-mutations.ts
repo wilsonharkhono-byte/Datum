@@ -10,8 +10,6 @@ import {
   type MemberMutationResult,
 } from "@datum/core";
 
-export type { MemberMutationResult };
-
 export async function addProjectMember(formData: FormData): Promise<MemberMutationResult> {
   const parsed = AddProjectMemberInput.safeParse({
     projectId:     formData.get("projectId"),

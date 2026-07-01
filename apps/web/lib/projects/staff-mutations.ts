@@ -11,8 +11,6 @@ import {
   type CreateStaffResult,
 } from "@/lib/projects/staff-core";
 
-export type { CreateStaffResult };
-
 type CreateStaffInputType = zType.infer<typeof CreateStaffInput>;
 
 /**

@@ -12,8 +12,6 @@ import {
 } from "@datum/core";
 import { instantiateAreaSteps, writePlannedDates } from "@/lib/steps/mutations";
 
-export type { AreaMutationResult };
-
 // ─── FormData coercions ───────────────────────────────────────────────────────
 
 function optStr(v: FormDataEntryValue | null): string | undefined {

@@ -9,10 +9,8 @@
 // with ONLY the checked items. All writes go through the session client / RLS.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  applyAreaProposal,
-  type ApplyAreaProposalResult,
-} from "@/lib/areas/suggest-mutations";
+import { applyAreaProposal } from "@/lib/areas/suggest-mutations";
+import type { ApplyAreaProposalResult } from "@datum/core";
 import type { AreaProposal, AreaType } from "@/lib/areas/extract";
 import { CheckIcon, XIcon, SparkIcon } from "@/components/icons/Icon";
 
