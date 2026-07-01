@@ -41,6 +41,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                   Analisa Durasi
                 </Link>
               )}
+              <Link
+                href="/risiko"
+                className="hidden text-xs font-medium text-[#524E49] hover:text-[#141210] sm:block"
+              >
+                Risiko
+              </Link>
             </div>
             <div className="flex items-center gap-2">
               {canManageAccess(staff) && (
