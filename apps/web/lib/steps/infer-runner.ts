@@ -11,6 +11,10 @@ import {
   type StepVerdict,
 } from "@/lib/steps/infer";
 
+// NOTE: single-area assumption — if a card spans multiple areas seeded from the same
+// template, duplicate step_codes will collide in selectApplicableMatches's code→candidate
+// map (only the last area's area_step_id is kept). Acceptable for the single-area pilot;
+// revisit in the propagation slice when multi-area cards are introduced.
 /** Active, non-removed steps for every area linked to a card, with template name + gate. */
 export async function getCandidateStepsForCard(
   supabase: SupabaseClient<Database>,

@@ -1,5 +1,5 @@
 // apps/web/tests/unit/apply-step-inference.test.ts
-import { describe, it, expect, vi } from "vitest";
+import { it, expect } from "vitest";
 import { applyStepInference } from "@/lib/steps/mutations";
 import type { SelectedMatch } from "@/lib/steps/infer";
 
@@ -37,6 +37,8 @@ it("inserts one AI event per selected match with source/confidence/card_event_id
     area_step_id: "as-1",
     project_id: "p-1",
     status: "done",
+    note: null,
+    percent_complete: 100,
     source: "ai",
     confidence: 0.9,
     card_event_id: "ce-1",

@@ -27,6 +27,8 @@ create unique index if not exists area_step_events_ai_dedup
   where source = 'ai' and card_event_id is not null;
 
 -- 2. Outbox state on card_events (only 'work' events are ever claimed).
+-- Non-work rows keep ai_step_status='pending' harmlessly; the claim RPC + partial index
+-- both filter on event_kind='work', so non-work rows are never processed.
 alter table public.card_events
   add column if not exists ai_step_status      text not null default 'pending',
   add column if not exists ai_step_error       text,

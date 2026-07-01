@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     try {
       const candidates = await getCandidateStepsForCard(supabase, ev.card_id);
       if (candidates.length === 0) {
-        await supabase
+        const { error: writeErr } = await supabase
           .from("card_events")
           .update({
             ai_step_status: "skipped",
@@ -52,6 +52,7 @@ export async function GET(req: Request) {
             ai_step_processed_at: now(),
           })
           .eq("id", ev.id);
+        if (writeErr) throw writeErr;
         skipped++;
         continue;
       }
@@ -73,10 +74,11 @@ export async function GET(req: Request) {
         selected,
       });
 
-      await supabase
+      const { error: writeErr } = await supabase
         .from("card_events")
         .update({ ai_step_status: "done", ai_step_error: null, ai_step_processed_at: now() })
         .eq("id", ev.id);
+      if (writeErr) throw writeErr;
       done++;
     } catch (e) {
       console.warn(`[cron/infer-card-steps] event ${ev.id} failed: ${errMsg(e)}`);

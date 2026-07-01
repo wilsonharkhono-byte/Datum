@@ -11,4 +11,5 @@ it("authorizes only the correct bearer", () => {
 it("detects the missing-RPC error", () => {
   expect(isMissingFunctionError({ code: "PGRST202", message: null })).toBe(true);
   expect(isMissingFunctionError({ code: null, message: "boom" })).toBe(false);
+  expect(isMissingFunctionError({ code: null, message: "could not find the function foo" })).toBe(true);
 });

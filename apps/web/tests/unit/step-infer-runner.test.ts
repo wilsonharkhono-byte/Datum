@@ -1,5 +1,5 @@
 // apps/web/tests/unit/step-infer-runner.test.ts
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { inferCardEventSteps } from "@/lib/steps/infer-runner";
 import type { CandidateStep } from "@/lib/steps/infer";
 
