@@ -18,7 +18,7 @@ describe("summarizeDurations", () => {
 });
 
 describe("learnedDurationRows", () => {
-  const steps: StandardStepRow[] = [{ code: "D6", gate_code: "D", name: "Lantai", typical_duration_days: 6 }];
+  const steps: StandardStepRow[] = [{ code: "D6", gate_code: "D", name: "Lantai", typical_duration_days: 6, lead_time_days: 0, step_type: "site_work" }];
   const inst = (s: string, e: string): DurationInstance => ({ step_code: "D6", actual_start: s, actual_end: e });
   it("n=0 → stats null, suggest null", () => {
     const [r] = learnedDurationRows([], steps, gn);
@@ -39,5 +39,30 @@ describe("learnedDurationRows", () => {
   it("excludes instances missing actual_start/end", () => {
     const bad = [{ step_code: "D6", actual_start: "", actual_end: "2026-06-09" } as DurationInstance];
     expect(learnedDurationRows(bad, steps, gn)[0]!.stats).toBeNull();
+  });
+});
+
+describe("learnedDurationRows metric routing", () => {
+  const inst = (code: string, s: string, e: string) => ({ step_code: code, actual_start: s, actual_end: e });
+  const gn = (g: string) => g;
+  it("procurement → lead_time metric, estimate = lead_time_days, suggests vs lead time", () => {
+    const steps = [{ code: "P", gate_code: "D", name: "Order", typical_duration_days: 1, lead_time_days: 14, step_type: "procurement" }];
+    const five = Array.from({ length: 5 }, () => inst("P", "2026-06-01", "2026-06-21")); // 20 days
+    const [r] = learnedDurationRows(five as never, steps as never, gn);
+    expect(r!.metric).toBe("lead_time");
+    expect(r!.estimate).toBe(14);
+    expect(r!.suggest).toBe(20);
+  });
+  it("site_work → duration metric, estimate = typical_duration_days (unchanged #27 behavior)", () => {
+    const steps = [{ code: "W", gate_code: "D", name: "Pasang", typical_duration_days: 6, lead_time_days: 0, step_type: "site_work" }];
+    const five = Array.from({ length: 5 }, () => inst("W", "2026-06-01", "2026-06-09")); // 8 days
+    const [r] = learnedDurationRows(five as never, steps as never, gn);
+    expect(r!.metric).toBe("duration");
+    expect(r!.estimate).toBe(6);
+    expect(r!.suggest).toBe(8);
+  });
+  it("n<5 → no suggest (both metrics)", () => {
+    const steps = [{ code: "P", gate_code: "D", name: "Order", typical_duration_days: 1, lead_time_days: 14, step_type: "procurement" }];
+    expect(learnedDurationRows([inst("P","2026-06-01","2026-06-21")] as never, steps as never, gn)[0]!.suggest).toBeNull();
   });
 });

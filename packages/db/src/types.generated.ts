@@ -2884,6 +2884,10 @@ export type Database = {
         Args: { p_code: string; p_typical_duration_days: number }
         Returns: undefined
       }
+      apply_learned_lead_time: {
+        Args: { p_code: string; p_lead_time_days: number }
+        Returns: undefined
+      }
       claim_attachments_for_analysis: {
         Args: { p_limit?: number }
         Returns: {

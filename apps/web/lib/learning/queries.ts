@@ -9,7 +9,7 @@ export async function getDurationLearning(
   const [{ data: steps, error: e1 }, { data: inst, error: e2 }] = await Promise.all([
     supabase
       .from("trade_steps")
-      .select("code, gate_code, name, typical_duration_days")
+      .select("code, gate_code, name, typical_duration_days, lead_time_days, step_type")
       .is("project_id", null).eq("source", "standard").eq("active", true)
       .order("gate_code").order("sort_order"),
     supabase
