@@ -60,7 +60,12 @@ export function forecastArea(
 
   const span = (s: ForecastStep): number => {
     const dur = Number.isFinite(s.typical_duration_days) ? Math.max(0, s.typical_duration_days) : 0;
-    const lead = s.step_type === "procurement" && Number.isFinite(s.lead_time_days) ? Math.max(0, s.lead_time_days) : 0;
+    // Lead time is reserved for every NON-physical step (decision + procurement), matching
+    // back-schedule's back-pass (start = end - (lead + duration) for all !isPhysical steps).
+    // Gating on "procurement" alone drops a lead-bearing decision's lead time and
+    // under-projects the finish (e.g. Gate B's B1 decision, lead 7, on every bathroom's path).
+    const isPhysical = s.step_type === "site_work" || s.step_type === "inspection";
+    const lead = !isPhysical && Number.isFinite(s.lead_time_days) ? Math.max(0, s.lead_time_days) : 0;
     return dur + lead;
   };
 

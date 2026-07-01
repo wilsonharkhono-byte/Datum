@@ -14,7 +14,7 @@
 
 - Calendar days. Reuse `addDays` from `@/lib/steps/back-schedule`; add `daysBetween(a,b)` (round, on `slice(0,10)`).
 - **Done** = `accepted` ∪ `done_with_defects`; `not_applicable` excluded.
-- `span(s) = typical_duration_days + (step_type === "procurement" ? lead_time_days : 0)`, coerced ≥ 0.
+- `span(s) = typical_duration_days + (isPhysical ? 0 : lead_time_days)`, `isPhysical = step_type ∈ {site_work, inspection}` (non-physical = decision + procurement include lead, matching back-schedule), coerced ≥ 0.
 - Baseline = area handover **target** (`max(area_gate_status.target_end_date)`), NOT `max(planned_end)`. `slipDays > 0` = projected past target = late; negative = ahead; `null` = no target.
 - Degradation is intentional: not-started steps anchor at `max(planned_start, today, predFinish)` when `planned_start` exists (bathrooms → precise), else `max(today, predFinish)` (ASAP → conservative, no false positives).
 - **Verify:** pure → vitest TDD (exhaustive); `pnpm -C apps/web typecheck` + `pnpm -C apps/web build` (Node 22 via nvm: `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use 22`). Engine also goes through adversarial verification (controller) before PR.

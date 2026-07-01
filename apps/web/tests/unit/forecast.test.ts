@@ -65,11 +65,16 @@ describe("forecastArea", () => {
     expect(r.hasPlan).toBe(false);
   });
 
-  it("procurement span includes lead; non-procurement does not", () => {
+  it("span: non-physical (procurement AND decision) include lead; physical steps do not", () => {
     const proc = forecastArea([step({ step_code: "P", step_type: "procurement", typical_duration_days: 2, lead_time_days: 10 })], [], TODAY, null);
-    expect(proc.projectedFinish).toBe("2026-07-13"); // today + 12
+    expect(proc.projectedFinish).toBe("2026-07-13"); // today + 12 (dur 2 + lead 10)
+    // A decision step reserves lead+duration too — matches back-schedule's back-pass for all !isPhysical.
+    const dec = forecastArea([step({ step_code: "D", step_type: "decision", typical_duration_days: 1, lead_time_days: 7 })], [], TODAY, null);
+    expect(dec.projectedFinish).toBe("2026-07-09"); // today + 8 (dur 1 + lead 7)
     const site = forecastArea([step({ step_code: "S", step_type: "site_work", typical_duration_days: 2, lead_time_days: 10 })], [], TODAY, null);
-    expect(site.projectedFinish).toBe("2026-07-03"); // today + 2 (lead ignored)
+    expect(site.projectedFinish).toBe("2026-07-03"); // today + 2 (physical: lead ignored)
+    const insp = forecastArea([step({ step_code: "I", step_type: "inspection", typical_duration_days: 1, lead_time_days: 5 })], [], TODAY, null);
+    expect(insp.projectedFinish).toBe("2026-07-02"); // today + 1 (physical: lead ignored)
   });
 
   it("edges: empty / all not_applicable / null target / cycle-safe", () => {

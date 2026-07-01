@@ -48,7 +48,7 @@ forecastArea(steps: ForecastStep[], deps: TradeStepDep[], today: string, target:
 Definitions (calendar-day; reuse `addDays`, add `daysBetween(a,b) = round((Date.parse(b)−Date.parse(a))/DAY_MS)` on the YYYY-MM-DD slices):
 - `applicable` = steps with `status !== "not_applicable"`. If none → `{ target, projectedFinish:null, slipDays:null, complete:false, hasPlan:false }`.
 - `isDone(s)` = `status ∈ {accepted, done_with_defects}`.
-- `span(s)` = `typical_duration_days + (step_type === "procurement" ? lead_time_days : 0)` (coerce NaN/negative → 0).
+- `span(s)` = `typical_duration_days + (isPhysical ? 0 : lead_time_days)` where `isPhysical = step_type ∈ {site_work, inspection}` — i.e. **every non-physical step (decision + procurement) reserves lead+duration**, matching back-schedule's back-pass (`start = end − (lead + duration)` for all `!isPhysical`). Coerce NaN/negative → 0.
 - **Forward topological pass** over `applicable` by `trade_step_deps` predecessors (only edges whose both ends are in the set; guarded loop like back-schedule; cycle-safe fallback):
   - `predFinish` = `max(projected_end[p])` over resolved in-set predecessors, else `null`.
   - **done:** `projected_end = actual_end ?? actual_start ?? today`.
