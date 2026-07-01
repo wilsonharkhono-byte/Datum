@@ -42,6 +42,25 @@ describe("forecastArea", () => {
     expect(r.hasPlan).toBe(true);
   });
 
+  it("timestamp-suffixed date fields normalize to YYYY-MM-DD (no Invalid Date crash)", () => {
+    // area_steps.planned_start/actual_* are PG `date` today, but a timestamp suffix from a
+    // future column change (or a hand-built row) must not blow up addDays. daysBetween already
+    // slices its inputs; resolve() must too.
+    const planned = forecastArea(
+      [step({ step_code: "A", typical_duration_days: 2, planned_start: "2026-07-10T09:30:00Z" })],
+      [], TODAY, null,
+    );
+    // planned_start sliced to 2026-07-10; not_started site_work +2 ⇒ 2026-07-12.
+    expect(planned.projectedFinish).toBe("2026-07-12");
+    // DONE branch returns actual_end directly — it must be sliced too, not leaked with a suffix.
+    const done = forecastArea(
+      [step({ step_code: "A", status: "accepted", actual_end: "2026-07-02T14:00:00Z" })],
+      [], TODAY, "2026-06-30",
+    );
+    expect(done.projectedFinish).toBe("2026-07-02");
+    expect(done.slipDays).toBe(2);
+  });
+
   it("all done → complete, projected = max actual_end, slip = actual vs target", () => {
     const steps = [
       step({ step_code: "A", status: "accepted", actual_end: "2026-06-28" }),

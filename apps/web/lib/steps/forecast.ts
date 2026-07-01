@@ -71,15 +71,24 @@ export function forecastArea(
 
   const projected = new Map<string, string>();
   const resolve = (s: ForecastStep, predFinish: string | null): string => {
-    if (DONE.has(s.status)) return s.actual_end ?? s.actual_start ?? today;
+    // Slice every date input to YYYY-MM-DD before it reaches maxIso/addDays. The source columns
+    // are PG `date` today, but a timestamp suffix (future column change, hand-built row) would make
+    // addDays concat an invalid Date and throw. daysBetween already slices its inputs; match it here
+    // so resolve() never leaks a suffix into a compare, addDays, or the returned finish date.
+    const now = today.slice(0, 10);
+    const plannedStart = s.planned_start?.slice(0, 10) ?? null;
+    const actualStart = s.actual_start?.slice(0, 10) ?? null;
+    const actualEnd = s.actual_end?.slice(0, 10) ?? null;
+    const pred = predFinish?.slice(0, 10) ?? null;
+    if (DONE.has(s.status)) return actualEnd ?? actualStart ?? now;
     if (s.status === "in_progress") {
-      const elapsed = s.actual_start ? Math.max(0, daysBetween(s.actual_start, today)) : 0;
+      const elapsed = actualStart ? Math.max(0, daysBetween(actualStart, now)) : 0;
       const remaining = Math.max(1, span(s) - elapsed);
-      return addDays(maxIso(today, predFinish ?? today), remaining);
+      return addDays(maxIso(now, pred ?? now), remaining);
     }
     // not_started / blocked / stalled
-    const startBasis = s.planned_start ? maxIso(s.planned_start, today) : today;
-    const anchor = maxIso(startBasis, predFinish ?? startBasis);
+    const startBasis = plannedStart ? maxIso(plannedStart, now) : now;
+    const anchor = maxIso(startBasis, pred ?? startBasis);
     return addDays(anchor, span(s));
   };
 
