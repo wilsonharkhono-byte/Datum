@@ -44,6 +44,14 @@ export default async function SlipRiskPage() {
                   Penyebab utama: {r.risk.bottleneck.areaName} · {r.risk.bottleneck.stepName} — {r.risk.bottleneck.message}
                 </p>
               ) : null}
+              {r.forecast.slipDays != null ? (
+                <p className={`mt-0.5 text-[11px] ${r.forecast.slipDays > 0 ? "text-red-700" : "text-[var(--text-muted)]"}`}>
+                  Perkiraan handover {r.forecast.projectedHandover ?? "—"}
+                  {r.forecast.slipDays > 0
+                    ? ` · +${r.forecast.slipDays} hari dari target${r.forecast.worstArea ? ` (${r.forecast.worstArea.areaName})` : ""}`
+                    : " · sesuai/di depan target"}
+                </p>
+              ) : null}
             </li>
           );
         })}

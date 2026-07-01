@@ -2,11 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 import { getProjectStepSignals } from "@/lib/steps/queries";
 import { summarizeProjectRisk, type ProjectRisk } from "@/lib/steps/slip-risk";
+import { getProjectForecast, type ProjectForecast } from "@/lib/steps/forecast-queries";
 
 export type ProjectSlipRow = {
   project: { id: string; code: string; name: string };
   risk: ProjectRisk;
   signalCount: number;
+  forecast: ProjectForecast;
 };
 
 const LEVEL_RANK: Record<ProjectRisk["level"], number> = { behind: 0, at_risk: 1, on_track: 2 };
@@ -26,10 +28,12 @@ export async function getProjectsSlipRisk(
   const rows = await Promise.all(
     (projects ?? []).map(async (p) => {
       const signals = await getProjectStepSignals(supabase, p.id, today, now);
+      const forecast = await getProjectForecast(supabase, p.id, today);
       return {
         project: { id: p.id, code: p.project_code, name: p.project_name },
         risk: summarizeProjectRisk(signals),
         signalCount: signals.length,
+        forecast,
       };
     }),
   );
@@ -38,6 +42,7 @@ export async function getProjectsSlipRisk(
     (a, b) =>
       LEVEL_RANK[a.risk.level] - LEVEL_RANK[b.risk.level] ||
       b.risk.behindCount - a.risk.behindCount ||
-      b.signalCount - a.signalCount,
+      b.signalCount - a.signalCount ||
+      (b.forecast.slipDays ?? -Infinity) - (a.forecast.slipDays ?? -Infinity),
   );
 }
