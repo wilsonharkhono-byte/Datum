@@ -2,7 +2,9 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   CreateCardInput as CoreCreateCardInput,
   createCard as coreCreateCard,
@@ -43,6 +45,8 @@ import {
 } from "@/lib/notifications/producers";
 import { sendExpoPush } from "@/lib/notifications/push-send";
 import { recomputeProjectGates } from "@/lib/gates/recompute";
+import { processPendingStepInference } from "@/lib/steps/run-inference";
+import * as Sentry from "@sentry/nextjs";
 
 // Union of RELEVANT_KINDS in lib/gates/readiness-rules.ts — the kinds that can
 // move an (area, gate) cell. note and photo never affect readiness, so their
@@ -230,6 +234,14 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
         preview,
       });
     }
+  }
+
+  if (input.eventKind === "work") {
+    after(() =>
+      processPendingStepInference(createSupabaseAdminClient(), 5).catch((e) => {
+        Sentry.captureException(e, { extra: { where: "createCardEvent.after" } });
+      }),
+    );
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
@@ -861,6 +873,14 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
         data:  { link: `/project/${result.projectCode}/cards/${result.cardSlug}` },
       }).catch(console.warn);
     }
+  }
+
+  if (result.eventKind === "work") {
+    after(() =>
+      processPendingStepInference(createSupabaseAdminClient(), 5).catch((e) => {
+        Sentry.captureException(e, { extra: { where: "approveCardEventDraft.after" } });
+      }),
+    );
   }
 
   revalidatePath("/review");

@@ -4,6 +4,7 @@ export type StepStatusInput = {
   workEvents: Array<{
     occurred_at: string;
     created_at: string;
+    source?: "human" | "ai";
     payload: { status?: string; percent_complete?: number; blocked_on?: string; description?: string } | null;
   }>;
   checkpoints: Array<{ required: boolean; result: "pending" | "pass" | "fail" }>;
@@ -17,6 +18,12 @@ export type StepStatusResult = {
   actualStart: string | null;
   actualEnd: string | null;
 };
+
+/** Human events outrank AI: if any human event exists, AI events are ignored. */
+function applyPrecedence<T extends { source?: "human" | "ai" }>(events: T[]): T[] {
+  const hasHuman = events.some((e) => (e.source ?? "human") === "human");
+  return hasHuman ? events.filter((e) => (e.source ?? "human") === "human") : events;
+}
 
 function latest<T extends { occurred_at: string; created_at: string }>(events: T[]): T | null {
   if (events.length === 0) return null;
@@ -40,13 +47,14 @@ function earliestStart(events: StepStatusInput["workEvents"]): string | null {
 }
 
 export function projectStepStatus(input: StepStatusInput): StepStatusResult {
-  const last = latest(input.workEvents);
+  const workEvents = applyPrecedence(input.workEvents);
+  const last = latest(workEvents);
   if (!last) {
     return { status: "not_started", lastProgressAt: null, blockingReason: null, actualStart: null, actualEnd: null };
   }
 
   const lastProgressAt = last.occurred_at;
-  const actualStart = earliestStart(input.workEvents);
+  const actualStart = earliestStart(workEvents);
 
   if (last.payload?.status === "blocked") {
     return {

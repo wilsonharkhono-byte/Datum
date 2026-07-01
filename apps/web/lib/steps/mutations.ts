@@ -3,6 +3,7 @@ import type { Database } from "@datum/db";
 import { backScheduleSteps } from "@/lib/steps/back-schedule";
 import { projectStepStatus } from "@/lib/steps/status";
 import type { TradeStepDep, TradeStepTemplate } from "@/lib/steps/types";
+import type { SelectedMatch } from "@/lib/steps/infer";
 
 /** Call the SQL instantiation function for an area (idempotent). */
 export async function instantiateAreaSteps(
@@ -62,7 +63,7 @@ export async function projectAreaStep(
   areaStepId: string,
 ): Promise<void> {
   const [evRes, cpRes, punchRes] = await Promise.all([
-    supabase.from("area_step_events").select("occurred_at, created_at, status, note, percent_complete").eq("area_step_id", areaStepId),
+    supabase.from("area_step_events").select("occurred_at, created_at, status, note, percent_complete, source").eq("area_step_id", areaStepId),
     supabase.from("area_step_checkpoints").select("required, result").eq("area_step_id", areaStepId),
     supabase.from("punch_items").select("severity, status").eq("area_step_id", areaStepId),
   ]);
@@ -77,6 +78,7 @@ export async function projectAreaStep(
     workEvents: (events ?? []).map((e) => ({
       occurred_at: e.occurred_at,
       created_at: e.created_at,
+      source: (e.source ?? "human") as "human" | "ai",
       payload: {
         status: e.status,
         percent_complete: e.percent_complete ?? undefined,
@@ -187,4 +189,33 @@ export async function restoreAreaStep(
     .update({ removed_at: null })
     .eq("id", args.areaStepId);
   if (error) throw error;
+}
+
+/**
+ * Write AI-inferred step events for one card event, then re-project each step.
+ * Idempotent via the (card_event_id, area_step_id) unique index on source='ai'
+ * — a duplicate insert errors with code 23505, which we swallow.
+ */
+export async function applyStepInference(
+  supabase: SupabaseClient<Database>,
+  args: { cardEventId: string; projectId: string; selected: SelectedMatch[] },
+): Promise<void> {
+  for (const m of args.selected) {
+    const { error } = await supabase.from("area_step_events").insert({
+      area_step_id: m.area_step_id,
+      project_id: args.projectId,
+      status: m.status,
+      note: m.blocked_on,
+      percent_complete: m.status === "done" ? 100 : null,
+      source: "ai",
+      confidence: m.confidence,
+      card_event_id: args.cardEventId,
+    });
+    // 23505 = unique_violation (already inferred for this card event) → skip re-project.
+    if (error) {
+      if ((error as { code?: string }).code === "23505") continue;
+      throw error;
+    }
+    await projectAreaStep(supabase, m.area_step_id);
+  }
 }

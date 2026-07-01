@@ -386,6 +386,8 @@ export type Database = {
       area_step_events: {
         Row: {
           area_step_id: string
+          card_event_id: string | null
+          confidence: number | null
           created_at: string
           id: string
           logged_by_staff_id: string | null
@@ -393,10 +395,13 @@ export type Database = {
           occurred_at: string
           percent_complete: number | null
           project_id: string
+          source: string
           status: string
         }
         Insert: {
           area_step_id: string
+          card_event_id?: string | null
+          confidence?: number | null
           created_at?: string
           id?: string
           logged_by_staff_id?: string | null
@@ -404,10 +409,13 @@ export type Database = {
           occurred_at?: string
           percent_complete?: number | null
           project_id: string
+          source?: string
           status: string
         }
         Update: {
           area_step_id?: string
+          card_event_id?: string | null
+          confidence?: number | null
           created_at?: string
           id?: string
           logged_by_staff_id?: string | null
@@ -415,6 +423,7 @@ export type Database = {
           occurred_at?: string
           percent_complete?: number | null
           project_id?: string
+          source?: string
           status?: string
         }
         Relationships: [
@@ -423,6 +432,13 @@ export type Database = {
             columns: ["area_step_id"]
             isOneToOne: false
             referencedRelation: "area_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "area_step_events_card_event_id_fkey"
+            columns: ["card_event_id"]
+            isOneToOne: false
+            referencedRelation: "card_events"
             referencedColumns: ["id"]
           },
           {
@@ -929,6 +945,10 @@ export type Database = {
       }
       card_events: {
         Row: {
+          ai_step_attempts: number
+          ai_step_error: string | null
+          ai_step_processed_at: string | null
+          ai_step_status: string
           card_id: string
           cost_visible: boolean
           created_at: string
@@ -944,6 +964,10 @@ export type Database = {
           source_kind: Database["public"]["Enums"]["card_event_source"]
         }
         Insert: {
+          ai_step_attempts?: number
+          ai_step_error?: string | null
+          ai_step_processed_at?: string | null
+          ai_step_status?: string
           card_id: string
           cost_visible?: boolean
           created_at?: string
@@ -959,6 +983,10 @@ export type Database = {
           source_kind: Database["public"]["Enums"]["card_event_source"]
         }
         Update: {
+          ai_step_attempts?: number
+          ai_step_error?: string | null
+          ai_step_processed_at?: string | null
+          ai_step_status?: string
           card_id?: string
           cost_visible?: boolean
           created_at?: string
@@ -2887,6 +2915,34 @@ export type Database = {
       apply_learned_lead_time: {
         Args: { p_code: string; p_lead_time_days: number }
         Returns: undefined
+      }
+      claim_card_events_for_step_inference: {
+        Args: { p_limit?: number }
+        Returns: {
+          ai_step_attempts: number
+          ai_step_error: string | null
+          ai_step_processed_at: string | null
+          ai_step_status: string
+          card_id: string
+          cost_visible: boolean
+          created_at: string
+          draft_id: string | null
+          event_kind: Database["public"]["Enums"]["card_event_kind"]
+          id: string
+          logged_by_staff_id: string | null
+          occurred_at: string
+          payload: Json
+          project_id: string
+          search_text: string | null
+          source_id: string | null
+          source_kind: Database["public"]["Enums"]["card_event_source"]
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "card_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       claim_attachments_for_analysis: {
         Args: { p_limit?: number }
