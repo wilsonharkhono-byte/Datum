@@ -25,14 +25,23 @@ export type RecomputeResult =
  *
  * NOTE: recomputeProjectGates is NOT a "use server" export in core — it is the
  * extracted query body. The web "use server" file wraps it; mobile calls directly.
+ *
+ * opts.skipAuthCheck: system/background callers (e.g. the Next `after()` hook
+ * that fires post-inference using the service-role admin client) have no
+ * end-user session to check — the admin client already bypasses RLS by design,
+ * so the getUser() guard would always fail there. Only pass this from trusted
+ * server-only call sites (never from a request path driven by end-user input).
  */
 export async function recomputeProjectGates(
   sb: DatumClient,
   projectId:   string,
   projectCode: string,
+  opts?: { skipAuthCheck?: boolean },
 ): Promise<RecomputeResult> {
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+  if (!opts?.skipAuthCheck) {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+  }
 
   // 1. Load all areas for the project
   const { data: areas, error: aErr } = await sb
