@@ -400,4 +400,76 @@ describe("retrieveProjectContext + buildContextBlock — PM context sections", (
     const ctx = buildContextBlock(cards);
     expect(ctx).toContain("Kamar Mandi Utama");
   });
+
+  // ── Regression: lead-time-risk must be scoped to (area_id, step_code) ──────
+  // Every room instantiates the same trade_steps template, so step_code alone
+  // recurs across rooms (uniqueness is (area_id, step_code)). Two areas here
+  // both instantiate step "P1" ("Order marmer") — but only Area A also has
+  // its successor "P2" close enough to trigger `lead_time_risk`. If the
+  // lookup were keyed by stepCode alone, Area B's "Order marmer" would
+  // wrongly inherit Area A's risk marker.
+  describe("lead-time-risk is area-scoped, not step-code-global", () => {
+    const AREA_A = { id: "area-a", area_code: "A01", area_name: "Kamar Mandi Utama", area_type: "bathroom", sort_order: 1, project_id: "p1", area_sqm: null, finish_profile: {}, floor: null, created_at: "", updated_at: "", target_date: null };
+    const AREA_B = { id: "area-b", area_code: "A02", area_name: "Kamar Mandi Tamu", area_type: "bathroom", sort_order: 2, project_id: "p1", area_sqm: null, finish_profile: {}, floor: null, created_at: "", updated_at: "", target_date: null };
+
+    // Area A: P1 (procurement, lead_time_days=14, not_started) → successor P2
+    // planned to start in 3 days — well inside the lead-time threshold, so
+    // computeStepSignals fires lead_time_risk for area-a:P1.
+    const A_P1 = {
+      id: "aa-p1", step_code: "P1", status: "not_started", planned_start: "2026-07-10", planned_end: null,
+      assigned_trade: "Vendor Marmer", blocking_reason: null, last_progress_at: null, created_at: "2026-06-01T00:00:00Z", area_id: "area-a",
+      trade_steps: { sort_order: 2, step_type: "procurement", name: "Order marmer", gate_code: "C", trade_role: null, lead_time_days: 14, typical_duration_days: 1 },
+      area_step_checkpoints: [], actual_start: null, actual_end: null,
+    };
+    const A_P2 = {
+      id: "aa-p2", step_code: "P2", status: "not_started", planned_start: "2026-07-05", planned_end: null,
+      assigned_trade: null, blocking_reason: null, last_progress_at: null, created_at: "2026-06-01T00:00:00Z", area_id: "area-a",
+      trade_steps: { sort_order: 3, step_type: "site_work", name: "Pasang marmer", gate_code: "C", trade_role: null, lead_time_days: 0, typical_duration_days: 2 },
+      area_step_checkpoints: [], actual_start: null, actual_end: null,
+    };
+
+    // Area B: same step_code "P1" ("Order marmer"), but NO "P2" successor
+    // instantiated in this room — so it can never trigger lead_time_risk,
+    // proving the marker doesn't leak in from Area A.
+    const B_P1 = {
+      id: "bb-p1", step_code: "P1", status: "not_started", planned_start: "2026-07-20", planned_end: null,
+      assigned_trade: "Vendor Marmer", blocking_reason: null, last_progress_at: null, created_at: "2026-06-01T00:00:00Z", area_id: "area-b",
+      trade_steps: { sort_order: 2, step_type: "procurement", name: "Order marmer", gate_code: "C", trade_role: null, lead_time_days: 14, typical_duration_days: 1 },
+      area_step_checkpoints: [], actual_start: null, actual_end: null,
+    };
+
+    const twoAreaAreaStepsResponder: Responder = (calls) => {
+      const removedFilter = calls.find((c) => c.fn === "not" && c.args[0] === "removed_at");
+      if (removedFilter) return { data: [], error: null };
+      return { data: [A_P1, A_P2, B_P1], error: null };
+    };
+
+    it("marks only the flagged area's step, not the other area's same-coded step", async () => {
+      const supa = fakeClient({
+        cards: constant([]),
+        areas: constant([AREA_A, AREA_B]),
+        area_steps: twoAreaAreaStepsResponder,
+        trade_steps: constant([]),
+        trade_step_deps: constant([{ step_code: "P2", predecessor_code: "P1" }]),
+        area_step_events: constant([]),
+        area_gate_status: constant([]),
+        card_events: constant([]),
+      });
+
+      const cards = await retrieveProjectContext(supa, "p1");
+      const ctx = buildContextBlock(cards);
+
+      // Both rooms' "Order marmer" procurement lines are present...
+      const pengadaan = ctx.slice(ctx.indexOf("PENGADAAN/ORDER:"));
+      expect(pengadaan).toContain("Kamar Mandi Utama");
+      expect(pengadaan).toContain("Kamar Mandi Tamu");
+
+      // ...but only Area A's line carries the risk marker.
+      const lines = pengadaan.split("\n").filter((l) => l.includes("Order marmer"));
+      const aLine = lines.find((l) => l.includes("Kamar Mandi Utama"));
+      const bLine = lines.find((l) => l.includes("Kamar Mandi Tamu"));
+      expect(aLine).toContain("[RISIKO LEAD TIME]");
+      expect(bLine).not.toContain("[RISIKO LEAD TIME]");
+    });
+  });
 });

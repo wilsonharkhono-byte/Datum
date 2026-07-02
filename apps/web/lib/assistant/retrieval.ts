@@ -335,16 +335,27 @@ async function buildPmContextSections(
   const keputusanSection = formatOpenDecisions([...decisionEventRows, ...decisionStepRows]);
 
   // ── PENGADAAN/ORDER ───────────────────────────────────────────────────────
-  const leadTimeRiskByStep = new Map<string, { message: string }>();
+  // Keyed by `${areaId}:${stepCode}` — step_code alone is NOT unique per
+  // project (the same template step recurs across every room that
+  // instantiates it; uniqueness is (area_id, step_code)). Keying by stepCode
+  // alone would let room A's lead-time-risk marker bleed onto room B's
+  // same-coded step.
+  const leadTimeRiskByAreaStep = new Map<string, { message: string }>();
   for (const row of signals) {
-    if (row.signal.kind === "lead_time_risk") leadTimeRiskByStep.set(row.stepCode, { message: row.signal.message });
+    if (row.signal.kind === "lead_time_risk") {
+      leadTimeRiskByAreaStep.set(`${row.areaId}:${row.stepCode}`, { message: row.signal.message });
+    }
   }
   const procurementRows: ProcurementRow[] = [];
   for (const a of areas) {
     const steps = roomViews.get(a.id)?.steps ?? [];
     for (const s of steps) {
       if (s.step_type !== "procurement") continue;
-      procurementRows.push({ areaName: a.area_name, step: s, leadTimeRisk: leadTimeRiskByStep.get(s.step_code) ?? null });
+      procurementRows.push({
+        areaName: a.area_name,
+        step: s,
+        leadTimeRisk: leadTimeRiskByAreaStep.get(`${a.id}:${s.step_code}`) ?? null,
+      });
     }
   }
   const pengadaanSection = formatProcurement(procurementRows);
