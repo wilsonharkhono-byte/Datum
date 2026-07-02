@@ -136,7 +136,9 @@ function tryTopicMatch(topicName: string | null, areas: HintArea[]): HintArea | 
     const floorOverlap = topicFloors.size === 0 || [...topicFloors].some((f) => areaFloors.has(f));
 
     if (roomOverlap && floorOverlap && topicRoomTypes.size > 0) {
-      // Prefer areas where floor also matched when topic specified a floor.
+      // floorOverlap is a hard filter, not a soft preference: when the topic
+      // names a floor, areas whose floor tokens don't intersect it are
+      // excluded outright (see floorOverlap's definition above).
       candidates.push(area);
     }
   }

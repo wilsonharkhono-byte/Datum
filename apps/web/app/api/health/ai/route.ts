@@ -69,6 +69,10 @@ async function getStepInferenceSection(
   admin: AdminClient,
 ): Promise<Record<string, number> | Unavailable> {
   try {
+    // No `as (typeof STEP_INFERENCE_STATUSES)[number]` cast here (unlike
+    // getAttachmentsSection's ai_status above) — ai_step_status is a plain
+    // text column, not a Postgres enum, so the generated Database type
+    // already accepts a bare string for .eq().
     return await countByStatus(STEP_INFERENCE_STATUSES, (status) =>
       admin.from("card_events").select("*", { count: "exact", head: true }).eq("ai_step_status", status),
     );

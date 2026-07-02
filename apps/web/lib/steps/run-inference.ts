@@ -60,6 +60,21 @@ export async function processPendingStepInference(
         continue;
       }
 
+      const eventText = summarizeEventText(ev.event_kind, ev.payload);
+      if (eventText.trim().length === 0) {
+        const { error: writeErr } = await supabase
+          .from("card_events")
+          .update({
+            ai_step_status: "skipped",
+            ai_step_error: "no_text",
+            ai_step_processed_at: now(),
+          })
+          .eq("id", ev.id);
+        if (writeErr) throw writeErr;
+        skipped++;
+        continue;
+      }
+
       const { data: card } = await supabase
         .from("cards")
         .select("title")
@@ -67,7 +82,7 @@ export async function processPendingStepInference(
         .single();
       const { verdict } = await inferCardEventSteps({
         cardTitle: card?.title ?? "",
-        eventText: summarizeEventText(ev.event_kind, ev.payload),
+        eventText,
         candidates,
       });
 

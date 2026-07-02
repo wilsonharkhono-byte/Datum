@@ -107,6 +107,8 @@ describe("buildInferencePrompt", () => {
     expect(systemText).toContain("besok");
     expect(systemText).toContain("siap mulai");
     expect(systemText).toContain("BUKAN progres");
+    expect(systemText).toContain("tinggal finishing cat besok");
+    expect(systemText).toContain("jangan tandai step cat");
   });
 
   it("instructs the model to first decide is_progress and short-circuit non-progress text", () => {

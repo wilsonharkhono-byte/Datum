@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition, useId, useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import * as Sentry from "@sentry/nextjs";
 import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
 import { linkCardToArea } from "@/lib/cards/area-link-mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
@@ -218,8 +219,15 @@ export function AddEventForm({
         linkFd.set("areaId", areaHint.area.id);
         linkFd.set("projectCode", projectCode);
         linkFd.set("cardSlug", cardSlug);
-        await linkCardToArea(linkFd);
-        // Best-effort — never block event creation on a link failure.
+        const linkRes = await linkCardToArea(linkFd);
+        // Best-effort — never block event creation on a link failure, but
+        // report it so a silently-failing capture-time hint doesn't go unnoticed.
+        if (!linkRes.ok) {
+          Sentry.captureMessage("AddEventForm: capture-time area link failed", {
+            level: "warning",
+            extra: { cardId, areaId: areaHint.area.id, error: linkRes.error },
+          });
+        }
       }
       const res = await createCardEvent(fd);
       if (!res.ok) {

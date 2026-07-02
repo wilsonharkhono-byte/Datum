@@ -104,6 +104,15 @@ describe("suggestAreaForCard — card title tokens (priority 2)", () => {
     expect(result?.reason).toBe("title");
     expect(result?.area.id).toBe("a-mbr");
   });
+
+  it("returns null when the title contains two different room-type keywords with candidates in both types (union-ambiguity)", () => {
+    const result = suggestAreaForCard({
+      cardTitle: "cek kitchen dan km lt 1",
+      topicName: null,
+      areas: AREAS,
+    });
+    expect(result).toBeNull();
+  });
 });
 
 describe("suggestAreaForCard — no match", () => {

@@ -12,6 +12,7 @@ vi.mock("@/lib/gates/recompute-system", () => ({ recomputeProjectGatesSystem: vi
 import { processPendingStepInference } from "@/lib/steps/run-inference";
 import { getCandidateStepsForCard, inferCardEventSteps } from "@/lib/steps/infer-runner";
 import { applyStepInference } from "@/lib/steps/mutations";
+import { summarizeEventText } from "@/lib/steps/infer";
 import { recomputeProjectGatesSystem } from "@/lib/gates/recompute-system";
 
 function makeSupabase(
@@ -52,6 +53,11 @@ function makeSupabase(
 describe("processPendingStepInference", () => {
   beforeEach(() => {
     vi.mocked(recomputeProjectGatesSystem).mockClear();
+    vi.mocked(inferCardEventSteps).mockClear();
+    vi.mocked(applyStepInference).mockClear();
+    // Default: non-empty text so the empty-text short-circuit doesn't fire
+    // for tests unrelated to it. The dedicated no_text test overrides this.
+    vi.mocked(summarizeEventText).mockReturnValue("some field text");
   });
 
   it("returns migrationPending when the claim RPC is missing (PGRST202)", async () => {
@@ -92,6 +98,33 @@ describe("processPendingStepInference", () => {
     const calls = (supabase as any)._updateCalls as any[];
     expect(calls).toContainEqual(
       expect.objectContaining({ ai_step_status: "skipped", ai_step_error: "not_progress" }),
+    );
+    expect(recomputeProjectGatesSystem).not.toHaveBeenCalled();
+  });
+
+  it("marks the event skipped with ai_step_error='no_text' and never calls Haiku when summarizeEventText returns empty/whitespace", async () => {
+    const claimedEvent = {
+      id: "ce-empty",
+      card_id: "card-1",
+      project_id: "p-1",
+      occurred_at: "2026-07-02T10:00:00.000Z",
+      event_kind: "note",
+      payload: { body: "   " },
+    };
+    const supabase = makeSupabase({ data: [claimedEvent], error: null });
+    vi.mocked(getCandidateStepsForCard).mockResolvedValue([
+      { area_step_id: "as-1", step_code: "BW1", name: "Waterproofing", gate_code: "B", status: "not_started" },
+    ] as any);
+    vi.mocked(summarizeEventText).mockReturnValue("   ");
+
+    const result = await processPendingStepInference(supabase, 5);
+
+    expect(result).toEqual({ claimed: 1, done: 0, skipped: 1, failed: 0 });
+    expect(inferCardEventSteps).not.toHaveBeenCalled();
+    expect(applyStepInference).not.toHaveBeenCalled();
+    const calls = (supabase as any)._updateCalls as any[];
+    expect(calls).toContainEqual(
+      expect.objectContaining({ ai_step_status: "skipped", ai_step_error: "no_text" }),
     );
     expect(recomputeProjectGatesSystem).not.toHaveBeenCalled();
   });
