@@ -36,6 +36,17 @@ describe("ResolveEventInput schema", () => {
     const long = "x".repeat(501);
     expect(ResolveEventInput.safeParse({ ...base, reason: long }).success).toBe(false);
   });
+
+  it("accepts an optional outcome, empty allowed", () => {
+    expect(ResolveEventInput.safeParse({ ...base, outcome: "pakai marmer putih" }).success).toBe(true);
+    expect(ResolveEventInput.safeParse({ ...base, outcome: "" }).success).toBe(true);
+    expect(ResolveEventInput.safeParse(base).success).toBe(true); // omitted entirely
+  });
+
+  it("rejects outcome longer than 500 chars", () => {
+    const long = "x".repeat(501);
+    expect(ResolveEventInput.safeParse({ ...base, outcome: long }).success).toBe(false);
+  });
 });
 
 // ─── Mocked supabase ─────────────────────────────────────────────────────────
@@ -78,6 +89,24 @@ describe("resolveCardEvent", () => {
 
     const args = calls[0] as Record<string, unknown>;
     expect(args.p_reason).toBe("sudah dijawab");
+  });
+
+  it("passes the outcome through to the rpc", async () => {
+    const calls: unknown[] = [];
+    const supabase = {
+      rpc: (_fn: string, args: unknown) => {
+        calls.push(args);
+        return Promise.resolve({ error: null });
+      },
+    } as unknown;
+
+    await resolveCardEvent(
+      supabase as Parameters<typeof resolveCardEvent>[0],
+      { eventId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890", newStatus: "decided", outcome: "pakai marmer putih" },
+    );
+
+    const args = calls[0] as Record<string, unknown>;
+    expect(args.p_outcome).toBe("pakai marmer putih");
   });
 
   it("returns ok:false with the rpc error message", async () => {

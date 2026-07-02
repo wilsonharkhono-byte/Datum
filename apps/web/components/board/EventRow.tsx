@@ -117,10 +117,8 @@ function ResolveAction({
   const p = event.payload as Record<string, unknown>;
   let newStatus: "decided" | "answered" | null = null;
   let label = "";
-  if (
-    event.event_kind === "decision" &&
-    isDecisionOpen(p as { status?: string; approved_by?: string })
-  ) {
+  const isDecision = event.event_kind === "decision" && isDecisionOpen(p as { status?: string; approved_by?: string });
+  if (isDecision) {
     newStatus = "decided";
     label = "Tandai diputuskan";
   } else if (
@@ -137,12 +135,21 @@ function ResolveAction({
         const res = await resolveCardEvent(fd);
         if (!res.ok) alert(`Gagal menandai: ${res.error}`);
       }}
-      className="flex-shrink-0 self-start"
+      className="flex flex-shrink-0 flex-wrap items-center gap-1 self-start"
     >
       <input type="hidden" name="eventId" value={event.id} />
       <input type="hidden" name="projectCode" value={projectCode} />
       <input type="hidden" name="cardSlug" value={cardSlug} />
       <input type="hidden" name="newStatus" value={newStatus} />
+      {isDecision ? (
+        <input
+          type="text"
+          name="outcome"
+          placeholder="Apa keputusannya? (opsional)"
+          maxLength={500}
+          className="min-w-0 flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] text-[var(--foreground)] placeholder:text-[var(--text-muted)]"
+        />
+      ) : null}
       <button
         type="submit"
         className="rounded border border-[var(--border)] bg-[var(--surface-alt)] px-2 py-0.5 text-[10px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)]"

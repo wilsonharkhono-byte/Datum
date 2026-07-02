@@ -2750,6 +2750,13 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "trade_steps_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
         ]
       }
       vendor_quotes: {
@@ -2890,21 +2897,21 @@ export type Database = {
       add_custom_area_step: {
         Args: {
           p_area_id: string
+          p_gate_code?: string
           p_name: string
           p_step_type: string
-          p_gate_code?: string
         }
         Returns: string
       }
       add_standard_step: {
         Args: {
+          p_applies_to_area_types: string[]
           p_gate_code: string
+          p_lead_time_days: number
           p_name: string
           p_step_type: string
           p_trade_role: string
           p_typical_duration_days: number
-          p_lead_time_days: number
-          p_applies_to_area_types: string[]
         }
         Returns: string
       }
@@ -2915,6 +2922,29 @@ export type Database = {
       apply_learned_lead_time: {
         Args: { p_code: string; p_lead_time_days: number }
         Returns: undefined
+      }
+      claim_attachments_for_analysis: {
+        Args: { p_limit?: number }
+        Returns: {
+          ai_attempts: number
+          ai_caption: string | null
+          ai_error: string | null
+          ai_extracted: Json | null
+          ai_model: string | null
+          ai_processed_at: string | null
+          ai_status: Database["public"]["Enums"]["attachment_ai_status"]
+          card_event_id: string
+          created_at: string
+          id: string
+          mime_type: string
+          storage_path: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "card_attachments"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       claim_card_events_for_step_inference: {
         Args: { p_limit?: number }
@@ -2940,29 +2970,6 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "card_events"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
-      claim_attachments_for_analysis: {
-        Args: { p_limit?: number }
-        Returns: {
-          ai_attempts: number
-          ai_caption: string | null
-          ai_error: string | null
-          ai_extracted: Json | null
-          ai_model: string | null
-          ai_processed_at: string | null
-          ai_status: Database["public"]["Enums"]["attachment_ai_status"]
-          card_event_id: string
-          created_at: string
-          id: string
-          mime_type: string
-          storage_path: string
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "card_attachments"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -2993,11 +3000,16 @@ export type Database = {
         Returns: undefined
       }
       reorder_standard_steps: {
-        Args: { p_gate_code: string; p_codes: string[] }
+        Args: { p_codes: string[]; p_gate_code: string }
         Returns: undefined
       }
       resolve_card_event: {
-        Args: { p_event_id: string; p_new_status: string; p_reason?: string }
+        Args: {
+          p_event_id: string
+          p_new_status: string
+          p_outcome?: string
+          p_reason?: string
+        }
         Returns: undefined
       }
       seed_area_steps: { Args: { p_area_id: string }; Returns: undefined }
@@ -3006,21 +3018,21 @@ export type Database = {
         Returns: undefined
       }
       set_standard_step_active: {
-        Args: { p_code: string; p_active: boolean }
+        Args: { p_active: boolean; p_code: string }
         Returns: undefined
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       update_standard_step: {
         Args: {
+          p_applicability: Json
+          p_applies_to_area_types: string[]
           p_code: string
+          p_lead_time_days: number
           p_name: string
           p_step_type: string
           p_trade_role: string
           p_typical_duration_days: number
-          p_lead_time_days: number
-          p_applicability: Json
-          p_applies_to_area_types: string[]
         }
         Returns: undefined
       }

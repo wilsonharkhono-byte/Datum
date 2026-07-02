@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { StepDetail } from "@/components/schedule/StepDetail";
 import { AddStepForm } from "@/components/schedule/AddStepForm";
 import { restoreStep } from "@/lib/steps/actions";
+import { truncateNames } from "@/lib/steps/flags";
 import type { getRoomStepView, AreaStepEventRow } from "@/lib/steps/queries";
 
 type View = Awaited<ReturnType<typeof getRoomStepView>>;
@@ -54,7 +55,11 @@ export function RoomStepsPanel({ areaId, view, stepEvents }: { areaId: string; v
       {view.flags.readyToStart || view.flags.needsDecision.length > 0 ? (
         <div className="bg-[var(--sand-tint)] px-4 py-2 text-[11px] text-[var(--sand-dark)]">
           {view.flags.readyToStart ? <span className="mr-3">Siap dimulai: {nameOf(view.flags.readyToStart)}</span> : null}
-          {view.flags.needsDecision.length > 0 ? <span>Perlu keputusan: {view.flags.needsDecision.map(nameOf).join(", ")}</span> : null}
+          {view.flags.needsDecision.length > 0 ? (
+            <span>
+              Perlu keputusan: {truncateNames(view.flags.needsDecision.map((code) => nameOf(code) ?? code))}
+            </span>
+          ) : null}
         </div>
       ) : null}
 

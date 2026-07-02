@@ -18,6 +18,11 @@ export const ResolveEventInput = z.object({
   eventId:   z.string().uuid(),
   newStatus: z.enum(RESOLVE_STATUSES),
   reason:    z.string().max(500).optional(),
+  // "Apa keputusannya?" — optional inline capture from the "Tandai diputuskan"
+  // flow. For decision events the RPC merges this into payload.proposed_spec
+  // (the decision zod schema's field for "what was decided"); ignored for
+  // other event kinds. Empty/omitted leaves the payload untouched.
+  outcome:   z.string().max(500).optional(),
 });
 
 export type ResolveEventInputType = z.infer<typeof ResolveEventInput>;
@@ -46,6 +51,7 @@ export async function resolveCardEvent(
     p_event_id:   input.eventId,
     p_new_status: input.newStatus,
     p_reason:     input.reason ?? undefined,
+    p_outcome:    input.outcome ?? undefined,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };

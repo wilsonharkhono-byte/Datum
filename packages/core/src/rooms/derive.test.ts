@@ -62,6 +62,58 @@ describe("deriveStage", () => {
     const stage = deriveStage([cell("A", "passed"), cell("H", "ready_for_handoff")]);
     expect(stage).toEqual({ kind: "passed", gate: "H" });
   });
+
+  // B3 live bug: area_gate_status cells are computed from card_events and can
+  // go stale (a gate-H card event marked done sets H ready_for_handoff) while
+  // the real day-to-day source of truth — area_steps — shows live wet-work at
+  // an earlier gate. The stage chip must reflect the room's actual activity,
+  // not a stale/absent gate-cell signal.
+  it("falls back to the furthest step-with-activity's gate when no gate cell is active", () => {
+    const stage = deriveStage(
+      [cell("A", "not_started"), cell("B", "not_started"), cell("H", "not_started")],
+      [
+        { gate_code: "B", status: "in_progress" }, // BW2
+        { gate_code: "B", status: "in_progress" }, // BW3
+        { gate_code: "A", status: "accepted" },
+      ],
+    );
+    expect(stage).toEqual({ kind: "active", gate: "B", status: "in_progress" });
+  });
+
+  it("ignores stale not_started/passed gate cells in favor of live step activity (the exact live-bug fixture)", () => {
+    // All 8 gate cells default to not_started (never recomputed / no relevant
+    // card events yet) while BW2/BW3 (gate B trade steps) are in_progress.
+    const cells: RoomGateCell[] = (
+      ["A", "B", "C", "D", "E", "F", "G", "H"] as GateCode[]
+    ).map((g) => cell(g, "not_started"));
+    const steps = [
+      { gate_code: "B" as GateCode, status: "in_progress" as const },
+      { gate_code: "B" as GateCode, status: "in_progress" as const },
+    ];
+    expect(deriveStage(cells, steps)).toEqual({ kind: "active", gate: "B", status: "in_progress" });
+  });
+
+  it("prefers a genuinely active gate cell over step activity at an earlier gate", () => {
+    const stage = deriveStage(
+      [cell("D", "in_progress")],
+      [{ gate_code: "B", status: "in_progress" }],
+    );
+    expect(stage).toEqual({ kind: "active", gate: "D", status: "in_progress" });
+  });
+
+  it("still falls back to passed gate cells when steps show no activity", () => {
+    const stage = deriveStage(
+      [cell("A", "passed"), cell("B", "passed")],
+      [{ gate_code: "A", status: "accepted" }],
+    );
+    expect(stage).toEqual({ kind: "passed", gate: "B" });
+  });
+
+  it("stays none when neither gate cells nor steps show activity", () => {
+    expect(deriveStage([cell("A", "not_started")], [{ gate_code: "A", status: "not_started" }])).toEqual({
+      kind: "none",
+    });
+  });
 });
 
 describe("blockerCount", () => {

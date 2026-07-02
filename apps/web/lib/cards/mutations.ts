@@ -1006,6 +1006,8 @@ const ResolveEventInput = z.object({
   cardSlug:    z.string().min(1),
   newStatus:   z.enum(["needs_decision", "decided", "superseded", "open", "answered"]),
   reason:      z.string().max(500).optional(),
+  // "Apa keputusannya?" — optional inline input on "Tandai diputuskan".
+  outcome:     z.string().max(500).optional(),
 });
 
 export type ResolveEventResult = { ok: true } | { ok: false; error: string };
@@ -1019,6 +1021,7 @@ export async function resolveCardEvent(formData: FormData): Promise<ResolveEvent
       cardSlug:    formData.get("cardSlug"),
       newStatus:   formData.get("newStatus"),
       reason:      formData.get("reason") || undefined,
+      outcome:     formData.get("outcome") || undefined,
     });
   } catch {
     return { ok: false, error: "Form tidak valid" };
@@ -1032,6 +1035,7 @@ export async function resolveCardEvent(formData: FormData): Promise<ResolveEvent
     eventId:   input.eventId,
     newStatus: input.newStatus,
     reason:    input.reason,
+    outcome:   input.outcome,
   });
   if (!result.ok) return result;
 

@@ -123,6 +123,7 @@ export {
   looksLikeImage,
   safeHostname,
   valueLabel,
+  textField,
 } from "./cards/event-render";
 
 // ─── Card event mutations ─────────────────────────────────────────────────────
@@ -399,6 +400,7 @@ export {
   relativeTimeId,
   type CellStatus,
   type RoomGateCell,
+  type RoomStepActivity,
   type RoomStage,
   type NextAction,
   type Room,
