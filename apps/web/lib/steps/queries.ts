@@ -186,39 +186,35 @@ const AREA_STEP_EVENTS_ATTRIBUTION_SELECT =
   `${AREA_STEP_EVENTS_BASE_SELECT}, source, confidence, card_event_id, ` +
   "card_events:card_event_id (card_id, cards:card_id (slug, projects:project_id (project_code)))";
 
+/** area_id-scoped variant of the same selects, via an inner-join embed on area_steps. */
+const AREA_STEP_EVENTS_BASE_SELECT_BY_AREA =
+  "id, area_step_id, status, note, percent_complete, occurred_at, created_at, staff:logged_by_staff_id (full_name), area_steps!inner (area_id)";
+
+const AREA_STEP_EVENTS_ATTRIBUTION_SELECT_BY_AREA =
+  `${AREA_STEP_EVENTS_BASE_SELECT_BY_AREA}, source, confidence, card_event_id, ` +
+  "card_events:card_event_id (card_id, cards:card_id (slug, projects:project_id (project_code)))";
+
 /**
- * Fetch all events for an area's steps in one query (one round-trip), joined to staff.full_name
- * plus AI attribution (source/confidence) and, for AI events, the originating card's link
- * (card_event_id -> card_events -> cards -> projects, all in the same round-trip).
- *
- * Degrades to the pre-attribution select if the attribution columns don't exist yet in prod
- * (before `supabase db push` lands the 2026-06-28 migration): attribution fields fall back to
- * source='human'/confidence=null/card_link=null so the page still renders, just without badges.
- * Returns a map keyed by area_step_id for O(1) lookup in the render path.
- * Ordered newest-first within each step.
+ * Shared core: run the attribution-select-with-degrade-fallback query described
+ * below and return the grouped-by-area_step_id map. `run(select)` performs one
+ * query attempt for the given select string; the caller supplies the two
+ * (attribution, fallback) select variants appropriate to its filter (by step id
+ * list or by area id list) so this helper doesn't need to know which column is
+ * being filtered on.
  */
-export async function getAreaStepEvents(
-  supabase: SupabaseClient<Database>,
-  stepIds: string[],
+async function fetchAreaStepEvents(
+  run: (select: string) => Promise<{ data: unknown[] | null; error: { code?: string | null; message?: string | null } | null }>,
+  attributionSelect: string,
+  baseSelect: string,
 ): Promise<Map<string, AreaStepEventRow[]>> {
-  if (stepIds.length === 0) return new Map();
+  const attribution = await run(attributionSelect);
 
-  const attribution = await supabase
-    .from("area_step_events")
-    .select(AREA_STEP_EVENTS_ATTRIBUTION_SELECT)
-    .in("area_step_id", stepIds)
-    .order("occurred_at", { ascending: false });
-
-  let data: unknown[] | null = attribution.data as unknown[] | null;
+  let data: unknown[] | null = attribution.data;
   let error = attribution.error;
 
   if (error && isMissingColumnError(error)) {
-    const fallback = await supabase
-      .from("area_step_events")
-      .select(AREA_STEP_EVENTS_BASE_SELECT)
-      .in("area_step_id", stepIds)
-      .order("occurred_at", { ascending: false });
-    data = fallback.data as unknown[] | null;
+    const fallback = await run(baseSelect);
+    data = fallback.data;
     error = fallback.error;
   }
   if (error) throw error;
@@ -231,6 +227,72 @@ export async function getAreaStepEvents(
     map.set(row.area_step_id, bucket);
   }
   return map;
+}
+
+/**
+ * Fetch all events for an area's steps in one query (one round-trip), joined to staff.full_name
+ * plus AI attribution (source/confidence) and, for AI events, the originating card's link
+ * (card_event_id -> card_events -> cards -> projects, all in the same round-trip).
+ *
+ * Degrades to the pre-attribution select if the attribution columns don't exist yet in prod
+ * (before `supabase db push` lands the 2026-06-28 migration): attribution fields fall back to
+ * source='human'/confidence=null/card_link=null so the page still renders, just without badges.
+ * Returns a map keyed by area_step_id for O(1) lookup in the render path.
+ * Ordered newest-first within each step.
+ *
+ * NOTE: filters via `.in("area_step_id", stepIds)` — the URL grows with the number of step ids.
+ * For whole-project fan-outs (e.g. the Rooms page, which can have hundreds of steps across many
+ * rooms) use `getAreaStepEventsForAreas` instead, which filters on the much smaller area id list
+ * and stays well under PostgREST/proxy URL length limits. Keep this one for per-step/per-card
+ * callers that already have a short, bounded step id list.
+ */
+export async function getAreaStepEvents(
+  supabase: SupabaseClient<Database>,
+  stepIds: string[],
+): Promise<Map<string, AreaStepEventRow[]>> {
+  if (stepIds.length === 0) return new Map();
+
+  return fetchAreaStepEvents(
+    async (select) =>
+      await supabase
+        .from("area_step_events")
+        .select(select)
+        .in("area_step_id", stepIds)
+        .order("occurred_at", { ascending: false }),
+    AREA_STEP_EVENTS_ATTRIBUTION_SELECT,
+    AREA_STEP_EVENTS_BASE_SELECT,
+  );
+}
+
+/**
+ * Area-scoped variant of `getAreaStepEvents`: same fields, same degrade path, same
+ * return shape (map keyed by area_step_id) — but filters on `area_steps.area_id` via
+ * an inner-join embed (`area_steps!inner (area_id)` + `.in("area_steps.area_id", areaIds)`)
+ * instead of enumerating every step id.
+ *
+ * Why: the Rooms page can have hundreds of steps across a project's rooms (e.g. ~958
+ * area_steps across 15 rooms on a real project). `getAreaStepEvents(stepIds)` builds a
+ * PostgREST GET URL with one UUID per step id in the `.in()` filter, which exceeds the
+ * proxy's URL length limit and 500s the whole page ("URI too long"). Filtering on area
+ * ids instead keeps the filter list bounded by room count (tens, not hundreds+), which
+ * stays comfortably under the limit.
+ */
+export async function getAreaStepEventsForAreas(
+  supabase: SupabaseClient<Database>,
+  areaIds: string[],
+): Promise<Map<string, AreaStepEventRow[]>> {
+  if (areaIds.length === 0) return new Map();
+
+  return fetchAreaStepEvents(
+    async (select) =>
+      await supabase
+        .from("area_step_events")
+        .select(select)
+        .in("area_steps.area_id", areaIds)
+        .order("occurred_at", { ascending: false }),
+    AREA_STEP_EVENTS_ATTRIBUTION_SELECT_BY_AREA,
+    AREA_STEP_EVENTS_BASE_SELECT_BY_AREA,
+  );
 }
 
 // ─── Project-wide signal query ────────────────────────────────────────────────

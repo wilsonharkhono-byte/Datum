@@ -19,7 +19,7 @@ describe("projectStepStatus precedence (newest-information-wins)", () => {
     expect(r.status).toBe("accepted");
   });
 
-  it("ignores an AI event older than the newest human event", () => {
+  it("counts an AI event newer than an earlier human event (regression coverage for the old fixture ordering)", () => {
     const r = projectStepStatus({
       workEvents: [
         ev("2026-06-01T00:00:00Z", "in_progress", "human"),
@@ -28,8 +28,6 @@ describe("projectStepStatus precedence (newest-information-wins)", () => {
       checkpoints: [],
       punchItems: [],
     });
-    // human is OLDER here — wait: this case is "AI newer than human" (see next test name);
-    // kept for back-compat coverage of the old fixture ordering.
     expect(r.status).toBe("accepted"); // AI "done" is newer than the human tap, so it counts
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAreaStepEvents, isMissingColumnError, mapAreaStepEventRow } from "@/lib/steps/queries";
+import { getAreaStepEvents, getAreaStepEventsForAreas, isMissingColumnError, mapAreaStepEventRow } from "@/lib/steps/queries";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 
@@ -13,6 +13,40 @@ function fakeClient(rows: unknown[], capturedSelect?: { value?: string }) {
         return builder;
       },
       in: () => builder,
+      order: () => Promise.resolve({ data: rows, error: null }),
+    };
+    return builder;
+  }
+  return {
+    from(_table: string) {
+      return chain();
+    },
+  } as unknown as SupabaseClient<Database>;
+}
+
+/**
+ * Fake client for getAreaStepEventsForAreas: same chaining as fakeClient, but
+ * captures the field(s) passed to `.in()` too, so we can assert the query
+ * filters on `area_steps.area_id` (the fix for the "URI too long" bug) rather
+ * than enumerating step ids.
+ */
+function fakeAreaFilterClient(
+  rows: unknown[],
+  captured?: { select?: string; inField?: string; inValues?: unknown[] },
+) {
+  function chain(): any {
+    const builder: any = {
+      select(s: string) {
+        if (captured) captured.select = s;
+        return builder;
+      },
+      in(field: string, values: unknown[]) {
+        if (captured) {
+          captured.inField = field;
+          captured.inValues = values;
+        }
+        return builder;
+      },
       order: () => Promise.resolve({ data: rows, error: null }),
     };
     return builder;
@@ -207,6 +241,102 @@ describe("getAreaStepEvents", () => {
     const supa = fakeDegradingClient([], { code: "PGRST301", message: "JWT expired" }, selects);
     await expect(getAreaStepEvents(supa, ["step1"])).rejects.toMatchObject({ code: "PGRST301" });
     expect(selects).toHaveLength(1);
+  });
+});
+
+describe("getAreaStepEventsForAreas", () => {
+  it("returns an empty map when areaIds is empty (no DB call)", async () => {
+    const supa = fakeAreaFilterClient([]);
+    const result = await getAreaStepEventsForAreas(supa, []);
+    expect(result.size).toBe(0);
+  });
+
+  it("filters via the area_steps.area_id embed, not area_step_id — avoids enumerating every step id", async () => {
+    const captured: { select?: string; inField?: string; inValues?: unknown[] } = {};
+    const supa = fakeAreaFilterClient([], captured);
+    await getAreaStepEventsForAreas(supa, ["area1", "area2"]);
+    expect(captured.inField).toBe("area_steps.area_id");
+    expect(captured.inValues).toEqual(["area1", "area2"]);
+  });
+
+  it("includes the area_steps!inner embed in the select so the area_id filter is joinable", async () => {
+    const captured: { select?: string } = {};
+    const supa = fakeAreaFilterClient([], captured);
+    await getAreaStepEventsForAreas(supa, ["area1"]);
+    expect(captured.select).toContain("area_steps!inner");
+    expect(captured.select).toContain("area_id");
+  });
+
+  it("includes the attribution select (source, confidence, card_event_id, card_events join) on the first attempt", async () => {
+    const captured: { select?: string } = {};
+    const supa = fakeAreaFilterClient([], captured);
+    await getAreaStepEventsForAreas(supa, ["area1"]);
+    expect(captured.select).toContain("source");
+    expect(captured.select).toContain("confidence");
+    expect(captured.select).toContain("card_event_id");
+    expect(captured.select).toContain("card_events");
+  });
+
+  it("groups returned rows by area_step_id, same shape as getAreaStepEvents", async () => {
+    const rows = [
+      { ...BASE_EVENT, id: "ev1", area_step_id: "step1" },
+      { ...BASE_EVENT, id: "ev2", area_step_id: "step1", note: "lanjut lagi" },
+      { ...BASE_EVENT, id: "ev3", area_step_id: "step2", staff: null, note: null, percent_complete: null },
+    ];
+    const supa = fakeAreaFilterClient(rows);
+    const result = await getAreaStepEventsForAreas(supa, ["area1", "area2"]);
+
+    expect(result.size).toBe(2);
+    expect(result.get("step1")).toHaveLength(2);
+    expect(result.get("step2")).toHaveLength(1);
+  });
+
+  it("maps AI attribution fields the same way as getAreaStepEvents (shared mapper)", async () => {
+    const aiRow = {
+      ...BASE_EVENT,
+      id: "ev-ai",
+      source: "ai",
+      confidence: 0.947,
+      card_event_id: "cev1",
+      card_events: {
+        card_id: "card1",
+        cards: { slug: "pasang-lantai", projects: { project_code: "BDG-H1" } },
+      },
+    };
+    const supa = fakeAreaFilterClient([aiRow]);
+    const result = await getAreaStepEventsForAreas(supa, ["area1"]);
+    const row = result.get("step1")![0]!;
+    expect(row.source).toBe("ai");
+    expect(row.confidence).toBeCloseTo(0.947);
+    expect(row.card_link).toEqual({ projectCode: "BDG-H1", cardSlug: "pasang-lantai" });
+  });
+
+  it("degrades to the base (non-attribution, area-scoped) select when the first attempt errors with a missing-column error", async () => {
+    let call = 0;
+    const selects: string[] = [];
+    function chain(): any {
+      const builder: any = {
+        select(s: string) {
+          selects.push(s);
+          return builder;
+        },
+        in: () => builder,
+        order: () => {
+          call++;
+          if (call === 1) return Promise.resolve({ data: null, error: { code: "42703", message: 'column "source" does not exist' } });
+          return Promise.resolve({ data: [BASE_EVENT], error: null });
+        },
+      };
+      return builder;
+    }
+    const supa = { from: (_t: string) => chain() } as unknown as SupabaseClient<Database>;
+    const result = await getAreaStepEventsForAreas(supa, ["area1"]);
+    expect(selects[0]).toContain("source");
+    expect(selects[0]).toContain("area_steps!inner");
+    expect(selects[1]).not.toContain("source");
+    expect(selects[1]).toContain("area_steps!inner"); // fallback keeps the area-scoped embed, just drops attribution fields
+    const row = result.get("step1")![0]!;
+    expect(row.source).toBe("human");
   });
 });
 

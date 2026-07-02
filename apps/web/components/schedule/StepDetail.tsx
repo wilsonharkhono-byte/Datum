@@ -151,6 +151,28 @@ export function hasNewerAiEvent(events: Pick<AreaStepEventRow, "source" | "occur
   return events.some((e) => e.source === "ai" && e.occurred_at > nowIso);
 }
 
+/**
+ * Pure: the note to send when a human hits "Benar" on an AI history row.
+ *
+ * For a blocked AI row, the projection derives `blockingReason` from the latest
+ * event's note (see lib/steps/status.ts `payload.blocked_on ?? payload.description`
+ * — read here via the row's `note` field). Sending a generic "Dikonfirmasi" note
+ * unconditionally would become the newest human event and overwrite that reason
+ * with the confirmation text, destroying the "why" the room is blocked.
+ *
+ * So for blocked rows: carry the AI event's own note forward when it has one;
+ * otherwise fall back to the step's current `blocking_reason` (still on the
+ * step even though this event's note is empty); otherwise "Dikonfirmasi".
+ * Non-blocked rows are unaffected — always "Dikonfirmasi".
+ */
+export function benarNote(
+  ev: Pick<AreaStepEventRow, "status" | "note">,
+  currentBlockingReason: string | null,
+): string {
+  if (ev.status === "blocked") return ev.note ?? currentBlockingReason ?? "Dikonfirmasi";
+  return "Dikonfirmasi";
+}
+
 export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: AreaStepEventRow[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -179,13 +201,18 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
     run(() => submitStepUpdate({ areaStepId: step.id, status }));
   }
 
-  /** "Benar" on an AI history row: write a human-authored confirming event with the same status — cheap, locks it in via the newest-information-wins rule. */
+  /**
+   * "Benar" on an AI history row: write a human-authored confirming event with
+   * the same status — cheap, locks it in via the newest-information-wins rule.
+   * For a blocked row, carry the blocking reason forward (see `benarNote`)
+   * instead of overwriting it with a generic confirmation note.
+   */
   function confirmAiEvent(ev: AreaStepEventRow) {
     run(() =>
       submitStepUpdate({
         areaStepId: step.id,
         status: ev.status as "not_started" | "in_progress" | "blocked" | "done",
-        note: "Dikonfirmasi",
+        note: benarNote(ev, step.blocking_reason),
       }),
     );
   }

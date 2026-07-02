@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProjectRooms } from "@/lib/rooms/queries";
-import { getRoomStepViews, getAreaStepEvents } from "@/lib/steps/queries";
+import { getRoomStepViews, getAreaStepEventsForAreas } from "@/lib/steps/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { RoomsView } from "@/components/rooms/RoomsView";
 
@@ -36,11 +36,13 @@ export default async function ProjectRoomsPage({
   );
 
   // One batched fetch for step history (incl. AI attribution) across every
-  // room's steps — same shape as the per-area helper, just fed all step ids
-  // up front so the page issues a single extra round-trip regardless of room
-  // count (mirrors getRoomStepViews' fixed-round-trip pattern above).
-  const allStepIds = [...stepViews.values()].flatMap((v) => v.steps.map((s) => s.id));
-  const stepEvents = await getAreaStepEvents(supabase, allStepIds);
+  // room's steps — same shape as the per-area helper, just filtered by area id
+  // (not step id) so the page issues a single extra round-trip regardless of
+  // room count (mirrors getRoomStepViews' fixed-round-trip pattern above)
+  // without building a PostgREST URL that enumerates every step id (can be
+  // hundreds+ across a project's rooms — see getAreaStepEventsForAreas' docstring).
+  const areaIds = data.rooms.map((r) => r.areaId);
+  const stepEvents = await getAreaStepEventsForAreas(supabase, areaIds);
 
   return <RoomsView data={data} now={Date.now()} stepViews={stepViews} stepEvents={stepEvents} />;
 }
