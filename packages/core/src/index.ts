@@ -225,6 +225,18 @@ export {
   type QuoteEvent,
 } from "./brief/bottlenecks";
 
+export {
+  getRecentPulse,
+  groupPulseEvents,
+  mapStepEventRow,
+  mapCardEventRow,
+  summarizePulseCardEvent,
+  type PulseEvent,
+  type PulseSource,
+  type PulseRoomGroup,
+  type PulseProjectGroup,
+} from "./brief/pulse";
+
 // ─── Advisor reads + ranking ──────────────────────────────────────────────────
 export {
   getAdvisorData,
@@ -239,6 +251,8 @@ export {
   dueLabelFor,
   ageLabelFor,
 } from "./advisor/rank";
+
+export { capStaleCards, type StaleCapResult } from "./advisor/stale-cap";
 
 export {
   type AdvisorItem,

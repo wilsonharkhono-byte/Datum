@@ -21,6 +21,7 @@ import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { AdvisorItemRow } from "@/components/brief/AdvisorItemRow";
 import { BriefSection } from "@/components/brief/BriefSection";
 import { useBrief, useAdvisor } from "@/lib/query/hooks";
+import { capStaleCards } from "@datum/core";
 
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
 
@@ -166,7 +167,10 @@ export default function BriefScreen() {
     );
   }
 
-  const advisorItems = advisorData?.items ?? [];
+  // Same stale-card demotion as web's /brief — applied at render level so
+  // the shared getAdvisorData contract stays unchanged for other consumers
+  // (see capStaleCards in @datum/core's advisor/stale-cap.ts).
+  const { items: advisorItems, hiddenStaleCount } = capStaleCards(advisorData?.items ?? [], 3);
   const gateRisks = brief?.gateRisks ?? [];
   const staleByProject = brief?.staleByProject ?? [];
 
@@ -236,6 +240,11 @@ export default function BriefScreen() {
               ))}
             </View>
           )}
+          {hiddenStaleCount > 0 ? (
+            <Text testID="advisor-hidden-stale" className="mt-2 text-[10px] uppercase tracking-wide text-text-muted">
+              +{hiddenStaleCount} lainnya tanpa aktivitas
+            </Text>
+          ) : null}
         </View>
 
         {/* ── Six BriefData sections ── */}

@@ -1,16 +1,47 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBriefData } from "@/lib/brief/queries";
-import { getAdvisorItems } from "@/lib/advisor/queries";
+import { getAdvisorItems, capStaleCards } from "@/lib/advisor/queries";
+import { getProjectsSlipRisk } from "@/lib/steps/slip-risk-queries";
 import { BriefSection } from "@/components/brief/BriefSection";
 import { AdvisorFeed } from "@/components/brief/AdvisorFeed";
+import { PulseSection } from "@/components/brief/PulseSection";
+import { ForecastSection } from "@/components/brief/ForecastSection";
 
-export default async function BriefPage() {
+export default async function BriefPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ stale?: string }>;
+}) {
+  const { stale } = await searchParams;
+  // "lihat semua →" target: no dedicated stale-cards page exists, so the
+  // brief itself carries the uncapped view — ?stale=semua widens the advisor
+  // limit (the engine ranks stale_card lowest, so extra rows are the hidden
+  // stale tail) and skips the render-time cap below.
+  const showAllStale = stale === "semua";
+
   const supabase = await createSupabaseServerClient();
-  const [brief, advisorItems] = await Promise.all([
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  const nowIso = new Date().toISOString();
+
+  const [brief, advisorItemsRaw, forecastRows] = await Promise.all([
     getBriefData(supabase),
-    getAdvisorItems(supabase, { now: new Date(), limit: 10 }),
+    getAdvisorItems(supabase, { now: new Date(), limit: showAllStale ? 40 : 10 }),
+    // Forecast fold-in: web-local (the slip-risk/forecast stack under
+    // apps/web/lib/steps/ is not portable to @datum/core without a much
+    // larger refactor — see task-5 report). Reuses /risiko's own query,
+    // never reimplemented.
+    getProjectsSlipRisk(supabase, today, nowIso),
   ]);
+
+  // Demote stale-card ("Tanpa aktivitas") noise on THIS page only — the
+  // shared advisor engine (getAdvisorData/getAdvisorItems) is also consumed
+  // by /project/[slug] and the assistant's retrieval context, so the cap is
+  // applied here at render time, not inside the engine (see capStaleCards
+  // in @datum/core's advisor/stale-cap.ts for the full rationale).
+  const { items: advisorItems, hiddenStaleCount } = showAllStale
+    ? { items: advisorItemsRaw, hiddenStaleCount: 0 }
+    : capStaleCards(advisorItemsRaw, 3);
 
   return (
     <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
@@ -24,7 +55,19 @@ export default async function BriefPage() {
       </header>
 
       <div className="mb-4">
-        <AdvisorFeed items={advisorItems} />
+        <PulseSection groups={brief.pulse ?? []} />
+      </div>
+
+      <div className="mb-4">
+        <ForecastSection rows={forecastRows} />
+      </div>
+
+      <div className="mb-4">
+        <AdvisorFeed
+          items={advisorItems}
+          hiddenStaleCount={hiddenStaleCount}
+          showAllStaleHref="/brief?stale=semua"
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
