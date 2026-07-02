@@ -63,6 +63,12 @@ Same as Phase 0+1 plan (Node 22 PATH, never `git add -A`, local stack 553xx, per
 
 ---
 
+### Task 6.5 (added by Phase-1 whole-branch review): Recompute hardening
+
+**Files:** `apps/web/lib/cards/mutations.ts`, `apps/web/lib/steps/run-inference.ts`, `packages/core/src/gates/recompute.ts`, tests.
+
+**Requirements:** (1) Dedup the double recompute per request: when `processPendingStepInference` already recomputed a project, the trailing unconditional `recomputeProjectGatesSystem` for that project must be skipped (thread the recomputed-project set or reorder). (2) Batch `recomputeProjectGates`'s per-cell sequential upserts into one bulk `upsert([...])` (A×8 rows) — same result, one round-trip. Unit-test the dedup; core change ⇒ ROOT gates.
+
 ### Task 6: Coherence fixes — risk vocabulary, stage chip, decision outcome, renderer tolerance, blob truncation
 
 **Files:** `apps/web/lib/steps/slip-risk.ts` (level derivation), rooms stage derivation (`packages/core` or `apps/web/lib` — find where "Gate H Serah Terima berjalan" text is built), decision resolve action + dialog (`Tandai diputuskan` flow), the card timeline decision renderer, `RoomStepsPanel`/`RoomRow` flags line; tests.
