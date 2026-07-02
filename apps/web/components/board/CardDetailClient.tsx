@@ -28,6 +28,7 @@ export function CardDetailClient({
   projectCode,
   currentStaffId,
   attachmentsByEvent,
+  stepNamesByEvent,
   candidates,
   header,
   addEvent,
@@ -48,6 +49,8 @@ export function CardDetailClient({
   projectCode: string;
   currentStaffId: string | null;
   attachmentsByEvent: Map<string, CardAttachment[]>;
+  /** card_event_id -> step names the AI wrote off that event (Task 4 attribution). */
+  stepNamesByEvent: Map<string, string[]>;
   candidates: StaffLite[];
   // Server-rendered sections passed through unchanged (kept as RSC).
   header: ReactNode;
@@ -90,6 +93,7 @@ export function CardDetailClient({
           <Timeline
             events={card.events}
             attachmentsByEvent={attachmentsByEvent}
+            stepNamesByEvent={stepNamesByEvent}
             projectCode={projectCode}
             cardSlug={slug}
           />
@@ -133,7 +137,7 @@ export function CardDetailClient({
             candidates={candidates}
           />
         </div>
-        <div className="mt-5 border-t border-[var(--border)] pt-4">
+        <div id="areas-terkait" className="mt-5 scroll-mt-4 border-t border-[var(--border)] pt-4">
           <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sand-dark)]">
             Areas terkait
           </h2>

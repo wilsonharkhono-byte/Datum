@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCardWithTimelineByProjectCode, getCardAttachments, getCardMembers, getCardComments, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
+import { getStepNamesByCardEvent } from "@/lib/steps/queries";
 import { getCardAreas } from "@/lib/cards/area-link-queries";
 import { getCardLinks } from "@/lib/cards/link-queries";
 import { getProjectAreas } from "@/lib/projects/area-queries";
@@ -44,7 +45,7 @@ export default async function CardDetailPage({
   }
   const detail = detailRes.value;
 
-  const [attachmentsByEvent, memberRows, comments, candidates, topics, cardAreas, projectAreas, cardLinks] = await Promise.all([
+  const [attachmentsByEvent, memberRows, comments, candidates, topics, cardAreas, projectAreas, cardLinks, stepNamesByEvent] = await Promise.all([
     getCardAttachments(supabase, detail.card.id),
     getCardMembers(supabase, detail.card.id),
     getCardComments(supabase, detail.card.id),
@@ -53,6 +54,11 @@ export default async function CardDetailPage({
     getCardAreas(supabase, detail.card.id),
     getProjectAreas(supabase, project.id),
     getCardLinks(supabase, detail.card.id),
+    // ONE grouped query for the whole page (Task 4), not per event — reverse lookup of
+    // AI-authored step names by the card_event that produced them. `.in()` on event ids
+    // is safe here (unlike the Rooms page's step-id fan-out): a card page has at most a
+    // few dozen events, so the filter list stays well under the URL length limit.
+    getStepNamesByCardEvent(supabase, detail.events.map((e) => e.id)),
   ]);
   const topicName = topics.find((t) => t.id === detail.card.topic_id)?.name ?? "—";
 
@@ -99,6 +105,7 @@ export default async function CardDetailPage({
             projectCode={project.project_code}
             currentStaffId={currentStaffId}
             attachmentsByEvent={attachmentsByEvent}
+            stepNamesByEvent={stepNamesByEvent}
             candidates={candidates}
             header={
               <CardHeader

@@ -2,6 +2,7 @@ import type { CardEvent, CardAttachment } from "@datum/db";
 import { HIGH_RISK_KINDS, isDecisionOpen, isClientRequestOpen, type EventKind } from "@datum/types";
 import { resolveCardEvent } from "@/lib/cards/mutations";
 import { summarize, extractUrls, looksLikeImage, safeHostname } from "@datum/core";
+import { aiResultLine, isUnlinkedCardHint } from "@/lib/cards/ai-result-line";
 import { EventAttachments } from "./EventAttachments";
 
 const KIND_LABEL: Record<string, string> = {
@@ -29,14 +30,18 @@ export function EventRow({
   attachments,
   projectCode,
   cardSlug,
+  aiStepNames,
 }: {
   event: CardEvent;
   attachments: CardAttachment[];
   projectCode: string;
   cardSlug: string;
+  /** Step names the AI wrote off the back of this event (empty when none/not applicable). */
+  aiStepNames?: string[];
 }) {
   const urls = extractUrls(event.payload as Record<string, unknown>);
   const isHighRisk = HIGH_RISK_KINDS.has(event.event_kind as EventKind);
+  const resultLine = aiResultLine(event.ai_step_status, event.ai_step_error, aiStepNames ?? []);
   return (
     <li className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
       {/* Mobile: stacks — a meta line (kind + date) above a full-width summary,
@@ -80,6 +85,20 @@ export function EventRow({
         </div>
       ) : null}
       <EventAttachments attachments={attachments} projectCode={projectCode} cardSlug={cardSlug} />
+      {resultLine ? (
+        <p className="mt-1 text-[10px] italic text-[var(--text-muted)] md:ml-[12.5rem]">
+          {isUnlinkedCardHint(event.ai_step_status, event.ai_step_error) ? (
+            <>
+              AI: kartu belum tertaut ke ruangan —{" "}
+              <a href="#areas-terkait" className="not-italic underline hover:no-underline">
+                tautkan agar progres terbaca
+              </a>
+            </>
+          ) : (
+            resultLine
+          )}
+        </p>
+      ) : null}
     </li>
   );
 }

@@ -298,6 +298,66 @@ export async function getAreaStepEventsForAreas(
   );
 }
 
+const STEP_NAMES_BY_CARD_EVENT_SELECT =
+  "card_event_id, area_step_id, area_steps:area_step_id (trade_steps:step_code (name))";
+
+type RawStepNameByCardEventRow = {
+  card_event_id: string | null;
+  area_step_id: string;
+  area_steps: { trade_steps: { name: string } | null } | null;
+};
+
+/**
+ * Reverse lookup for the card timeline (Task 4): given a card's event ids, find every
+ * area_step_events row the AI wrote off the back of each event (source='ai',
+ * card_event_id in the list) and return the step names, grouped by card_event_id, in
+ * the order the AI wrote them (insertion order — no separate sort column needed since
+ * a single event rarely touches more than a couple of steps).
+ *
+ * ONE grouped query for the whole card page — not per event — mirroring
+ * `getProjectStepActivity`'s single-round-trip pattern in lib/activity/step-activity.ts.
+ *
+ * Safe to call with `.in("card_event_id", eventIds)`: a card page has at most a few
+ * dozen events (bounded per card, unlike the Rooms page's hundreds of area_steps across
+ * many rooms — see `getAreaStepEventsForAreas` above for why that one avoids `.in()` on
+ * step ids), so the resulting PostgREST filter list stays well under the URL length
+ * that caused the "URI too long" issue there.
+ *
+ * Degrades to an empty map if `card_event_id`/`source` don't exist yet in prod (pre
+ * `supabase db push` for the 2026-06-28 migration) — there's nothing to attribute
+ * without those columns, so silence (no names, no "AI: memperbarui langkah" line) is
+ * the correct degrade, not a thrown error.
+ */
+export async function getStepNamesByCardEvent(
+  supabase: SupabaseClient<Database>,
+  cardEventIds: string[],
+): Promise<Map<string, string[]>> {
+  if (cardEventIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from("area_step_events")
+    .select(STEP_NAMES_BY_CARD_EVENT_SELECT)
+    .eq("source", "ai")
+    .in("card_event_id", cardEventIds);
+
+  if (error) {
+    if (isMissingColumnError(error)) return new Map();
+    throw error;
+  }
+
+  const map = new Map<string, string[]>();
+  for (const raw of data ?? []) {
+    const r = raw as unknown as RawStepNameByCardEventRow;
+    if (!r.card_event_id) continue;
+    const name = r.area_steps?.trade_steps?.name;
+    if (!name) continue;
+    const bucket = map.get(r.card_event_id) ?? [];
+    bucket.push(name);
+    map.set(r.card_event_id, bucket);
+  }
+  return map;
+}
+
 // ─── Project-wide signal query ────────────────────────────────────────────────
 
 /**

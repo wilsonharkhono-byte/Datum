@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getAreaStepEvents, getAreaStepEventsForAreas, isMissingColumnError, mapAreaStepEventRow } from "@/lib/steps/queries";
+import {
+  getAreaStepEvents,
+  getAreaStepEventsForAreas,
+  getStepNamesByCardEvent,
+  isMissingColumnError,
+  mapAreaStepEventRow,
+} from "@/lib/steps/queries";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 
@@ -337,6 +343,93 @@ describe("getAreaStepEventsForAreas", () => {
     expect(selects[1]).toContain("area_steps!inner"); // fallback keeps the area-scoped embed, just drops attribution fields
     const row = result.get("step1")![0]!;
     expect(row.source).toBe("human");
+  });
+});
+
+/**
+ * Fake client for getStepNamesByCardEvent: supports .select().eq().in() resolving
+ * directly (no terminal .order()), and can optionally error (for the degrade test).
+ */
+function fakeCardEventNamesClient(
+  rows: unknown[] | null,
+  error: { code?: string; message?: string } | null = null,
+  captured?: { select?: string; eqField?: string; eqValue?: unknown; inField?: string; inValues?: unknown[] },
+) {
+  function chain(): any {
+    const builder: any = {
+      select(s: string) {
+        if (captured) captured.select = s;
+        return builder;
+      },
+      eq(field: string, value: unknown) {
+        if (captured) {
+          captured.eqField = field;
+          captured.eqValue = value;
+        }
+        return builder;
+      },
+      in(field: string, values: unknown[]) {
+        if (captured) {
+          captured.inField = field;
+          captured.inValues = values;
+        }
+        return Promise.resolve({ data: rows, error });
+      },
+    };
+    return builder;
+  }
+  return { from: (_t: string) => chain() } as unknown as SupabaseClient<Database>;
+}
+
+describe("getStepNamesByCardEvent", () => {
+  it("returns an empty map when cardEventIds is empty (no DB call)", async () => {
+    const supa = fakeCardEventNamesClient([]);
+    const result = await getStepNamesByCardEvent(supa, []);
+    expect(result.size).toBe(0);
+  });
+
+  it("filters on source='ai' and card_event_id in the given ids", async () => {
+    const captured: { eqField?: string; eqValue?: unknown; inField?: string; inValues?: unknown[] } = {};
+    const supa = fakeCardEventNamesClient([], null, captured);
+    await getStepNamesByCardEvent(supa, ["cev1", "cev2"]);
+    expect(captured.eqField).toBe("source");
+    expect(captured.eqValue).toBe("ai");
+    expect(captured.inField).toBe("card_event_id");
+    expect(captured.inValues).toEqual(["cev1", "cev2"]);
+  });
+
+  it("groups step names by card_event_id, preserving row order", async () => {
+    const rows = [
+      { card_event_id: "cev1", area_step_id: "s1", area_steps: { trade_steps: { name: "Waterproofing" } } },
+      { card_event_id: "cev1", area_step_id: "s2", area_steps: { trade_steps: { name: "Pasang lantai" } } },
+      { card_event_id: "cev2", area_step_id: "s3", area_steps: { trade_steps: { name: "Pengecatan" } } },
+    ];
+    const supa = fakeCardEventNamesClient(rows);
+    const result = await getStepNamesByCardEvent(supa, ["cev1", "cev2"]);
+    expect(result.get("cev1")).toEqual(["Waterproofing", "Pasang lantai"]);
+    expect(result.get("cev2")).toEqual(["Pengecatan"]);
+  });
+
+  it("skips rows with a null card_event_id or unresolved step name", async () => {
+    const rows = [
+      { card_event_id: null, area_step_id: "s1", area_steps: { trade_steps: { name: "Orphan" } } },
+      { card_event_id: "cev1", area_step_id: "s2", area_steps: null },
+      { card_event_id: "cev1", area_step_id: "s3", area_steps: { trade_steps: { name: "Waterproofing" } } },
+    ];
+    const supa = fakeCardEventNamesClient(rows);
+    const result = await getStepNamesByCardEvent(supa, ["cev1"]);
+    expect(result.get("cev1")).toEqual(["Waterproofing"]);
+  });
+
+  it("degrades to an empty map when the query errors with a missing-column error", async () => {
+    const supa = fakeCardEventNamesClient(null, { code: "42703", message: 'column "card_event_id" does not exist' });
+    const result = await getStepNamesByCardEvent(supa, ["cev1"]);
+    expect(result.size).toBe(0);
+  });
+
+  it("rethrows non-missing-column errors", async () => {
+    const supa = fakeCardEventNamesClient(null, { code: "PGRST301", message: "JWT expired" });
+    await expect(getStepNamesByCardEvent(supa, ["cev1"])).rejects.toMatchObject({ code: "PGRST301" });
   });
 });
 
