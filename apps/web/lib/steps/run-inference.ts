@@ -67,6 +67,7 @@ export async function processPendingStepInference(
       await applyStepInference(supabase, {
         cardEventId: ev.id,
         projectId: ev.project_id,
+        occurredAt: ev.occurred_at,
         selected,
       });
 

@@ -198,7 +198,7 @@ export async function restoreAreaStep(
  */
 export async function applyStepInference(
   supabase: SupabaseClient<Database>,
-  args: { cardEventId: string; projectId: string; selected: SelectedMatch[] },
+  args: { cardEventId: string; projectId: string; occurredAt: string; selected: SelectedMatch[] },
 ): Promise<void> {
   for (const m of args.selected) {
     const { error } = await supabase.from("area_step_events").insert({
@@ -206,10 +206,11 @@ export async function applyStepInference(
       project_id: args.projectId,
       status: m.status,
       note: m.blocked_on,
-      percent_complete: m.status === "done" ? 100 : null,
+      percent_complete: null,
       source: "ai",
       confidence: m.confidence,
       card_event_id: args.cardEventId,
+      occurred_at: args.occurredAt,
     });
     // 23505 = unique_violation (already inferred for this card event) → skip re-project.
     if (error) {

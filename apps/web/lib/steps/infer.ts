@@ -46,7 +46,8 @@ ATURAN:
 - status: "in_progress" (sedang dikerjakan), "done" (selesai), atau "blocked" (terhambat).
 - blocked_on: alasan singkat jika blocked, selain itu null.
 - confidence: 0..1, seberapa yakin pencocokan ini.
-- Jangan menebak step_code di luar daftar. Hanya laporkan yang benar-benar terlihat dari catatan.`;
+- Jangan menebak step_code di luar daftar. Hanya laporkan yang benar-benar terlihat dari catatan.
+- Laporkan HANYA pekerjaan yang sudah berjalan atau selesai. Rencana/niat ("akan", "besok", "siap mulai") BUKAN progres — jangan cocokkan step untuk itu.`;
   const userText = `KARTU: ${args.cardTitle}\nCATATAN: ${args.eventText}`;
   return { systemText, userText };
 }

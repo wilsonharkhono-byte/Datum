@@ -36,6 +36,18 @@ describe("buildInferencePrompt", () => {
     expect(systemText).toContain("D6");
     expect(userText).toContain("Waterproofing selesai");
   });
+
+  it("instructs the model to exclude future intentions from progress matches", () => {
+    const { systemText } = buildInferencePrompt({
+      cardTitle: "KM Utama",
+      eventText: "siap flood test besok",
+      candidates,
+    });
+    expect(systemText).toContain("akan");
+    expect(systemText).toContain("besok");
+    expect(systemText).toContain("siap mulai");
+    expect(systemText).toContain("BUKAN progres");
+  });
 });
 
 describe("parseStepVerdict", () => {
