@@ -200,6 +200,7 @@ export default function CardDetailScreen() {
           <CardAreas
             cardId={cardId}
             projectId={card.project_id}
+            code={code}
             currentAreas={areasQuery.data ?? []}
           />
         ) : null}

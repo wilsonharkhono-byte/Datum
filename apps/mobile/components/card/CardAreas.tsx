@@ -31,13 +31,15 @@ function areaLabel(area: Area): string {
 interface CardAreasProps {
   cardId: string;
   projectId: string;
+  /** project_code (route param) — identity for the useBoard/useRooms query keys. */
+  code: string;
   currentAreas: Area[];
 }
 
-export function CardAreas({ cardId, projectId, currentAreas }: CardAreasProps) {
+export function CardAreas({ cardId, projectId, code, currentAreas }: CardAreasProps) {
   const [open, setOpen] = useState(false);
-  const linkArea = useLinkCardArea(cardId, projectId);
-  const unlinkArea = useUnlinkCardArea(cardId, projectId);
+  const linkArea = useLinkCardArea(cardId, projectId, code);
+  const unlinkArea = useUnlinkCardArea(cardId, projectId, code);
   const [error, setError] = useState<string | null>(null);
 
   const areasQuery = useAreas(projectId);

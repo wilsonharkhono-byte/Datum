@@ -544,7 +544,7 @@ describe("CardAreas — link and unlink", () => {
   it("renders linked areas as chips and shows the picker affordance", () => {
     const qc = makeClient();
     const { getByText, getByLabelText } = render(
-      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[AREA_LINKED]} />,
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} code={CODE} currentAreas={[AREA_LINKED]} />,
       { wrapper: wrapper(qc) },
     );
 
@@ -555,7 +555,7 @@ describe("CardAreas — link and unlink", () => {
   it("shows the empty state when no areas are linked", () => {
     const qc = makeClient();
     const { getByText } = render(
-      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[]} />,
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} code={CODE} currentAreas={[]} />,
       { wrapper: wrapper(qc) },
     );
     expect(getByText("Belum ada area terkait.")).toBeTruthy();
@@ -566,7 +566,7 @@ describe("CardAreas — link and unlink", () => {
     const invalidateSpy = jest.spyOn(qc, "invalidateQueries");
 
     const { getByLabelText, findByLabelText, queryByLabelText } = render(
-      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[AREA_LINKED]} />,
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} code={CODE} currentAreas={[AREA_LINKED]} />,
       { wrapper: wrapper(qc) },
     );
 
@@ -584,10 +584,22 @@ describe("CardAreas — link and unlink", () => {
       expect.objectContaining({ cardId: CARD_ID, areaId: AREA_ADDABLE.id }),
     );
 
+    // card-areas + areas invalidated…
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith(
         expect.objectContaining({ queryKey: ["card-areas", CARD_ID] }),
       ),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: keys.areas(PROJECT_ID) }),
+    );
+    // …plus board (per-card deadline badge) + rooms (Ruangan screen), both of
+    // which derive from card_areas and would otherwise go stale.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: keys.board(CODE) }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: keys.rooms(CODE) }),
     );
   });
 
@@ -596,7 +608,7 @@ describe("CardAreas — link and unlink", () => {
     const invalidateSpy = jest.spyOn(qc, "invalidateQueries");
 
     const { getByLabelText } = render(
-      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[AREA_LINKED]} />,
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} code={CODE} currentAreas={[AREA_LINKED]} />,
       { wrapper: wrapper(qc) },
     );
 
@@ -608,10 +620,22 @@ describe("CardAreas — link and unlink", () => {
       expect.objectContaining({ cardId: CARD_ID, areaId: AREA_LINKED.id }),
     );
 
+    // card-areas + areas invalidated…
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith(
         expect.objectContaining({ queryKey: ["card-areas", CARD_ID] }),
       ),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: keys.areas(PROJECT_ID) }),
+    );
+    // …plus board (per-card deadline badge) + rooms (Ruangan screen), both of
+    // which derive from card_areas and would otherwise go stale.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: keys.board(CODE) }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: keys.rooms(CODE) }),
     );
   });
 
@@ -620,7 +644,7 @@ describe("CardAreas — link and unlink", () => {
     const qc = makeClient();
 
     const { getByLabelText, findByLabelText, findByText } = render(
-      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[AREA_LINKED]} />,
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} code={CODE} currentAreas={[AREA_LINKED]} />,
       { wrapper: wrapper(qc) },
     );
 
