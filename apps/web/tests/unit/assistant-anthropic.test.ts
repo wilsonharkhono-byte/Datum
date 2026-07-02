@@ -130,3 +130,33 @@ describe("PM system prompt content (Task 2 requirements)", () => {
     expect(a).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/); // no ISO timestamp
   });
 });
+
+describe("PM system prompt content (Task 3 — confirm-gated action tail)", () => {
+  it("describes the fenced <action>{json}</action> tail format", () => {
+    expect(SYSTEM).toMatch(/<action>/);
+    expect(SYSTEM).toMatch(/<\/action>/);
+  });
+
+  it("names all three action types", () => {
+    expect(SYSTEM).toMatch(/"remind"/);
+    expect(SYSTEM).toMatch(/"update_step"/);
+    expect(SYSTEM).toMatch(/"record_decision"/);
+  });
+
+  it("caps proposals to at most one action tail per reply", () => {
+    expect(SYSTEM).toMatch(/paling banyak satu (blok )?aksi/i);
+  });
+
+  it("instructs offering an action only when clearly helpful, not by default", () => {
+    expect(SYSTEM).toMatch(/hanya (jika|bila|saat).*(jelas membantu|benar-benar membantu)/i);
+  });
+
+  it("instructs the action tail must be the very last thing in the reply", () => {
+    expect(SYSTEM).toMatch(/akhir (dari )?jawaban/i);
+  });
+
+  it("is still byte-stable after the Task 3 extension (no interpolated values)", () => {
+    expect(SYSTEM).toBe(SYSTEM);
+    expect(SYSTEM).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+  });
+});

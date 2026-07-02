@@ -16,6 +16,15 @@ export type AssistantStreamEvent =
       sessionId: string | null;
       citations: Citation[];
       usage: { input_tokens: number; output_tokens: number };
+      /**
+       * Confirm-gated action proposal (Phase 3 Task 3), already parsed +
+       * validated server-side, or null when the reply had no (valid) action
+       * tail. Left as `unknown` here — the concrete zod schema for the three
+       * action types lives in apps/web/lib/assistant/actions.ts (web-only,
+       * since the executors need web-only queries); core only needs to know
+       * the wire shape exists so it round-trips through parseStreamLine.
+       */
+      action: unknown;
     }
   | { type: "error"; message: string };
 
@@ -60,6 +69,7 @@ export function parseStreamLine(line: string): AssistantStreamEvent | null {
                   : 0,
             }
           : { input_tokens: 0, output_tokens: 0 },
+      action: "action" in ev ? ev.action : null,
     };
   }
   if (ev.type === "error" && typeof ev.message === "string") {
@@ -112,4 +122,26 @@ export function extractCitations(answer: string): Citation[] {
  */
 export function stripCitationTokens(text: string): string {
   return text.replace(/\s*\[(?:card|event):[0-9a-f-]{36}\]/gi, "");
+}
+
+// ─── stripActionTail ────────────────────────────────────────────────────────
+
+/**
+ * Remove a confirm-gated action tail (`<action>{json}</action>`, Phase 3
+ * Task 3) from text meant for display. Isomorphic — used by the web message
+ * route to strip before persisting/citing, and directly by any client
+ * (mobile) that renders the raw accumulated stream text and hasn't (yet)
+ * built its own action-chip UI, so a raw `<action>` tag never leaks into a
+ * chat bubble on any platform.
+ *
+ * Truncates at the FIRST `<action>` occurrence and drops everything after —
+ * this is deliberately more aggressive than a token-strip: an action tail is
+ * always meant to be the last thing in a reply, so anything from the first
+ * open tag onward (closed or not, valid JSON or not) is presentation-only
+ * plumbing, never message content.
+ */
+export function stripActionTail(text: string): string {
+  const idx = text.indexOf("<action>");
+  if (idx === -1) return text;
+  return text.slice(0, idx).trimEnd();
 }

@@ -11,6 +11,7 @@ import {
 } from "@/lib/assistant/anthropic";
 import { ensureSession, recordExchange, fetchRecentMessages } from "@/lib/assistant/audit";
 import { ChatRequest } from "@/lib/assistant/types";
+import { parseActionTail, stripActionTail } from "@/lib/assistant/actions";
 
 /**
  * Streaming protocol — newline-delimited JSON (NDJSON), one event per line:
@@ -112,11 +113,20 @@ export async function POST(req: Request) {
       void (async () => {
         try {
           const final = await stream.finalMessage();
-          const answer = textOf(final.content);
+          const rawAnswer = textOf(final.content);
           const usage = {
             input_tokens: final.usage.input_tokens,
             output_tokens: final.usage.output_tokens,
           };
+
+          // Confirm-gated action tail (Task 3): parse + validate the trailing
+          // <action>{json}</action> block, then strip it from the text that
+          // gets displayed/stored/cited — nothing downstream (history replay,
+          // citations, the persisted transcript) should ever see the raw tag.
+          // Invalid/absent tails silently parse to null; the client-side
+          // parse in ChatDock is a defensive fallback for the same text.
+          const action = parseActionTail(rawAnswer);
+          const answer = stripActionTail(rawAnswer);
           const citations = extractCitations(answer);
 
           // 3. Audit — best-effort after stream completion. Failure here must
@@ -136,7 +146,7 @@ export async function POST(req: Request) {
             Sentry.captureException(e);
           }
 
-          send({ type: "done", sessionId, citations, usage });
+          send({ type: "done", sessionId, citations, usage, action });
         } catch (e) {
           console.error("[assistant/message] anthropic stream failed", e);
           send({ type: "error", message: `Asisten gagal menjawab: ${errorMessage(e)}` });

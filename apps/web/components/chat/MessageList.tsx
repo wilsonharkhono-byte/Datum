@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { stripCitationTokens } from "@datum/core";
+import { stripCitationTokens, stripActionTail } from "@datum/core";
 import { InlineCardSnippet } from "./InlineCardSnippet";
 import { ProposalCard, type Proposal } from "./ProposalCard";
+import { ActionChip } from "./ActionChip";
+import type { ActionProposalType } from "@/lib/assistant/types";
 
 export type Message =
   | { role: "user"; content: string }
@@ -16,6 +18,13 @@ export type Message =
       error?: boolean;
       /** true for offline-queue notices — rendered in amber "tersimpan offline" style */
       queued?: boolean;
+      /**
+       * Confirm-gated action proposal (Task 3), parsed server-side from the
+       * reply's <action>{json}</action> tail. Only rendered once the stream
+       * has finished (never mid-stream — the tail may still be arriving as
+       * raw text deltas until `done`).
+       */
+      action?: ActionProposalType | null;
     }
   | { role: "assistant"; proposal: Proposal };
 
@@ -41,11 +50,14 @@ export function MessageList({
   pending,
   pendingLabel = "Sedang memproses…",
   onRetry,
+  projectId,
 }: {
   messages: Message[];
   pending: boolean;
   pendingLabel?: string;
   onRetry?: (() => void) | null;
+  /** Needed to render an ActionChip's Konfirmasi tap with the right project scope. */
+  projectId: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { ref.current?.scrollTo({ top: ref.current.scrollHeight }); }, [messages, pending]);
@@ -101,10 +113,17 @@ export function MessageList({
             </div>
           );
         }
+        // The action tail (Task 3) arrives at the very end of the stream —
+        // strip it from the displayed bubble defensively even if the
+        // server-computed `done.action`/stripped text weren't applied for
+        // some reason (e.g. a legacy/queued message). Only render the chip
+        // once streaming has finished; while streaming the tail may still be
+        // a partial, unparseable fragment.
+        const displayText = stripActionTail(stripCitationTokens(m.content));
         return (
           <div key={i} className="flex flex-col gap-2">
             <div className="max-w-[80%] rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 whitespace-pre-wrap">
-              {stripCitationTokens(m.content)}
+              {displayText}
               {m.streaming ? (
                 <span className="ml-0.5 inline-block h-3 w-[2px] animate-pulse bg-[var(--sand-dark)] align-middle motion-reduce:animate-none" aria-hidden="true" />
               ) : null}
@@ -115,6 +134,9 @@ export function MessageList({
                   <InlineCardSnippet key={c.cardId} cardId={c.cardId} eventIds={c.eventIds} />
                 ))}
               </div>
+            ) : null}
+            {!m.streaming && m.action ? (
+              <ActionChip action={m.action} projectId={projectId} />
             ) : null}
           </div>
         );

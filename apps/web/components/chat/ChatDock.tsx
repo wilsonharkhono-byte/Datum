@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { stripActionTail } from "@datum/core";
 import { useAssistant } from "./AssistantProvider";
 import { MessageList, type Message } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { SparkIcon, XIcon } from "@/components/icons/Icon";
 import { drain, enqueue, readQueue, remove } from "@/lib/assistant/offline-queue";
+import type { ActionProposalType } from "@/lib/assistant/types";
 
 type Mode = "tanya" | "catat";
 
@@ -237,21 +239,37 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     };
 
     const handleEvent = (line: string) => {
-      let evt: { type?: string; text?: string; message?: string; sessionId?: string | null; citations?: { cardId: string; eventIds: string[] }[] };
+      let evt: {
+        type?: string;
+        text?: string;
+        message?: string;
+        sessionId?: string | null;
+        citations?: { cardId: string; eventIds: string[] }[];
+        action?: ActionProposalType | null;
+      };
       try { evt = JSON.parse(line); } catch { return; }
       if (evt.type === "delta") {
         appendDelta(evt.text ?? "");
       } else if (evt.type === "done") {
         finished = true;
         if (evt.sessionId) setSessionId(evt.sessionId);
+        // The action tail (Task 3) streamed in as raw text via `delta` events
+        // above (the server can't hold it back mid-stream), so the
+        // accumulated bubble content still has the raw <action>...</action>
+        // tag in it here. Finalize the bubble with that tail stripped and
+        // attach the server-parsed+validated `action` (if any) — this is the
+        // "client parses AFTER stream completion" step: MessageList's render
+        // also strips defensively, but stripping here keeps the *stored*
+        // message (localStorage, history) clean too.
         setMessages((m) => {
           const copy = m.slice();
           const last = copy[copy.length - 1];
           if (last && last.role === "assistant" && "content" in last && last.streaming) {
             copy[copy.length - 1] = {
               role: "assistant",
-              content: last.content,
+              content: stripActionTail(last.content),
               citations: evt.citations ?? [],
+              action: evt.action ?? null,
             };
           } else if (!started) {
             // Model produced no text at all — still surface an honest bubble.
@@ -522,6 +540,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             pending={pending}
             pendingLabel={pendingLabel ?? WAITING_LABEL}
             onRetry={lastFailed ? retryLast : null}
+            projectId={projectId}
           />
         ) : null}
 

@@ -55,7 +55,12 @@ vi.mock("@/lib/assistant/anthropic", () => ({
   streamAssistant: mockStreamAssistant,
   extractCitations: vi.fn().mockReturnValue([]),
   AnthropicNotConfiguredError: class AnthropicNotConfiguredError extends Error {},
-  textOf: vi.fn().mockReturnValue("Jawaban PM."),
+  // Real-ish behavior (not a fixed constant) so tests can control the final
+  // answer text via the fake stream's content blocks, same shape as the real
+  // textOf in anthropic.ts.
+  textOf: vi.fn((content: { type: string; text?: string }[]) =>
+    content.filter((c) => c.type === "text").map((c) => c.text ?? "").join(""),
+  ),
 }));
 
 vi.mock("@/lib/assistant/audit", () => ({
@@ -152,5 +157,82 @@ describe("POST /api/assistant/message — history wiring", () => {
     const done = events.find((e) => e.type === "done");
     expect(done).toBeDefined();
     expect(done!.sessionId).toBe(SESSION_ID);
+  });
+});
+
+describe("POST /api/assistant/message — action tail (Task 3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    mockSupabaseClient.__staffMaybeSingle.mockResolvedValue({ data: { id: "staff-1" }, error: null });
+    mockRetrieveProjectContext.mockResolvedValue([]);
+    mockBuildContextBlock.mockReturnValue("KONTEKS PALSU");
+    mockFetchRecentMessages.mockResolvedValue([]);
+    mockEnsureSession.mockResolvedValue(SESSION_ID);
+    mockRecordExchange.mockResolvedValue(undefined);
+  });
+
+  function fakeStreamWithText(text: string) {
+    return {
+      on: vi.fn(),
+      finalMessage: vi.fn().mockResolvedValue({
+        content: [{ type: "text", text }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }),
+      abort: vi.fn(),
+    };
+  }
+
+  it("parses a valid action tail and includes it in the done trailer", async () => {
+    const raw = `Baik.\n<action>{"type":"remind","message":"Cek flood test"}</action>`;
+    mockStreamAssistant.mockReturnValue(fakeStreamWithText(raw));
+
+    const req = makeRequest({ projectId: PROJECT_ID, question: "Ingatkan mandor", sessionId: SESSION_ID });
+    const res = await POST(req);
+    const events = await drainNdjson(res);
+
+    const done = events.find((e) => e.type === "done");
+    expect(done!.action).toEqual({ type: "remind", message: "Cek flood test" });
+  });
+
+  it("strips the action tail from the text handed to recordExchange (never persists the raw tag)", async () => {
+    const raw = `Baik, akan saya bantu.\n<action>{"type":"remind","message":"Cek flood test"}</action>`;
+    mockStreamAssistant.mockReturnValue(fakeStreamWithText(raw));
+
+    const req = makeRequest({ projectId: PROJECT_ID, question: "Ingatkan mandor", sessionId: SESSION_ID });
+    const res = await POST(req);
+    await drainNdjson(res);
+
+    expect(mockRecordExchange).toHaveBeenCalledWith(
+      mockSupabaseClient,
+      expect.objectContaining({ answer: "Baik, akan saya bantu." }),
+    );
+  });
+
+  it("done.action is null when there is no action tail", async () => {
+    mockStreamAssistant.mockReturnValue(fakeStreamWithText("Jawaban biasa tanpa aksi."));
+
+    const req = makeRequest({ projectId: PROJECT_ID, question: "Halo", sessionId: SESSION_ID });
+    const res = await POST(req);
+    const events = await drainNdjson(res);
+
+    const done = events.find((e) => e.type === "done");
+    expect(done!.action).toBeNull();
+  });
+
+  it("done.action is null and the malformed tag is stripped when the tail is invalid", async () => {
+    const raw = `Jawaban.\n<action>{"type":"remind"}</action>`; // missing required message
+    mockStreamAssistant.mockReturnValue(fakeStreamWithText(raw));
+
+    const req = makeRequest({ projectId: PROJECT_ID, question: "Halo", sessionId: SESSION_ID });
+    const res = await POST(req);
+    const events = await drainNdjson(res);
+
+    const done = events.find((e) => e.type === "done");
+    expect(done!.action).toBeNull();
+    expect(mockRecordExchange).toHaveBeenCalledWith(
+      mockSupabaseClient,
+      expect.objectContaining({ answer: "Jawaban." }),
+    );
   });
 });
