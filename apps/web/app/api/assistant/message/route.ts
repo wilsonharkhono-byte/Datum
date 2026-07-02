@@ -9,7 +9,7 @@ import {
   textOf,
   type AssistantStream,
 } from "@/lib/assistant/anthropic";
-import { ensureSession, recordExchange } from "@/lib/assistant/audit";
+import { ensureSession, recordExchange, fetchRecentMessages } from "@/lib/assistant/audit";
 import { ChatRequest } from "@/lib/assistant/types";
 
 /**
@@ -66,12 +66,17 @@ export async function POST(req: Request) {
     );
   }
 
+  // 1b. History — replay up to the last 8 turns of this session (empty for a
+  // brand-new session, i.e. no sessionId yet). Best-effort: a read failure
+  // degrades to single-turn rather than failing the request.
+  const history = await fetchRecentMessages(supabase, parsed.sessionId);
+
   // 2. Anthropic — open the stream. getAnthropicClient() throws synchronously
   // when the key is missing, so config errors still get a clean 503 before any
   // bytes are streamed.
   let stream: AssistantStream;
   try {
-    stream = streamAssistant({ question: parsed.question, contextBlock });
+    stream = streamAssistant({ question: parsed.question, contextBlock, history });
   } catch (e) {
     if (e instanceof AnthropicNotConfiguredError) {
       return NextResponse.json(

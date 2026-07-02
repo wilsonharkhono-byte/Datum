@@ -2,6 +2,37 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@datum/db";
 
+/** One stored turn, as read back from `assistant_messages` for history replay. */
+export type StoredMessage = {
+  role: Database["public"]["Enums"]["assistant_message_role"];
+  content: string;
+};
+
+/** How many prior turns (brief: "messages") to replay into the model call. */
+export const HISTORY_WINDOW = 8;
+
+/**
+ * Fetch the last `HISTORY_WINDOW` messages of a session, oldest-first (the
+ * order the Anthropic `messages` array needs). Returns [] for a brand-new
+ * session (no sessionId yet) or on any read failure — history replay is a
+ * quality improvement, not a hard dependency, so callers should degrade to a
+ * single-turn call rather than fail the request.
+ */
+export async function fetchRecentMessages(
+  supabase: SupabaseClient<Database>,
+  sessionId: string | undefined,
+): Promise<StoredMessage[]> {
+  if (!sessionId) return [];
+  const { data, error } = await supabase
+    .from("assistant_messages")
+    .select("role, content")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(HISTORY_WINDOW);
+  if (error || !data) return [];
+  return data.reverse();
+}
+
 export async function ensureSession(
   supabase: SupabaseClient<Database>,
   args: { staffId: string; projectId: string; sessionId?: string },
