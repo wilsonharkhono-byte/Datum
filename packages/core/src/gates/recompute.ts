@@ -104,40 +104,68 @@ export async function recomputeProjectGates(
   // 3. For each (area, gate), evaluate the rule and build the upsert row.
   //    Stickiness is resolved per-cell right here — using the areas/events/
   //    stickyPassed state already loaded above — BEFORE any write happens.
-  //    Collecting every row into a single bulk upsert therefore preserves
-  //    the exact same per-cell guard semantics the old sequential-upsert
-  //    loop had; only the round-trip count changes (A×8 → 1).
+  //
+  //    IMPORTANT: sticky-passed rows and non-sticky rows have DIFFERENT
+  //    column sets (sticky omits status/blocking_reason). supabase-js/
+  //    PostgREST serializes a single upsert array using the UNION of keys
+  //    across all row objects — any row missing a column that another row
+  //    in the same array carries gets that column implicitly NULL'd in the
+  //    generated INSERT, which violates the NOT NULL constraint on
+  //    status/blocking_reason and aborts the ENTIRE upsert (all-or-nothing).
+  //    So we split into two HOMOGENEOUS bulk upserts — one per column
+  //    shape — preserving both the exact per-cell guard semantics the old
+  //    sequential-upsert loop had AND the O(1)-round-trips intent of the
+  //    bulk upsert (now 2 instead of 1, still not A×8).
   const now = new Date().toISOString();
-  const rows: AreaGateStatusInsert[] = [];
+  const nonStickyRows: AreaGateStatusInsert[] = [];
+  const stickyRows: AreaGateStatusInsert[] = [];
   for (const area of areas) {
     const areaCardIds = cardsByArea.get(area.id) ?? [];
     const areaEvents = areaCardIds.flatMap((cid) => eventsByCard.get(cid) ?? []);
     for (const gate of GateCodes) {
       const result = evaluateGate(gate, { events: areaEvents });
       const isSticky = stickyPassed.has(`${area.id}|${gate}`);
-      rows.push({
-        project_id:           projectId,
-        area_id:              area.id,
-        gate_code:            gate,
+      if (isSticky) {
         // Sticky-passed cells keep their confirmed status + blocking_reason;
-        // only recompute bookkeeping (score/last_recomputed_at/stale) refreshes.
-        ...(isSticky
-          ? {}
-          : { status: result.status, blocking_reason: result.blockingReason }),
-        readiness_score:      result.readinessScore,
-        last_recomputed_at:   now,
-        stale:                false,
-      });
+        // only recompute bookkeeping (score/last_recomputed_at/stale)
+        // refreshes. Every row here shares the exact same key set.
+        stickyRows.push({
+          project_id:           projectId,
+          area_id:              area.id,
+          gate_code:            gate,
+          readiness_score:      result.readinessScore,
+          last_recomputed_at:   now,
+          stale:                false,
+        });
+      } else {
+        nonStickyRows.push({
+          project_id:           projectId,
+          area_id:              area.id,
+          gate_code:            gate,
+          status:               result.status,
+          blocking_reason:      result.blockingReason,
+          readiness_score:      result.readinessScore,
+          last_recomputed_at:   now,
+          stale:                false,
+        });
+      }
     }
   }
 
   let cellsUpdated = 0;
-  if (rows.length > 0) {
+  if (nonStickyRows.length > 0) {
     const { error: uErr } = await sb
       .from("area_gate_status")
-      .upsert(rows, { onConflict: "project_id,area_id,gate_code" });
+      .upsert(nonStickyRows, { onConflict: "project_id,area_id,gate_code" });
     if (uErr) return { ok: false, error: uErr.message };
-    cellsUpdated = rows.length;
+    cellsUpdated += nonStickyRows.length;
+  }
+  if (stickyRows.length > 0) {
+    const { error: uErr } = await sb
+      .from("area_gate_status")
+      .upsert(stickyRows, { onConflict: "project_id,area_id,gate_code" });
+    if (uErr) return { ok: false, error: uErr.message };
+    cellsUpdated += stickyRows.length;
   }
 
   // NOTE: projectCode is accepted so the web wrapper can call revalidatePath

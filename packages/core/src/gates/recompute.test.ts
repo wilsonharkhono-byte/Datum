@@ -10,10 +10,17 @@ import { recomputeProjectGates } from "./recompute";
 //   3. card_events (select *, in card_id)   — only if there are linked cards
 //   4. area_gate_status (select area_id/gate_code, eq project_id, eq status
 //      'passed', not actual_end_date null)  — sticky-passed lookup
-//   5. area_gate_status upsert(rows, onConflict)  — the bulk write under test
+//   5. area_gate_status upsert(rows, onConflict) x2 — the bulk writes under test
 //
-// Task 6.5: this must be exactly ONE upsert call carrying all
-// areas.length * GateCodes.length rows, not one upsert per cell.
+// Task 6.5: this must be TWO upsert calls (one per HOMOGENEOUS column
+// shape — non-sticky rows carry status/blocking_reason, sticky rows never
+// do), together carrying all areas.length * GateCodes.length rows, not one
+// upsert per cell. A single upsert call mixing both shapes is a bug: on
+// real PostgREST, supabase-js serializes the array using the UNION of keys
+// across all rows, so any row missing a key present on a sibling row gets
+// that column implicitly NULL'd in the generated INSERT — which violates
+// the NOT NULL constraint on status/blocking_reason and aborts the whole
+// upsert.
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 const PROJECT_CODE = "BDG-H1";
@@ -99,7 +106,7 @@ function workEvent(cardId: string, status: string, id = crypto.randomUUID()) {
 }
 
 describe("recomputeProjectGates — bulk upsert (Task 6.5)", () => {
-  it("issues exactly ONE upsert call carrying all area x gate rows", async () => {
+  it("issues exactly ONE upsert call (non-sticky only) carrying all area x gate rows when there are no sticky cells", async () => {
     const supa = makeSupa({
       areaIds: ["area-1", "area-2"],
       cardAreas: [{ card_id: "card-1", area_id: "area-1" }, { card_id: "card-2", area_id: "area-2" }],
@@ -112,6 +119,7 @@ describe("recomputeProjectGates — bulk upsert (Task 6.5)", () => {
     if (!result.ok) throw new Error("unreachable");
     expect(result.cellsUpdated).toBe(2 * GateCodes.length);
 
+    // No sticky cells → the sticky upsert is skipped entirely (empty array).
     expect(supa._mocks.upsertMock).toHaveBeenCalledTimes(1);
     const [{ rows, options }] = supa._mocks.upsertCalls;
     expect(Array.isArray(rows)).toBe(true);
@@ -124,6 +132,8 @@ describe("recomputeProjectGates — bulk upsert (Task 6.5)", () => {
     for (const row of rows as any[]) {
       expect(row.project_id).toBe(PROJECT_ID);
       expect(GateCodes).toContain(row.gate_code);
+      expect(row).toHaveProperty("status");
+      expect(row).toHaveProperty("blocking_reason");
       const key = `${row.area_id}|${row.gate_code}`;
       expect(seen.has(key)).toBe(false);
       seen.add(key);
@@ -141,13 +151,19 @@ describe("recomputeProjectGates — bulk upsert (Task 6.5)", () => {
 
   // STICKY-PASSED guard: a cell manually marked passed (status='passed' +
   // actual_end_date set) is a human decision — recompute must never clobber
-  // its status/blocking_reason back to a rule-derived value, even though all
-  // cells now travel through one bulk upsert call. Stickiness is decided
-  // per-cell BEFORE the write (using the same stickyPassed set the old
-  // sequential loop read), so the row for a sticky cell omits status/
-  // blocking_reason from its upsert payload — Postgres upsert only touches
-  // columns present in the row, leaving the existing DB value untouched.
-  it("omits status/blocking_reason from the row for a sticky-passed cell, but still includes it for non-sticky cells in the SAME bulk upsert call", async () => {
+  // its status/blocking_reason back to a rule-derived value. Stickiness is
+  // decided per-cell BEFORE the write (using the same stickyPassed set the
+  // old sequential loop read), so the row for a sticky cell omits status/
+  // blocking_reason entirely.
+  //
+  // CRITICAL (this is the T6.5 bug this test guards against): sticky and
+  // non-sticky rows must NOT travel in the same upsert array, because
+  // real PostgREST serializes one array using the UNION of keys across all
+  // rows — a row missing a key a sibling row carries gets that column
+  // implicitly NULL'd, which violates the NOT NULL constraint on
+  // status/blocking_reason and aborts the ENTIRE upsert. So they must be
+  // split into two separate, internally homogeneous upsert calls.
+  it("splits sticky and non-sticky rows into two homogeneous upsert calls — sticky rows never carry status/blocking_reason, non-sticky rows always do", async () => {
     const supa = makeSupa({
       areaIds: ["area-1"],
       cardAreas: [{ card_id: "card-1", area_id: "area-1" }],
@@ -160,14 +176,26 @@ describe("recomputeProjectGates — bulk upsert (Task 6.5)", () => {
 
     const result = await recomputeProjectGates(supa, PROJECT_ID, PROJECT_CODE, { skipAuthCheck: true });
     expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.cellsUpdated).toBe(GateCodes.length);
 
-    expect(supa._mocks.upsertMock).toHaveBeenCalledTimes(1);
-    const [{ rows }] = supa._mocks.upsertCalls;
-    const rowList = rows as any[];
-    expect(rowList).toHaveLength(GateCodes.length);
+    // Exactly two upsert calls: one for non-sticky rows, one for sticky rows.
+    expect(supa._mocks.upsertMock).toHaveBeenCalledTimes(2);
+    const [firstCall, secondCall] = supa._mocks.upsertCalls;
+    expect(firstCall.options).toEqual({ onConflict: "project_id,area_id,gate_code" });
+    expect(secondCall.options).toEqual({ onConflict: "project_id,area_id,gate_code" });
 
-    const stickyRow = rowList.find((r) => r.gate_code === "B");
-    expect(stickyRow).toBeDefined();
+    const firstRows = firstCall.rows as any[];
+    const secondRows = secondCall.rows as any[];
+    expect(firstRows.length + secondRows.length).toBe(GateCodes.length);
+
+    // Identify which call is the sticky one (contains gate B) vs non-sticky.
+    const stickyCallRows = firstRows.some((r) => r.gate_code === "B") ? firstRows : secondRows;
+    const nonStickyCallRows = stickyCallRows === firstRows ? secondRows : firstRows;
+
+    expect(stickyCallRows).toHaveLength(1);
+    const stickyRow = stickyCallRows[0];
+    expect(stickyRow.gate_code).toBe("B");
     expect(stickyRow).not.toHaveProperty("status");
     expect(stickyRow).not.toHaveProperty("blocking_reason");
     // Recompute bookkeeping still refreshes even for sticky cells.
@@ -175,9 +203,49 @@ describe("recomputeProjectGates — bulk upsert (Task 6.5)", () => {
     expect(stickyRow.last_recomputed_at).toBeTypeOf("string");
     expect(stickyRow.stale).toBe(false);
 
-    // Non-sticky gates in the same call DO carry a derived status.
-    const nonStickyRow = rowList.find((r) => r.gate_code !== "B");
-    expect(nonStickyRow).toHaveProperty("status");
+    // No row in the sticky call is missing/mismatched keys vs its siblings
+    // (trivially true here with 1 row, but assert key-set homogeneity
+    // explicitly for when more sticky rows exist).
+    const stickyKeySets = stickyCallRows.map((r) => Object.keys(r).sort().join(","));
+    expect(new Set(stickyKeySets).size).toBe(1);
+
+    // Non-sticky gates land in the other call and ALWAYS carry status.
+    expect(nonStickyCallRows.length).toBe(GateCodes.length - 1);
+    for (const row of nonStickyCallRows) {
+      expect(row).toHaveProperty("status");
+      expect(row).toHaveProperty("blocking_reason");
+    }
+    const nonStickyKeySets = nonStickyCallRows.map((r) => Object.keys(r).sort().join(","));
+    expect(new Set(nonStickyKeySets).size).toBe(1);
+
+    // The two calls have DIFFERENT key sets from each other (that's the
+    // whole point of the split — homogeneity within each call, not across).
+    expect(stickyKeySets[0]).not.toBe(nonStickyKeySets[0]);
+  });
+
+  it("skips the sticky upsert call entirely when every cell in the project is sticky-passed (no empty-array call)", async () => {
+    const supa = makeSupa({
+      areaIds: ["area-1"],
+      cardAreas: [],
+      cardEvents: [],
+      // Mark ALL gate codes sticky for area-1 so the non-sticky bucket is empty.
+      stickyPassed: GateCodes.map((gate_code) => ({ area_id: "area-1", gate_code })),
+    });
+
+    const result = await recomputeProjectGates(supa, PROJECT_ID, PROJECT_CODE, { skipAuthCheck: true });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.cellsUpdated).toBe(GateCodes.length);
+
+    // Only the sticky bucket is non-empty → exactly one upsert call.
+    expect(supa._mocks.upsertMock).toHaveBeenCalledTimes(1);
+    const [{ rows }] = supa._mocks.upsertCalls;
+    const rowList = rows as any[];
+    expect(rowList).toHaveLength(GateCodes.length);
+    for (const row of rowList) {
+      expect(row).not.toHaveProperty("status");
+      expect(row).not.toHaveProperty("blocking_reason");
+    }
   });
 
   it("surfaces the upsert error without partial success bookkeeping", async () => {
