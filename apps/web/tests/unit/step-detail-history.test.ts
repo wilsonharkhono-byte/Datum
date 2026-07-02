@@ -67,6 +67,7 @@ function makeEvent(overrides: Partial<AreaStepEventRow> = {}): AreaStepEventRow 
     note: "tukang datang besok",
     percent_complete: null,
     occurred_at: "2026-06-20T10:00:00Z",
+    created_at: "2026-06-20T10:00:00Z",
     author_name: "Budi Santoso",
     source: "human",
     confidence: null,

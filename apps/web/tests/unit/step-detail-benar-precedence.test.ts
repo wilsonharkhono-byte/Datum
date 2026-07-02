@@ -26,9 +26,18 @@ function benarNote(
 }
 
 // --- Mirror of StepDetail.tsx's isUnconfirmedBlock (Task 3 confirm-gate hint) ---
-function isUnconfirmedBlock(events: Pick<AreaStepEventRow, "source" | "status" | "occurred_at">[]): boolean {
+// Ties on occurred_at are broken by created_at, mirroring `latest()` in lib/steps/status.ts.
+function isUnconfirmedBlock(
+  events: Pick<AreaStepEventRow, "source" | "status" | "occurred_at" | "created_at">[],
+): boolean {
   if (events.length === 0) return false;
-  const governing = [...events].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)).at(-1)!;
+  const governing = [...events]
+    .sort((a, b) =>
+      a.occurred_at === b.occurred_at
+        ? a.created_at.localeCompare(b.created_at)
+        : a.occurred_at.localeCompare(b.occurred_at),
+    )
+    .at(-1)!;
   return governing.source === "ai" && governing.status === "blocked";
 }
 
@@ -40,6 +49,7 @@ function makeEvent(overrides: Partial<AreaStepEventRow> = {}): AreaStepEventRow 
     note: "tukang datang besok",
     percent_complete: null,
     occurred_at: "2026-06-20T10:00:00Z",
+    created_at: "2026-06-20T10:00:00Z",
     author_name: "Budi Santoso",
     source: "human",
     confidence: null,
@@ -144,5 +154,45 @@ describe("isUnconfirmedBlock", () => {
 
   it("false for an empty events list", () => {
     expect(isUnconfirmedBlock([])).toBe(false);
+  });
+
+  it("on an occurred_at tie, breaks by created_at (human row inserted later wins, matching the server)", () => {
+    const events = [
+      makeEvent({
+        id: "e1",
+        source: "ai",
+        status: "blocked",
+        occurred_at: "2026-06-20T10:00:00Z",
+        created_at: "2026-06-20T10:00:00Z",
+      }),
+      makeEvent({
+        id: "e2",
+        source: "human",
+        status: "blocked",
+        occurred_at: "2026-06-20T10:00:00Z", // same occurred_at as the AI row
+        created_at: "2026-06-20T10:05:00Z", // inserted after -> governs the tie
+      }),
+    ];
+    expect(isUnconfirmedBlock(events)).toBe(false);
+  });
+
+  it("on an occurred_at tie where the AI row was inserted later, it governs (still unconfirmed)", () => {
+    const events = [
+      makeEvent({
+        id: "e1",
+        source: "human",
+        status: "in_progress",
+        occurred_at: "2026-06-20T10:00:00Z",
+        created_at: "2026-06-20T10:00:00Z",
+      }),
+      makeEvent({
+        id: "e2",
+        source: "ai",
+        status: "blocked",
+        occurred_at: "2026-06-20T10:00:00Z", // same occurred_at as the human row
+        created_at: "2026-06-20T10:05:00Z", // inserted after -> governs the tie
+      }),
+    ];
+    expect(isUnconfirmedBlock(events)).toBe(true);
   });
 });

@@ -19,6 +19,8 @@ export type AreaStepEventRow = {
   note: string | null;
   percent_complete: number | null;
   occurred_at: string;
+  /** Insert-order tiebreak for occurred_at ties — mirrors the server's `latest()` precedence in lib/steps/status.ts. */
+  created_at: string;
   author_name: string | null;
   /** 'human' | 'ai'. Defaults to 'human' when the column isn't selected (degrade path) or is null. */
   source: string;
@@ -171,6 +173,7 @@ export function mapAreaStepEventRow(r: RawAreaStepEventRow): AreaStepEventRow {
     note: r.note,
     percent_complete: r.percent_complete !== null ? Number(r.percent_complete) : null,
     occurred_at: r.occurred_at ?? r.created_at,
+    created_at: r.created_at,
     author_name: staffRow?.full_name ?? null,
     source: r.source ?? "human",
     confidence: r.confidence !== undefined && r.confidence !== null ? Number(r.confidence) : null,

@@ -319,7 +319,12 @@ export function buildUnconfirmedBlockIntents(
   recipients: string[],
 ): UnconfirmedBlockIntent[] {
   const message = `AI mendeteksi kemungkinan terblokir: ${ctx.stepName} (${ctx.areaName}) — buka untuk konfirmasi`;
-  const link = `/project/${ctx.projectCode}/rooms`;
+  // `notifications` has no area_step_id column (see 20260601000014_notifications.sql)
+  // and no follow-up migration adds one. Encode the area_step id into the `link`
+  // query string instead — it's the same mechanism the readiness cron's own
+  // dedup (`isAlreadyNotified` in the cron route) already keys on, so the fix
+  // stays consistent with the existing dedup contract without a migration.
+  const link = `/project/${ctx.projectCode}/rooms?areaStep=${ctx.areaStepId}`;
   return recipients.map((recipientStaffId) => ({
     recipientStaffId,
     kind: UNCONFIRMED_BLOCK_KIND,
@@ -393,16 +398,26 @@ export async function loadUnconfirmedBlockIntents(
  * this recipient+areaStep+cardEvent — no time window needed since
  * `card_event_id` is a stable dedup key unlike the readiness cron's
  * recompute-daily signals) then inserts. Best-effort: never throws.
+ *
+ * `notifications` carries no `area_step_id` column, so matching on
+ * `card_event_id` alone under-dedups: one card event can write blocked
+ * events for TWO different area_steps (e.g. a single note blocking two
+ * bathroom steps), and both intents share the same recipient + card_event_id
+ * + kind — the second notification would look like a dup of the first and
+ * get dropped. `link` carries the area_step id (see `buildUnconfirmedBlockIntents`),
+ * so matching on `link` too makes the dedup per (recipient, area_step,
+ * card_event) — mirroring `dedupeKey`'s intent without a schema change.
  */
 export async function isUnconfirmedBlockAlreadyNotified(
   admin: Supa,
-  intent: Pick<UnconfirmedBlockIntent, "recipientStaffId" | "areaStepId" | "cardEventId" | "kind">,
+  intent: Pick<UnconfirmedBlockIntent, "recipientStaffId" | "areaStepId" | "cardEventId" | "kind" | "link">,
 ): Promise<boolean> {
   const { data, error } = await admin
     .from("notifications")
     .select("id")
     .eq("recipient_staff_id", intent.recipientStaffId)
     .eq("card_event_id", intent.cardEventId)
+    .eq("link", intent.link)
     .eq("kind", intent.kind)
     .limit(1);
   if (error) {
@@ -435,7 +450,7 @@ export async function notifyUnconfirmedAiBlock(
         summary: intent.message,
         link: intent.link,
       });
-      if (error) console.warn("[unconfirmed-block] insert failed:", error.message);
+      if (error) console.warn(`[unconfirmed-block] insert failed for ${intent.dedupeKey}:`, error.message);
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

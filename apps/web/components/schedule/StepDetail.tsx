@@ -152,17 +152,26 @@ export function hasNewerAiEvent(events: Pick<AreaStepEventRow, "source" | "occur
 }
 
 /**
- * Pure: true when the step's *governing* event (the newest by occurred_at)
- * is an AI-sourced "blocked" — i.e. the confirm-gate in lib/steps/status.ts
+ * Pure: true when the step's *governing* event (the newest by occurred_at,
+ * ties broken by created_at — mirrors `latest()` in lib/steps/status.ts) is
+ * an AI-sourced "blocked" — i.e. the confirm-gate in lib/steps/status.ts
  * projected this step as in_progress-with-note instead of a real `blocked`,
  * and it's still awaiting a human "Benar"/"Koreksi". Once a human event lands
  * at/after it (e.g. via Benar), that human event becomes the governing one
  * (same occurred_at >= comparison the server's precedence uses) and this
  * returns false — matching the server projection.
  */
-export function isUnconfirmedBlock(events: Pick<AreaStepEventRow, "source" | "status" | "occurred_at">[]): boolean {
+export function isUnconfirmedBlock(
+  events: Pick<AreaStepEventRow, "source" | "status" | "occurred_at" | "created_at">[],
+): boolean {
   if (events.length === 0) return false;
-  const governing = [...events].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)).at(-1)!;
+  const governing = [...events]
+    .sort((a, b) =>
+      a.occurred_at === b.occurred_at
+        ? a.created_at.localeCompare(b.created_at)
+        : a.occurred_at.localeCompare(b.occurred_at),
+    )
+    .at(-1)!;
   return governing.source === "ai" && governing.status === "blocked";
 }
 
