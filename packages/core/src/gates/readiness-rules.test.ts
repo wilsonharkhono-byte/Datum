@@ -23,6 +23,10 @@ function mockEvent(
     draft_id: null,
     created_at: createdAt ?? occurredAt,
     search_text: null,
+    ai_step_status: "pending",
+    ai_step_error: null,
+    ai_step_attempts: 0,
+    ai_step_processed_at: null,
   };
 }
 
