@@ -152,6 +152,21 @@ export function hasNewerAiEvent(events: Pick<AreaStepEventRow, "source" | "occur
 }
 
 /**
+ * Pure: true when the step's *governing* event (the newest by occurred_at)
+ * is an AI-sourced "blocked" — i.e. the confirm-gate in lib/steps/status.ts
+ * projected this step as in_progress-with-note instead of a real `blocked`,
+ * and it's still awaiting a human "Benar"/"Koreksi". Once a human event lands
+ * at/after it (e.g. via Benar), that human event becomes the governing one
+ * (same occurred_at >= comparison the server's precedence uses) and this
+ * returns false — matching the server projection.
+ */
+export function isUnconfirmedBlock(events: Pick<AreaStepEventRow, "source" | "status" | "occurred_at">[]): boolean {
+  if (events.length === 0) return false;
+  const governing = [...events].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)).at(-1)!;
+  return governing.source === "ai" && governing.status === "blocked";
+}
+
+/**
  * Pure: the note to send when a human hits "Benar" on an AI history row.
  *
  * For a blocked AI row, the projection derives `blockingReason` from the latest
@@ -181,6 +196,7 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
   const statusButtonsRef = useRef<HTMLDivElement | null>(null);
 
   const overrideHint = hasNewerAiEvent(events, new Date().toISOString());
+  const unconfirmedBlock = isUnconfirmedBlock(events);
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>) {
     setError(null);
@@ -233,6 +249,14 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
         {step.planned_start ? <span>Rencana {step.planned_start} – {step.planned_end}</span> : null}
         {step.assigned_trade ? <span>· {step.assigned_trade}</span> : null}
       </div>
+
+      {unconfirmedBlock ? (
+        <p className="mb-2 -mt-1">
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+            Kemungkinan terblokir — belum dikonfirmasi
+          </span>
+        </p>
+      ) : null}
 
       <div ref={statusButtonsRef} className="mb-3 flex flex-wrap gap-1.5">
         {(["not_started", "in_progress", "blocked", "done"] as const).map((s) => (

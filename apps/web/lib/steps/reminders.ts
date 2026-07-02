@@ -256,3 +256,189 @@ export async function buildReadinessReminders(
 
   return { intents, projectsScanned: projects.length, signalsFound };
 }
+
+// ─── Unconfirmed AI block notification (confirm-gate, Task 3) ────────────────
+
+/**
+ * A hallucinated AI "blocked" must never page the principal on its own — the
+ * projection layer (`projectStepStatus` in status.ts) already keeps it from
+ * escalating into `blocking_timeline`. But the *possible* block still needs
+ * to be loudly visible so a human confirms (or corrects) it quickly. This
+ * builds the notification intent(s) for that: reuses the same trade-role
+ * recipient resolution as readiness reminders, plus the card's watchers
+ * (`card_members`) since the AI event originated from a card note/photo/etc.
+ */
+
+/** Reuses the readiness-reminder kind — it's the one purpose-built for
+ * "review this and act" notifications and already renders on both web and
+ * mobile inboxes (falls back to the raw kind string if unlabeled, same as
+ * every other kind). A dedicated kind isn't worth a migration for this. */
+export const UNCONFIRMED_BLOCK_KIND = READINESS_REMINDER_KIND;
+
+export type UnconfirmedBlockContext = {
+  areaStepId: string;
+  cardEventId: string;
+  projectId: string;
+  projectCode: string;
+  stepName: string;
+  stepTradeRole: string | null;
+  areaName: string;
+};
+
+export type UnconfirmedBlockIntent = {
+  recipientStaffId: string;
+  kind: typeof UNCONFIRMED_BLOCK_KIND;
+  message: string;
+  link: string;
+  projectId: string;
+  cardEventId: string;
+  areaStepId: string;
+  /** Deterministic dedup key: one notification per (recipient, area_step, card_event). */
+  dedupeKey: string;
+};
+
+/**
+ * Pure: union of trade-role recipients (same resolution as readiness
+ * reminders) and the card's watcher staff ids, deduped. No escalation ladder
+ * here — this already fires only for a specific possible block, not a
+ * severity-scored signal, so the base set is the whole point.
+ */
+export function resolveUnconfirmedBlockRecipients(
+  tradeRole: string | null,
+  members: ProjectMember[],
+  project: Pick<ActiveProject, "principal_id" | "pic_id">,
+  cardWatcherIds: string[],
+): string[] {
+  const base = resolveRecipients(tradeRole, members, project);
+  return [...new Set([...base, ...cardWatcherIds])];
+}
+
+/** Pure: builds one intent per recipient for a possible AI block awaiting confirmation. */
+export function buildUnconfirmedBlockIntents(
+  ctx: UnconfirmedBlockContext,
+  recipients: string[],
+): UnconfirmedBlockIntent[] {
+  const message = `AI mendeteksi kemungkinan terblokir: ${ctx.stepName} (${ctx.areaName}) — buka untuk konfirmasi`;
+  const link = `/project/${ctx.projectCode}/rooms`;
+  return recipients.map((recipientStaffId) => ({
+    recipientStaffId,
+    kind: UNCONFIRMED_BLOCK_KIND,
+    message,
+    link,
+    projectId: ctx.projectId,
+    cardEventId: ctx.cardEventId,
+    areaStepId: ctx.areaStepId,
+    dedupeKey: [recipientStaffId, ctx.areaStepId, ctx.cardEventId].join("|"),
+  }));
+}
+
+/**
+ * Loads the context an unconfirmed AI block notification needs (step name +
+ * trade role, area name, project code, card watchers) and returns
+ * ready-to-insert intents. Pure DB reads only — no writes, no dedup check
+ * (that's the caller's job, mirroring the cron's `isAlreadyNotified` split
+ * of concerns) so this stays easy to unit test.
+ *
+ * Returns `[]` (best-effort) if the area_step/card_event can't be resolved —
+ * this must never throw and block the inference write that triggered it.
+ */
+export async function loadUnconfirmedBlockIntents(
+  admin: Supa,
+  args: { areaStepId: string; cardEventId: string; projectId: string },
+): Promise<UnconfirmedBlockIntent[]> {
+  const [stepRes, cardEventRes, projectRes] = await Promise.all([
+    admin
+      .from("area_steps")
+      .select("area_id, trade_steps:step_code (name, trade_role), areas:area_id (area_name)")
+      .eq("id", args.areaStepId)
+      .maybeSingle(),
+    admin.from("card_events").select("card_id").eq("id", args.cardEventId).maybeSingle(),
+    admin.from("projects").select("id, project_code, project_name, principal_id, pic_id").eq("id", args.projectId).maybeSingle(),
+  ]);
+
+  const step = stepRes.data as {
+    area_id: string;
+    trade_steps: { name: string; trade_role: string | null } | null;
+    areas: { area_name: string } | null;
+  } | null;
+  const project = projectRes.data as ActiveProject | null;
+  const cardId = (cardEventRes.data as { card_id: string } | null)?.card_id ?? null;
+
+  if (!step || !project) return [];
+
+  const [members, watchers] = await Promise.all([
+    getProjectMembers(admin, args.projectId),
+    cardId
+      ? admin.from("card_members").select("staff_id").eq("card_id", cardId).is("removed_at", null)
+      : Promise.resolve({ data: [] as { staff_id: string }[] }),
+  ]);
+  const cardWatcherIds = ((watchers as { data: { staff_id: string }[] | null }).data ?? []).map((w) => w.staff_id);
+
+  const ctx: UnconfirmedBlockContext = {
+    areaStepId: args.areaStepId,
+    cardEventId: args.cardEventId,
+    projectId: args.projectId,
+    projectCode: project.project_code,
+    stepName: step.trade_steps?.name ?? args.areaStepId,
+    stepTradeRole: step.trade_steps?.trade_role ?? null,
+    areaName: step.areas?.area_name ?? step.area_id,
+  };
+
+  const recipients = resolveUnconfirmedBlockRecipients(ctx.stepTradeRole, members, project, cardWatcherIds);
+  return buildUnconfirmedBlockIntents(ctx, recipients);
+}
+
+/**
+ * Checks dedup (skip if an unread matching notification already exists for
+ * this recipient+areaStep+cardEvent — no time window needed since
+ * `card_event_id` is a stable dedup key unlike the readiness cron's
+ * recompute-daily signals) then inserts. Best-effort: never throws.
+ */
+export async function isUnconfirmedBlockAlreadyNotified(
+  admin: Supa,
+  intent: Pick<UnconfirmedBlockIntent, "recipientStaffId" | "areaStepId" | "cardEventId" | "kind">,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("notifications")
+    .select("id")
+    .eq("recipient_staff_id", intent.recipientStaffId)
+    .eq("card_event_id", intent.cardEventId)
+    .eq("kind", intent.kind)
+    .limit(1);
+  if (error) {
+    console.warn("[unconfirmed-block] dedup check failed:", error.message);
+    return true; // err on the side of not duplicating
+  }
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Full pipeline: load context, resolve recipients, dedup, and write
+ * `notifications` rows for a possible AI block awaiting human confirmation.
+ * Best-effort — swallows errors so it never blocks the inference write that
+ * triggered it (same contract as the other notification producers).
+ */
+export async function notifyUnconfirmedAiBlock(
+  admin: Supa,
+  args: { areaStepId: string; cardEventId: string; projectId: string },
+): Promise<void> {
+  try {
+    const intents = await loadUnconfirmedBlockIntents(admin, args);
+    for (const intent of intents) {
+      const already = await isUnconfirmedBlockAlreadyNotified(admin, intent);
+      if (already) continue;
+      const { error } = await admin.from("notifications").insert({
+        recipient_staff_id: intent.recipientStaffId,
+        kind: intent.kind,
+        project_id: intent.projectId,
+        card_event_id: intent.cardEventId,
+        summary: intent.message,
+        link: intent.link,
+      });
+      if (error) console.warn("[unconfirmed-block] insert failed:", error.message);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[unconfirmed-block] notify failed:", msg);
+  }
+}

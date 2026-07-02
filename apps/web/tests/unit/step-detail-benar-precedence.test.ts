@@ -25,6 +25,13 @@ function benarNote(
   return "Dikonfirmasi";
 }
 
+// --- Mirror of StepDetail.tsx's isUnconfirmedBlock (Task 3 confirm-gate hint) ---
+function isUnconfirmedBlock(events: Pick<AreaStepEventRow, "source" | "status" | "occurred_at">[]): boolean {
+  if (events.length === 0) return false;
+  const governing = [...events].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)).at(-1)!;
+  return governing.source === "ai" && governing.status === "blocked";
+}
+
 function makeEvent(overrides: Partial<AreaStepEventRow> = {}): AreaStepEventRow {
   return {
     id: "ev1",
@@ -105,5 +112,37 @@ describe("benarNote", () => {
   it("non-blocked row with a null note: still 'Dikonfirmasi'", () => {
     const ev = makeEvent({ status: "done", note: null });
     expect(benarNote(ev, null)).toBe("Dikonfirmasi");
+  });
+});
+
+describe("isUnconfirmedBlock", () => {
+  it("true when the newest event is AI-sourced and blocked", () => {
+    const events = [
+      makeEvent({ id: "e1", source: "human", status: "in_progress", occurred_at: "2026-06-20T09:00:00Z" }),
+      makeEvent({ id: "e2", source: "ai", status: "blocked", occurred_at: "2026-06-20T10:00:00Z" }),
+    ];
+    expect(isUnconfirmedBlock(events)).toBe(true);
+  });
+
+  it("false once a human event lands at/after the AI-blocked one (Benar confirms it)", () => {
+    const events = [
+      makeEvent({ id: "e1", source: "ai", status: "blocked", occurred_at: "2026-06-20T10:00:00Z" }),
+      makeEvent({ id: "e2", source: "human", status: "blocked", occurred_at: "2026-06-20T11:00:00Z" }),
+    ];
+    expect(isUnconfirmedBlock(events)).toBe(false);
+  });
+
+  it("false when the newest event is human-blocked directly (unchanged real block)", () => {
+    const events = [makeEvent({ source: "human", status: "blocked", occurred_at: "2026-06-20T10:00:00Z" })];
+    expect(isUnconfirmedBlock(events)).toBe(false);
+  });
+
+  it("false when the newest AI event is not 'blocked' (e.g. done)", () => {
+    const events = [makeEvent({ source: "ai", status: "done", occurred_at: "2026-06-20T10:00:00Z" })];
+    expect(isUnconfirmedBlock(events)).toBe(false);
+  });
+
+  it("false for an empty events list", () => {
+    expect(isUnconfirmedBlock([])).toBe(false);
   });
 });

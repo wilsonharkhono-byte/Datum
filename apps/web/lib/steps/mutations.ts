@@ -4,6 +4,7 @@ import { backScheduleSteps } from "@/lib/steps/back-schedule";
 import { projectStepStatus } from "@/lib/steps/status";
 import type { TradeStepDep, TradeStepTemplate } from "@/lib/steps/types";
 import type { SelectedMatch } from "@/lib/steps/infer";
+import { notifyUnconfirmedAiBlock } from "@/lib/steps/reminders";
 
 /** Call the SQL instantiation function for an area (idempotent). */
 export async function instantiateAreaSteps(
@@ -195,6 +196,14 @@ export async function restoreAreaStep(
  * Write AI-inferred step events for one card event, then re-project each step.
  * Idempotent via the (card_event_id, area_step_id) unique index on source='ai'
  * — a duplicate insert errors with code 23505, which we swallow.
+ *
+ * Confirm-gate (Task 3): an AI-authored `blocked` match does NOT escalate on
+ * its own (see `projectStepStatus`'s blocked branch — it projects
+ * in_progress + unconfirmedBlock until a human confirms). But the possible
+ * block must still be loudly visible, so writing one here also fires a
+ * best-effort notification to the step's trade-role recipients + the card's
+ * watchers. Non-blocked AI statuses (done/in_progress) are low-risk and keep
+ * flowing without any extra notification (YAGNI per the brief).
  */
 export async function applyStepInference(
   supabase: SupabaseClient<Database>,
@@ -218,5 +227,13 @@ export async function applyStepInference(
       throw error;
     }
     await projectAreaStep(supabase, m.area_step_id);
+
+    if (m.status === "blocked") {
+      await notifyUnconfirmedAiBlock(supabase, {
+        areaStepId: m.area_step_id,
+        cardEventId: args.cardEventId,
+        projectId: args.projectId,
+      });
+    }
   }
 }

@@ -88,3 +88,63 @@ describe("projectStepStatus precedence (newest-information-wins)", () => {
     expect(r.status).toBe("in_progress");
   });
 });
+
+describe("projectStepStatus confirm-gate (AI 'blocked' does not escalate unconfirmed)", () => {
+  it("AI-blocked-latest: projects in_progress with unconfirmedBlock true, reason preserved", () => {
+    const r = projectStepStatus({
+      workEvents: [
+        ev("2026-06-01T00:00:00Z", "blocked", "ai"),
+      ],
+      checkpoints: [],
+      punchItems: [],
+    });
+    expect(r.status).toBe("in_progress");
+    expect(r.unconfirmedBlock).toBe(true);
+    expect(r.blockingReason).toBe("Terblokir");
+  });
+
+  it("AI-blocked then human Benar-blocked at/after it: real blocked, confirmed", () => {
+    const r = projectStepStatus({
+      workEvents: [
+        ev("2026-06-01T00:00:00Z", "blocked", "ai"),
+        ev("2026-06-02T00:00:00Z", "blocked", "human"),
+      ],
+      checkpoints: [],
+      punchItems: [],
+    });
+    expect(r.status).toBe("blocked");
+    expect(r.unconfirmedBlock).toBe(false);
+  });
+
+  it("human-blocked directly (no AI involved): blocked, confirmed (unchanged)", () => {
+    const r = projectStepStatus({
+      workEvents: [
+        ev("2026-06-01T00:00:00Z", "blocked", "human"),
+      ],
+      checkpoints: [],
+      punchItems: [],
+    });
+    expect(r.status).toBe("blocked");
+    expect(r.unconfirmedBlock).toBe(false);
+  });
+
+  it("non-blocked AI statuses (e.g. done) are unaffected by the confirm-gate", () => {
+    const r = projectStepStatus({
+      workEvents: [ev("2026-06-01T00:00:00Z", "done", "ai")],
+      checkpoints: [],
+      punchItems: [],
+    });
+    expect(r.status).toBe("accepted");
+    expect(r.unconfirmedBlock).toBe(false);
+  });
+
+  it("missing-source blocked event (back-compat) is treated as human: blocked, confirmed", () => {
+    const r = projectStepStatus({
+      workEvents: [ev("2026-06-01T00:00:00Z", "blocked")],
+      checkpoints: [],
+      punchItems: [],
+    });
+    expect(r.status).toBe("blocked");
+    expect(r.unconfirmedBlock).toBe(false);
+  });
+});

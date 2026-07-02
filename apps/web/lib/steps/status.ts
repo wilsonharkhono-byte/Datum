@@ -17,6 +17,16 @@ export type StepStatusResult = {
   blockingReason: string | null;
   actualStart: string | null;
   actualEnd: string | null;
+  /**
+   * True when the governing "blocked" signal came from an AI event with no
+   * human confirmation (yet) at/after it. A hallucinated AI "blocked" must
+   * never page the principal on its own — `status` is projected as
+   * `in_progress` (so it doesn't feed blocking_timeline/escalation) while
+   * this flag keeps the possible block visible for a human to confirm
+   * (e.g. via "Benar" on the AI row, which writes a human blocked event and
+   * flips this back to a real `blocked`). Always false on every other branch.
+   */
+  unconfirmedBlock: boolean;
 };
 
 /**
@@ -65,19 +75,38 @@ export function projectStepStatus(input: StepStatusInput): StepStatusResult {
   const workEvents = applyPrecedence(input.workEvents);
   const last = latest(workEvents);
   if (!last) {
-    return { status: "not_started", lastProgressAt: null, blockingReason: null, actualStart: null, actualEnd: null };
+    return { status: "not_started", lastProgressAt: null, blockingReason: null, actualStart: null, actualEnd: null, unconfirmedBlock: false };
   }
 
   const lastProgressAt = last.occurred_at;
   const actualStart = earliestStart(workEvents);
 
   if (last.payload?.status === "blocked") {
+    const blockingReason = last.payload.blocked_on ?? last.payload.description ?? "Terblokir";
+    // Confirm-gate: an AI-sourced "blocked" must not escalate on its own. By
+    // the time we get here `applyPrecedence` has already dropped any AI event
+    // older than the newest human event and let a same-or-newer human event
+    // win `latest()` outright — so if `last` is still AI-sourced, no human
+    // event (blocked or otherwise) exists at/after it. Project in_progress
+    // (won't feed blocking_timeline) but keep the reason + a flag so the UI
+    // can surface "possible block, unconfirmed" prominently.
+    if ((last.source ?? "human") === "ai") {
+      return {
+        status: "in_progress",
+        lastProgressAt,
+        blockingReason,
+        actualStart,
+        actualEnd: null,
+        unconfirmedBlock: true,
+      };
+    }
     return {
       status: "blocked",
       lastProgressAt,
-      blockingReason: last.payload.blocked_on ?? last.payload.description ?? "Terblokir",
+      blockingReason,
       actualStart,
       actualEnd: null,
+      unconfirmedBlock: false,
     };
   }
 
@@ -89,8 +118,8 @@ export function projectStepStatus(input: StepStatusInput): StepStatusResult {
       .filter((c) => c.required)
       .every((c) => c.result === "pass");
     const status = !hasOpenSeriousPunch && allRequiredPassed ? "accepted" : "done_with_defects";
-    return { status, lastProgressAt, blockingReason: null, actualStart, actualEnd: lastProgressAt };
+    return { status, lastProgressAt, blockingReason: null, actualStart, actualEnd: lastProgressAt, unconfirmedBlock: false };
   }
 
-  return { status: "in_progress", lastProgressAt, blockingReason: null, actualStart, actualEnd: null };
+  return { status: "in_progress", lastProgressAt, blockingReason: null, actualStart, actualEnd: null, unconfirmedBlock: false };
 }

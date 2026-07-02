@@ -27,6 +27,20 @@ describe("projectStepStatus", () => {
     ] }));
     expect(r.status).toBe("blocked");
     expect(r.blockingReason).toBe("marmer belum datang");
+    expect(r.unconfirmedBlock).toBe(false);
+  });
+
+  it("unconfirmedBlock defaults to false on every non-blocked-gate branch", () => {
+    expect(projectStepStatus(input()).unconfirmedBlock).toBe(false);
+    expect(
+      projectStepStatus(input({ workEvents: [ev("in_progress", "2026-07-02T00:00:00Z")] })).unconfirmedBlock,
+    ).toBe(false);
+    expect(
+      projectStepStatus(input({
+        workEvents: [ev("done", "2026-07-05T00:00:00Z")],
+        checkpoints: [{ required: true, result: "pass" }],
+      })).unconfirmedBlock,
+    ).toBe(false);
   });
 
   it("done_with_defects when work is done but a kritis/mayor punch is open", () => {
