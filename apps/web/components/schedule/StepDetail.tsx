@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitStepUpdate, submitCheckpointResult, removeStep } from "@/lib/steps/actions";
@@ -25,6 +26,24 @@ function formatEventTime(isoString: string): string {
   return new Date(isoString).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 }
 
+/** Pure: "Asisten AI" for AI-authored events with no human author; otherwise the human's name (may be null). */
+export function eventAuthorLabel(ev: Pick<AreaStepEventRow, "source" | "author_name">): string | null {
+  if (ev.source === "ai") return ev.author_name ?? "Asisten AI";
+  return ev.author_name;
+}
+
+/** Pure: confidence 0–1 → fixed 2-decimal display string (e.g. 0.947 -> "0.95"), null when absent. */
+export function confidenceLabel(confidence: number | null): string | null {
+  if (confidence === null) return null;
+  return confidence.toFixed(2);
+}
+
+/** Pure: href for "dari kartu →", null when there's no resolvable card link. */
+export function cardLinkHref(cardLink: AreaStepEventRow["card_link"]): string | null {
+  if (!cardLink) return null;
+  return `/project/${cardLink.projectCode}/cards/${cardLink.cardSlug}`;
+}
+
 function StepHistory({ events }: { events: AreaStepEventRow[] }) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? events : events.slice(0, HISTORY_PREVIEW);
@@ -42,20 +61,37 @@ function StepHistory({ events }: { events: AreaStepEventRow[] }) {
           <ol className="flex flex-col gap-2">
             {shown.map((ev) => {
               const chip = EVENT_CHIP[ev.status] ?? EVENT_CHIP.not_started!;
+              const isAi = ev.source === "ai";
+              const author = eventAuthorLabel(ev);
+              const confidence = confidenceLabel(ev.confidence);
+              const href = cardLinkHref(ev.card_link);
               return (
                 <li key={ev.id} className="flex flex-col gap-0.5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${chip.cls}`}>
                       {chip.label}
                     </span>
+                    {isAi ? (
+                      <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800">
+                        AI
+                      </span>
+                    ) : null}
                     {ev.percent_complete !== null ? (
                       <span className="text-[10px] text-[var(--text-muted)]">{ev.percent_complete}%</span>
                     ) : null}
                     <span className="text-[10px] text-[var(--text-muted)]">
                       {formatEventTime(ev.occurred_at)}
                     </span>
-                    {ev.author_name ? (
-                      <span className="text-[10px] text-[var(--text-muted)]">· {ev.author_name}</span>
+                    {author ? (
+                      <span className="text-[10px] text-[var(--text-muted)]">· {author}</span>
+                    ) : null}
+                    {confidence ? (
+                      <span className="text-[10px] text-[var(--text-muted)]">· {confidence}</span>
+                    ) : null}
+                    {href ? (
+                      <Link href={href} className="text-[10px] text-[var(--sand-dark)] underline hover:text-[var(--foreground)]">
+                        dari kartu →
+                      </Link>
                     ) : null}
                   </div>
                   {ev.note ? (

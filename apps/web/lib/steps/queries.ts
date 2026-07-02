@@ -6,6 +6,12 @@ import { computeStepSignals } from "@/lib/steps/signals";
 import type { StepSignal } from "@/lib/steps/signals";
 import { gateShortName } from "@datum/core";
 
+/** Where to send "dari kartu →" — the card that produced an AI-authored step event. */
+export type StepEventCardLink = {
+  projectCode: string;
+  cardSlug: string;
+};
+
 export type AreaStepEventRow = {
   id: string;
   area_step_id: string;
@@ -14,6 +20,13 @@ export type AreaStepEventRow = {
   percent_complete: number | null;
   occurred_at: string;
   author_name: string | null;
+  /** 'human' | 'ai'. Defaults to 'human' when the column isn't selected (degrade path) or is null. */
+  source: string;
+  /** AI confidence 0–1, null for human events or when unavailable. */
+  confidence: number | null;
+  card_event_id: string | null;
+  /** Resolved href target for "dari kartu →"; null when not an AI event or the join is unavailable. */
+  card_link: StepEventCardLink | null;
 };
 
 export type AreaStepCheckpoint = {
@@ -111,8 +124,76 @@ export async function getAreaSteps(
     .map(({ _sort, _created, ...rest }) => rest as AreaStepRow);
 }
 
+/** True when a Supabase/PostgREST error is caused by a column not existing yet (pre-migration prod). */
+export function isMissingColumnError(
+  error: { code?: string | null; message?: string | null } | null,
+): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true; // Postgres: undefined_column
+  const msg = (error.message ?? "").toLowerCase();
+  return msg.includes("column") && msg.includes("does not exist");
+}
+
+/** Raw shape returned by the attribution-extended select (source/confidence/card_event_id + card link join). */
+type RawAreaStepEventRow = {
+  id: string;
+  area_step_id: string;
+  status: string;
+  note: string | null;
+  percent_complete: number | null;
+  occurred_at: string | null;
+  created_at: string;
+  staff: { full_name: string } | null;
+  source?: string | null;
+  confidence?: number | null;
+  card_event_id?: string | null;
+  card_events?: {
+    card_id: string;
+    cards: {
+      slug: string;
+      projects: { project_code: string } | null;
+    } | null;
+  } | null;
+};
+
+/** Pure: one area_step_events row (+ optional attribution/card-link joins) → AreaStepEventRow. */
+export function mapAreaStepEventRow(r: RawAreaStepEventRow): AreaStepEventRow {
+  const staffRow = r.staff as { full_name: string } | null;
+  const cardRow = r.card_events?.cards ?? null;
+  const projectCode = cardRow?.projects?.project_code ?? null;
+  const cardLink: StepEventCardLink | null =
+    cardRow && projectCode ? { projectCode, cardSlug: cardRow.slug } : null;
+
+  return {
+    id: r.id,
+    area_step_id: r.area_step_id,
+    status: r.status,
+    note: r.note,
+    percent_complete: r.percent_complete !== null ? Number(r.percent_complete) : null,
+    occurred_at: r.occurred_at ?? r.created_at,
+    author_name: staffRow?.full_name ?? null,
+    source: r.source ?? "human",
+    confidence: r.confidence !== undefined && r.confidence !== null ? Number(r.confidence) : null,
+    card_event_id: r.card_event_id ?? null,
+    card_link: cardLink,
+  };
+}
+
+const AREA_STEP_EVENTS_BASE_SELECT =
+  "id, area_step_id, status, note, percent_complete, occurred_at, created_at, staff:logged_by_staff_id (full_name)";
+
+const AREA_STEP_EVENTS_ATTRIBUTION_SELECT =
+  `${AREA_STEP_EVENTS_BASE_SELECT}, source, confidence, card_event_id, ` +
+  "card_events:card_event_id (card_id, cards:card_id (slug, projects:project_id (project_code)))";
+
 /**
- * Fetch all events for an area's steps in one query (one round-trip), joined to staff.full_name.
+ * Fetch all events for an area's steps in one query (one round-trip), joined to staff.full_name
+ * plus AI attribution (source/confidence) and, for AI events, the originating card's link
+ * (card_event_id -> card_events -> cards -> projects, all in the same round-trip).
+ *
+ * Degrades to the pre-attribution select if the attribution columns don't exist yet in prod
+ * (before `supabase db push` lands the 2026-06-28 migration): attribution fields fall back to
+ * source='human'/confidence=null/card_link=null so the page still renders, just without badges.
  * Returns a map keyed by area_step_id for O(1) lookup in the render path.
  * Ordered newest-first within each step.
  */
@@ -122,28 +203,32 @@ export async function getAreaStepEvents(
 ): Promise<Map<string, AreaStepEventRow[]>> {
   if (stepIds.length === 0) return new Map();
 
-  const { data, error } = await supabase
+  const attribution = await supabase
     .from("area_step_events")
-    .select("id, area_step_id, status, note, percent_complete, occurred_at, created_at, staff:logged_by_staff_id (full_name)")
+    .select(AREA_STEP_EVENTS_ATTRIBUTION_SELECT)
     .in("area_step_id", stepIds)
     .order("occurred_at", { ascending: false });
+
+  let data: unknown[] | null = attribution.data as unknown[] | null;
+  let error = attribution.error;
+
+  if (error && isMissingColumnError(error)) {
+    const fallback = await supabase
+      .from("area_step_events")
+      .select(AREA_STEP_EVENTS_BASE_SELECT)
+      .in("area_step_id", stepIds)
+      .order("occurred_at", { ascending: false });
+    data = fallback.data as unknown[] | null;
+    error = fallback.error;
+  }
   if (error) throw error;
 
   const map = new Map<string, AreaStepEventRow[]>();
   for (const r of data ?? []) {
-    const staffRow = r.staff as { full_name: string } | null;
-    const row: AreaStepEventRow = {
-      id: r.id,
-      area_step_id: r.area_step_id,
-      status: r.status,
-      note: r.note,
-      percent_complete: r.percent_complete !== null ? Number(r.percent_complete) : null,
-      occurred_at: r.occurred_at ?? r.created_at,
-      author_name: staffRow?.full_name ?? null,
-    };
-    const bucket = map.get(r.area_step_id) ?? [];
+    const row = mapAreaStepEventRow(r as unknown as RawAreaStepEventRow);
+    const bucket = map.get(row.area_step_id) ?? [];
     bucket.push(row);
-    map.set(r.area_step_id, bucket);
+    map.set(row.area_step_id, bucket);
   }
   return map;
 }
