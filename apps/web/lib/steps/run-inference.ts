@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 import { getCandidateStepsForCard, inferCardEventSteps } from "@/lib/steps/infer-runner";
 import { applyStepInference } from "@/lib/steps/mutations";
-import { selectApplicableMatches, summarizeWorkEvent } from "@/lib/steps/infer";
+import { selectApplicableMatches, summarizeEventText } from "@/lib/steps/infer";
 import { isMissingFunctionError } from "@/lib/cron/auth";
 
 const MIN_CONFIDENCE = 0.6;
@@ -60,9 +60,24 @@ export async function processPendingStepInference(
         .single();
       const { verdict } = await inferCardEventSteps({
         cardTitle: card?.title ?? "",
-        eventText: summarizeWorkEvent(ev.payload),
+        eventText: summarizeEventText(ev.event_kind, ev.payload),
         candidates,
       });
+
+      if (!verdict.is_progress) {
+        const { error: writeErr } = await supabase
+          .from("card_events")
+          .update({
+            ai_step_status: "skipped",
+            ai_step_error: "not_progress",
+            ai_step_processed_at: now(),
+          })
+          .eq("id", ev.id);
+        if (writeErr) throw writeErr;
+        skipped++;
+        continue;
+      }
+
       const selected = selectApplicableMatches(verdict, candidates, MIN_CONFIDENCE);
       await applyStepInference(supabase, {
         cardEventId: ev.id,

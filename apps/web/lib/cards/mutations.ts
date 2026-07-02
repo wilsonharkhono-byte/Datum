@@ -46,6 +46,7 @@ import {
 import { sendExpoPush } from "@/lib/notifications/push-send";
 import { recomputeProjectGates } from "@/lib/gates/recompute";
 import { processPendingStepInference } from "@/lib/steps/run-inference";
+import { INFERABLE_KINDS } from "@/lib/steps/infer";
 import * as Sentry from "@sentry/nextjs";
 
 // Union of RELEVANT_KINDS in lib/gates/readiness-rules.ts — the kinds that can
@@ -236,7 +237,7 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
     }
   }
 
-  if (input.eventKind === "work") {
+  if (INFERABLE_KINDS.has(input.eventKind)) {
     after(() =>
       processPendingStepInference(createSupabaseAdminClient(), 5).catch((e) => {
         Sentry.captureException(e, { extra: { where: "createCardEvent.after" } });
@@ -875,7 +876,7 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
     }
   }
 
-  if (result.eventKind === "work") {
+  if (INFERABLE_KINDS.has(result.eventKind)) {
     after(() =>
       processPendingStepInference(createSupabaseAdminClient(), 5).catch((e) => {
         Sentry.captureException(e, { extra: { where: "approveCardEventDraft.after" } });
