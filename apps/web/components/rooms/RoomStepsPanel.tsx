@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { StepDetail } from "@/components/schedule/StepDetail";
 import { AddStepForm } from "@/components/schedule/AddStepForm";
 import { restoreStep } from "@/lib/steps/actions";
-import type { getRoomStepView } from "@/lib/steps/queries";
+import type { getRoomStepView, AreaStepEventRow } from "@/lib/steps/queries";
 
 type View = Awaited<ReturnType<typeof getRoomStepView>>;
+type StepEvents = Map<string, AreaStepEventRow[]>;
 const CHIP: Record<string, { label: string; cls: string }> = {
   not_started: { label: "Belum mulai", cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" },
   in_progress: { label: "Berjalan", cls: "bg-blue-100 text-blue-800" },
@@ -17,7 +18,7 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   done_with_defects: { label: "Selesai (ada defect)", cls: "bg-amber-100 text-amber-800" },
 };
 
-export function RoomStepsPanel({ areaId, view }: { areaId: string; view: View }) {
+export function RoomStepsPanel({ areaId, view, stepEvents }: { areaId: string; view: View; stepEvents?: StepEvents }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showAll, setShowAll] = useState(false);
@@ -43,7 +44,7 @@ export function RoomStepsPanel({ areaId, view }: { areaId: string; view: View })
           {view.flags.readyToStart === s.step_code ? <span className="text-[10px] text-[var(--sand-dark)]">siap</span> : null}
           <span className="text-[var(--text-muted)]">{isOpen ? "▾" : "▸"}</span>
         </button>
-        {isOpen ? <StepDetail step={s} /> : null}
+        {isOpen ? <StepDetail step={s} events={stepEvents?.get(s.id)} /> : null}
       </div>
     );
   }

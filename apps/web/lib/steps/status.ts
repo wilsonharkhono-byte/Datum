@@ -19,10 +19,25 @@ export type StepStatusResult = {
   actualEnd: string | null;
 };
 
-/** Human events outrank AI: if any human event exists, AI events are ignored. */
-function applyPrecedence<T extends { source?: "human" | "ai" }>(events: T[]): T[] {
-  const hasHuman = events.some((e) => (e.source ?? "human") === "human");
-  return hasHuman ? events.filter((e) => (e.source ?? "human") === "human") : events;
+/**
+ * Newest-information-wins precedence: an AI event is ignored iff a human event
+ * with occurred_at >= that AI event's occurred_at exists on the step (human
+ * wins ties). This lets AI updates count again once they're newer than the
+ * last human statement, instead of being silenced forever by one old human tap.
+ * Back-compat: an event with no `source` is treated as human.
+ */
+function applyPrecedence<T extends { source?: "human" | "ai"; occurred_at: string }>(events: T[]): T[] {
+  const humanTimes = events
+    .filter((e) => (e.source ?? "human") === "human")
+    .map((e) => e.occurred_at)
+    .sort((a, b) => b.localeCompare(a)); // descending
+  const newestHuman = humanTimes[0] ?? null;
+  if (newestHuman === null) return events;
+
+  return events.filter((e) => {
+    if ((e.source ?? "human") === "human") return true;
+    return e.occurred_at > newestHuman; // AI counts only if strictly newer than newest human
+  });
 }
 
 function latest<T extends { occurred_at: string; created_at: string }>(events: T[]): T | null {

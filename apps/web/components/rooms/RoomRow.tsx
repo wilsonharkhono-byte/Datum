@@ -7,9 +7,10 @@ import { relativeTimeId } from "@/lib/rooms/derive";
 import { StageChip } from "./StageChip";
 import { RoomStepsPanel } from "./RoomStepsPanel";
 import { RoomAssistantButton } from "./RoomAssistantButton";
-import type { getRoomStepView } from "@/lib/steps/queries";
+import type { getRoomStepView, AreaStepEventRow } from "@/lib/steps/queries";
 
 type StepView = Awaited<ReturnType<typeof getRoomStepView>>;
+type StepEvents = Map<string, AreaStepEventRow[]>;
 
 const ACTION_TONE: Record<Room["action"]["tone"], string> = {
   urgent: "text-[#C62828]",
@@ -32,11 +33,13 @@ export function RoomRow({
   projectCode,
   now,
   stepView,
+  stepEvents,
 }: {
   room: Room;
   projectCode: string;
   now: number;
   stepView?: StepView;
+  stepEvents?: StepEvents;
 }) {
   const [expanded, setExpanded] = useState(false);
   const rel = relativeTimeId(room.lastActivityAt, now);
@@ -99,7 +102,7 @@ export function RoomRow({
       {/* ── Expanded step panel ─────────────────────────────────────────── */}
       {expanded && stepView && hasSteps ? (
         <div>
-          <RoomStepsPanel areaId={room.areaId} view={stepView} />
+          <RoomStepsPanel areaId={room.areaId} view={stepView} stepEvents={stepEvents} />
           <div className="flex justify-end border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2">
             <RoomAssistantButton areaName={room.areaName} view={stepView} />
           </div>

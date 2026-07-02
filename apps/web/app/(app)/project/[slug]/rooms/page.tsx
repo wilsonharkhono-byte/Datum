@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProjectRooms } from "@/lib/rooms/queries";
-import { getRoomStepViews } from "@/lib/steps/queries";
+import { getRoomStepViews, getAreaStepEvents } from "@/lib/steps/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { RoomsView } from "@/components/rooms/RoomsView";
 
@@ -35,5 +35,12 @@ export default async function ProjectRoomsPage({
     data.rooms.map((r) => ({ areaId: r.areaId, areaType: r.areaType })),
   );
 
-  return <RoomsView data={data} now={Date.now()} stepViews={stepViews} />;
+  // One batched fetch for step history (incl. AI attribution) across every
+  // room's steps — same shape as the per-area helper, just fed all step ids
+  // up front so the page issues a single extra round-trip regardless of room
+  // count (mirrors getRoomStepViews' fixed-round-trip pattern above).
+  const allStepIds = [...stepViews.values()].flatMap((v) => v.steps.map((s) => s.id));
+  const stepEvents = await getAreaStepEvents(supabase, allStepIds);
+
+  return <RoomsView data={data} now={Date.now()} stepViews={stepViews} stepEvents={stepEvents} />;
 }
