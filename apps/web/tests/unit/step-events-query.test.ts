@@ -3,11 +3,16 @@ import {
   getAreaStepEvents,
   getAreaStepEventsForAreas,
   getStepNamesByCardEvent,
-  isMissingColumnError,
   mapAreaStepEventRow,
 } from "@/lib/steps/queries";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
+
+// NOTE: isMissingColumnError has been unified into the shared
+// isMissingSchemaError helper (packages/core/src/db/degrade.ts); its
+// dedicated unit coverage now lives in packages/core/src/db/degrade.test.ts.
+// This file keeps the degrade-PATH tests below (via getAreaStepEvents /
+// getStepNamesByCardEvent), which exercise the shared helper indirectly.
 
 // Minimal fake Supabase builder that supports the chaining used by getAreaStepEvents.
 // Captures the last .select() call so we can assert the select string.
@@ -430,21 +435,6 @@ describe("getStepNamesByCardEvent", () => {
   it("rethrows non-missing-column errors", async () => {
     const supa = fakeCardEventNamesClient(null, { code: "PGRST301", message: "JWT expired" });
     await expect(getStepNamesByCardEvent(supa, ["cev1"])).rejects.toMatchObject({ code: "PGRST301" });
-  });
-});
-
-describe("isMissingColumnError", () => {
-  it("detects Postgres undefined_column code 42703", () => {
-    expect(isMissingColumnError({ code: "42703", message: null })).toBe(true);
-  });
-  it("detects a 'column ... does not exist' message without the code", () => {
-    expect(isMissingColumnError({ code: null, message: 'column area_step_events.source does not exist' })).toBe(true);
-  });
-  it("returns false for unrelated errors", () => {
-    expect(isMissingColumnError({ code: "23505", message: "duplicate key" })).toBe(false);
-  });
-  it("returns false for null", () => {
-    expect(isMissingColumnError(null)).toBe(false);
   });
 });
 

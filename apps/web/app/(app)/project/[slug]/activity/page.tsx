@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getProjectStepActivity, groupByDay, type StepActivityItem } from "@/lib/activity/step-activity";
+import { eventAuthorLabel, confidenceLabel, cardLinkHref } from "@/lib/steps/attribution";
 
 const CHIP: Record<string, { label: string; cls: string }> = {
   not_started: { label: "Belum mulai", cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" },
@@ -9,22 +10,9 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   done: { label: "Selesai", cls: "bg-green-100 text-green-800" },
 };
 
-/** "Asisten AI" for AI-authored items with no human author; otherwise the human's name (may be null). */
+/** Adapts StepActivityItem's camelCase author field to the shared eventAuthorLabel's shape. */
 function itemAuthorLabel(it: Pick<StepActivityItem, "source" | "authorName">): string | null {
-  if (it.source === "ai") return it.authorName ?? "Asisten AI";
-  return it.authorName;
-}
-
-/** Confidence 0–1 → fixed 2-decimal display string, null when absent. */
-function itemConfidenceLabel(confidence: number | null): string | null {
-  if (confidence === null) return null;
-  return confidence.toFixed(2);
-}
-
-/** href for "dari kartu →", null when there's no resolvable card link. */
-function itemCardLinkHref(cardLink: StepActivityItem["cardLink"]): string | null {
-  if (!cardLink) return null;
-  return `/project/${cardLink.projectCode}/cards/${cardLink.cardSlug}`;
+  return eventAuthorLabel({ source: it.source, author_name: it.authorName });
 }
 
 export default async function ProjectActivityPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -58,8 +46,8 @@ export default async function ProjectActivityPage({ params }: { params: Promise<
               const chip = CHIP[it.status] ?? { label: it.status, cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" };
               const isAi = it.source === "ai";
               const author = itemAuthorLabel(it);
-              const confidence = itemConfidenceLabel(it.confidence);
-              const href = itemCardLinkHref(it.cardLink);
+              const confidence = confidenceLabel(it.confidence);
+              const href = cardLinkHref(it.cardLink);
               return (
                 <li key={it.id} className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px]">
                   <div className="flex flex-wrap items-center gap-2">

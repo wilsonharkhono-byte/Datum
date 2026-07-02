@@ -185,6 +185,40 @@ describe("processPendingStepInference", () => {
     expect(recomputeProjectGatesSystem).toHaveBeenCalledTimes(1);
   });
 
+  // is_progress was true (the AI read this as real progress) but nothing cleared the
+  // confidence bar — this must be distinguishable from a plain "done" with no error,
+  // so the card-side result line (ai-result-line.ts) can tell the user to check manually
+  // instead of silently rendering nothing.
+  it("marks the event done with ai_step_error='no_confident_match' when is_progress is true but selectApplicableMatches returns zero matches", async () => {
+    const claimedEvent = {
+      id: "ce-6",
+      card_id: "card-1",
+      project_id: "p-1",
+      occurred_at: "2026-07-02T10:00:00.000Z",
+      payload: { body: "ada progres tapi ga jelas di ruangan mana" },
+    };
+    const supabase = makeSupabase({ data: [claimedEvent], error: null });
+    vi.mocked(getCandidateStepsForCard).mockResolvedValue([
+      { area_step_id: "as-1", step_code: "BW1", name: "Waterproofing", gate_code: "B", status: "not_started" },
+    ] as any);
+    vi.mocked(inferCardEventSteps).mockResolvedValue({
+      verdict: { is_progress: true, matches: [{ area_step_id: "as-1", status: "done", confidence: 0.2 }] },
+    } as any);
+    const { selectApplicableMatches } = await import("@/lib/steps/infer");
+    vi.mocked(selectApplicableMatches).mockReturnValue([]);
+
+    const result = await processPendingStepInference(supabase, 5);
+
+    expect(result).toEqual({ claimed: 1, done: 1, skipped: 0, failed: 0, recomputedProjects: [] });
+    expect(applyStepInference).toHaveBeenCalledTimes(1);
+    const calls = (supabase as any)._updateCalls as any[];
+    expect(calls).toContainEqual(
+      expect.objectContaining({ ai_step_status: "done", ai_step_error: "no_confident_match" }),
+    );
+    // No matches applied means nothing gate-relevant was written -> no recompute.
+    expect(recomputeProjectGatesSystem).not.toHaveBeenCalled();
+  });
+
   // Task 6.5: mutations.ts after() hooks thread this set back to skip their
   // own trailing unconditional recompute for the same project — so it must
   // only ever list projects that were *successfully* recomputed here.

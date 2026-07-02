@@ -19,11 +19,26 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   done_with_defects: { label: "Selesai (ada defect)", cls: "bg-amber-100 text-amber-800" },
 };
 
-export function RoomStepsPanel({ areaId, view, stepEvents }: { areaId: string; view: View; stepEvents?: StepEvents }) {
+export function RoomStepsPanel({
+  areaId,
+  view,
+  stepEvents,
+  autoOpenStepId,
+}: {
+  areaId: string;
+  view: View;
+  stepEvents?: StepEvents;
+  /** Step id to auto-open on mount (from a ?areaStep= deep link — see rooms/page.tsx). */
+  autoOpenStepId?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [showAll, setShowAll] = useState(false);
-  const [openStep, setOpenStep] = useState<string | null>(null);
+  // Start in the "all steps" view when deep-linking to a specific step — the target
+  // may not be in `view.active` (e.g. an unconfirmed block that's still "in_progress"
+  // with a note rather than a real `blocked` status), so only the grouped/full list
+  // is guaranteed to render every step regardless of status.
+  const [showAll, setShowAll] = useState(autoOpenStepId != null);
+  const [openStep, setOpenStep] = useState<string | null>(autoOpenStepId ?? null);
   const [showRemoved, setShowRemoved] = useState(false);
   const nameOf = (code: string | null) => view.steps.find((s) => s.step_code === code)?.name ?? code;
 

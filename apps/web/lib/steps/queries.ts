@@ -4,7 +4,17 @@ import { computeAreaFlags, type AreaFlags } from "@/lib/steps/flags";
 import type { TradeStepDep } from "@/lib/steps/types";
 import { computeStepSignals } from "@/lib/steps/signals";
 import type { StepSignal } from "@/lib/steps/signals";
-import { gateShortName } from "@datum/core";
+import { gateShortName, isMissingSchemaError } from "@datum/core";
+
+/**
+ * Column/relationship names the area_step_events attribution queries in this
+ * file are willing to treat as "missing schema, degrade gracefully" (i.e.
+ * pre-`supabase db push` prod, before the 2026-06-28 migration lands).
+ * Passed to the shared `isMissingSchemaError` (packages/core/src/db/degrade.ts)
+ * so an unrelated missing-column error still throws instead of being
+ * silently swallowed.
+ */
+const STEP_EVENTS_ATTRIBUTION_SCHEMA_ALLOWLIST = ["source", "confidence", "card_event_id"];
 
 /** Where to send "dari kartu →" — the card that produced an AI-authored step event. */
 export type StepEventCardLink = {
@@ -126,16 +136,6 @@ export async function getAreaSteps(
     .map(({ _sort, _created, ...rest }) => rest as AreaStepRow);
 }
 
-/** True when a Supabase/PostgREST error is caused by a column not existing yet (pre-migration prod). */
-export function isMissingColumnError(
-  error: { code?: string | null; message?: string | null } | null,
-): boolean {
-  if (!error) return false;
-  if (error.code === "42703") return true; // Postgres: undefined_column
-  const msg = (error.message ?? "").toLowerCase();
-  return msg.includes("column") && msg.includes("does not exist");
-}
-
 /** Raw shape returned by the attribution-extended select (source/confidence/card_event_id + card link join). */
 type RawAreaStepEventRow = {
   id: string;
@@ -215,7 +215,7 @@ async function fetchAreaStepEvents(
   let data: unknown[] | null = attribution.data;
   let error = attribution.error;
 
-  if (error && isMissingColumnError(error)) {
+  if (error && isMissingSchemaError(error, STEP_EVENTS_ATTRIBUTION_SCHEMA_ALLOWLIST)) {
     const fallback = await run(baseSelect);
     data = fallback.data;
     error = fallback.error;
@@ -341,7 +341,7 @@ export async function getStepNamesByCardEvent(
     .in("card_event_id", cardEventIds);
 
   if (error) {
-    if (isMissingColumnError(error)) return new Map();
+    if (isMissingSchemaError(error, STEP_EVENTS_ATTRIBUTION_SCHEMA_ALLOWLIST)) return new Map();
     throw error;
   }
 

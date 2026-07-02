@@ -111,9 +111,15 @@ export async function processPendingStepInference(
         projectsToRecompute.add(ev.project_id);
       }
 
+      // is_progress was true (the AI read this as real progress) but nothing cleared
+      // the confidence bar in selectApplicableMatches — surface that distinctly from a
+      // plain "done" so the card-side result line (ai-result-line.ts) can tell the user
+      // to check manually, instead of silently rendering nothing.
+      const stepError = selected.length === 0 ? "no_confident_match" : null;
+
       const { error: writeErr } = await supabase
         .from("card_events")
-        .update({ ai_step_status: "done", ai_step_error: null, ai_step_processed_at: now() })
+        .update({ ai_step_status: "done", ai_step_error: stepError, ai_step_processed_at: now() })
         .eq("id", ev.id);
       if (writeErr) throw writeErr;
       done++;

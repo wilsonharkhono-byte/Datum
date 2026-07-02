@@ -1,7 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
-import { isMissingColumnError } from "@/lib/steps/queries";
+import { isMissingSchemaError } from "@datum/core";
 import type { StepEventCardLink } from "@/lib/steps/queries";
+
+/**
+ * Column/relationship names this file's attribution query is willing to
+ * treat as "missing schema, degrade gracefully" (pre-`supabase db push`
+ * prod). See packages/core/src/db/degrade.ts for the shared detector.
+ */
+const STEP_ACTIVITY_SCHEMA_ALLOWLIST = ["source", "confidence", "card_event_id"];
 
 export type StepActivityItem = {
   id: string;
@@ -110,7 +117,7 @@ export async function getProjectStepActivity(
   let data: unknown[] | null = attribution.data as unknown[] | null;
   let error = attribution.error;
 
-  if (error && isMissingColumnError(error)) {
+  if (error && isMissingSchemaError(error, STEP_ACTIVITY_SCHEMA_ALLOWLIST)) {
     const fallback = await supabase
       .from("area_step_events")
       .select(STEP_ACTIVITY_BASE_SELECT)

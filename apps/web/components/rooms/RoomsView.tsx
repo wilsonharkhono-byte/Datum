@@ -16,11 +16,17 @@ export function RoomsView({
   now,
   stepViews,
   stepEvents,
+  autoExpandAreaId,
+  autoExpandStepId,
 }: {
   data: ProjectRooms;
   now: number;
   stepViews?: StepViews;
   stepEvents?: StepEvents;
+  /** Room to auto-expand on mount (from a ?areaStep= deep link — see rooms/page.tsx). */
+  autoExpandAreaId?: string;
+  /** Step within that room to auto-open on mount, same deep link. */
+  autoExpandStepId?: string;
 }) {
   const count = data.rooms.length;
 
@@ -65,6 +71,8 @@ export function RoomsView({
               now={now}
               stepView={stepViews?.get(room.areaId)}
               stepEvents={stepEvents}
+              autoExpand={room.areaId === autoExpandAreaId}
+              autoOpenStepId={room.areaId === autoExpandAreaId ? autoExpandStepId : undefined}
             />
           ))}
         </div>

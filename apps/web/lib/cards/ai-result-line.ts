@@ -14,13 +14,15 @@
  *   - error (only set for 'skipped'/'failed'): 'no_candidate_steps' | 'not_progress' | 'no_text' | <message>
  *
  * Rendering rules (see docs/superpowers/plans/2026-07-02-launch-phase02.md Task 4):
- *   - done + step names available  -> "AI: memperbarui langkah {names}"
- *   - done but no names resolved   -> null (nothing to attribute; avoids a bare "AI: memperbarui langkah")
- *   - skipped/no_candidate_steps   -> "AI: kartu belum tertaut ke ruangan — tautkan agar progres terbaca"
- *   - skipped/not_progress         -> null (silence is correct: the event just wasn't step-relevant)
- *   - skipped/no_text              -> null (same: nothing to read)
- *   - failed                       -> "AI: gagal membaca — akan dicoba lagi"
- *   - pending/processing/other     -> null (no subtle "membaca…" line — see task-4-report.md for why)
+ *   - done + step names available     -> "AI: memperbarui langkah {names}"
+ *   - done + no_confident_match       -> "AI: membaca progres, tapi belum yakin langkah mana — periksa manual"
+ *     (is_progress was true but zero matches cleared the confidence bar — see run-inference.ts)
+ *   - done, no names, no error        -> null (nothing to attribute; avoids a bare "AI: memperbarui langkah")
+ *   - skipped/no_candidate_steps      -> "AI: kartu belum tertaut ke ruangan — tautkan agar progres terbaca"
+ *   - skipped/not_progress            -> null (silence is correct: the event just wasn't step-relevant)
+ *   - skipped/no_text                 -> null (same: nothing to read)
+ *   - failed                          -> "AI: gagal membaca — akan dicoba lagi"
+ *   - pending/processing/other        -> null (no subtle "membaca…" line — see task-4-report.md for why)
  */
 export function aiResultLine(
   status: string | null | undefined,
@@ -29,7 +31,11 @@ export function aiResultLine(
 ): string | null {
   switch (status) {
     case "done":
-      return stepNames.length > 0 ? `AI: memperbarui langkah ${stepNames.join(", ")}` : null;
+      if (stepNames.length > 0) return `AI: memperbarui langkah ${stepNames.join(", ")}`;
+      if (error === "no_confident_match") {
+        return "AI: membaca progres, tapi belum yakin langkah mana — periksa manual";
+      }
+      return null;
     case "skipped":
       if (error === "no_candidate_steps") {
         return "AI: kartu belum tertaut ke ruangan — tautkan agar progres terbaca";

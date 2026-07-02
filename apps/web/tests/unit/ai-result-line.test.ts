@@ -16,6 +16,18 @@ describe("aiResultLine", () => {
     expect(aiResultLine("done", null, [])).toBeNull();
   });
 
+  it("done + no_confident_match -> 'read progress, but unsure which step' hint", () => {
+    expect(aiResultLine("done", "no_confident_match", [])).toBe(
+      "AI: membaca progres, tapi belum yakin langkah mana — periksa manual",
+    );
+  });
+
+  it("done + step names takes precedence over no_confident_match (defensive: shouldn't co-occur in practice)", () => {
+    expect(aiResultLine("done", "no_confident_match", ["Waterproofing"])).toBe(
+      "AI: memperbarui langkah Waterproofing",
+    );
+  });
+
   it("skipped/no_candidate_steps -> unlinked-card hint", () => {
     expect(aiResultLine("skipped", "no_candidate_steps", [])).toBe(
       "AI: kartu belum tertaut ke ruangan — tautkan agar progres terbaca",

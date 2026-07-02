@@ -13,10 +13,15 @@
  * the pure EVENT_CHIP map and the formatEventTime helper, which we re-implement
  * here at the same spec as the component. The real correctness guarantee is the
  * `pnpm --filter web build` step which compiles the whole component tree.
+ *
+ * eventAuthorLabel / confidenceLabel / cardLinkHref are no longer mirrored here —
+ * they're shared between StepDetail.tsx and the activity feed page via
+ * lib/steps/attribution.ts, so we import the real implementations directly.
  */
 
 import { describe, expect, it } from "vitest";
 import type { AreaStepEventRow } from "@/lib/steps/queries";
+import { eventAuthorLabel, confidenceLabel, cardLinkHref } from "@/lib/steps/attribution";
 
 // --- Mirror the display helpers from StepDetail.tsx so we can unit-test them ---
 // (StepDetail.tsx is a .tsx "use client" file — vitest's node-env transform for this
@@ -37,24 +42,6 @@ const HISTORY_PREVIEW = 5;
 
 function buildHistoryItems(events: AreaStepEventRow[], expanded: boolean) {
   return expanded ? events : events.slice(0, HISTORY_PREVIEW);
-}
-
-/** Mirrors StepDetail.tsx's eventAuthorLabel: "Asisten AI" for author-less AI events, else the human name. */
-function eventAuthorLabel(ev: Pick<AreaStepEventRow, "source" | "author_name">): string | null {
-  if (ev.source === "ai") return ev.author_name ?? "Asisten AI";
-  return ev.author_name;
-}
-
-/** Mirrors StepDetail.tsx's confidenceLabel: fixed 2-decimal display, null when absent. */
-function confidenceLabel(confidence: number | null): string | null {
-  if (confidence === null) return null;
-  return confidence.toFixed(2);
-}
-
-/** Mirrors StepDetail.tsx's cardLinkHref: "/project/{code}/cards/{slug}", null when unresolved. */
-function cardLinkHref(cardLink: AreaStepEventRow["card_link"]): string | null {
-  if (!cardLink) return null;
-  return `/project/${cardLink.projectCode}/cards/${cardLink.cardSlug}`;
 }
 
 // --- Helpers used in assertions ---

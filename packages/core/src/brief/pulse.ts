@@ -18,6 +18,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
+import { isMissingSchemaError } from "../db/degrade";
 
 export type PulseSource = "human" | "ai";
 
@@ -233,25 +234,17 @@ const CARD_EVENT_SELECT =
   "cards:card_id ( slug, title, projects:project_id ( project_code, project_name ) )";
 
 /**
- * True when a Supabase/PostgREST error is caused by the attribution schema
- * not existing yet (pre-`db push` prod). Two shapes matter here:
+ * Column/relationship names this query is willing to treat as "missing
+ * schema, degrade gracefully" (pre-`db push` prod). Passed to the shared
+ * `isMissingSchemaError` from ../db/degrade, which catches both:
  *   - 42703 / "column … does not exist"  — plain column (source, confidence)
  *   - PGRST200 / "…relationship…"        — the `card_events:card_event_id`
  *     EMBED, which PostgREST reports as a missing relationship (not a missing
  *     column) when `card_event_id` doesn't exist yet.
- * Broader than the web-side isMissingColumnError on purpose: a false positive
- * here only downgrades the pulse to the attribution-free select, while a
- * missed match would throw and take down the WHOLE brief (web + mobile).
+ * Scoped via this allowlist so an unrelated missing-column error still
+ * throws and takes down the request rather than being silently swallowed.
  */
-function isMissingAttributionSchemaError(
-  error: { code?: string | null; message?: string | null } | null,
-): boolean {
-  if (!error) return false;
-  if (error.code === "42703") return true; // Postgres: undefined_column
-  if (error.code === "PGRST200") return true; // PostgREST: missing embed relationship
-  const msg = (error.message ?? "").toLowerCase();
-  return (msg.includes("column") && msg.includes("does not exist")) || msg.includes("relationship");
-}
+const PULSE_ATTRIBUTION_SCHEMA_ALLOWLIST = ["source", "confidence", "card_event_id"];
 
 const PULSE_WINDOW_HOURS = 48;
 /**
@@ -283,7 +276,7 @@ export async function getRecentPulse(
 
   let stepRows: unknown[] | null = stepAttribution.data as unknown[] | null;
   let stepError = stepAttribution.error;
-  if (stepError && isMissingAttributionSchemaError(stepError)) {
+  if (stepError && isMissingSchemaError(stepError, PULSE_ATTRIBUTION_SCHEMA_ALLOWLIST)) {
     const fallback = await supabase
       .from("area_step_events")
       .select(STEP_EVENT_SELECT_NO_ATTRIBUTION)

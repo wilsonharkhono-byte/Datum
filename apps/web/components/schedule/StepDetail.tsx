@@ -5,6 +5,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitStepUpdate, submitCheckpointResult, removeStep } from "@/lib/steps/actions";
 import type { AreaStepRow, AreaStepEventRow } from "@/lib/steps/queries";
+import { eventAuthorLabel, confidenceLabel, cardLinkHref } from "@/lib/steps/attribution";
 
 const STATUS_LABEL: Record<string, string> = {
   not_started: "Belum mulai",
@@ -24,24 +25,6 @@ const HISTORY_PREVIEW = 5;
 
 function formatEventTime(isoString: string): string {
   return new Date(isoString).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
-}
-
-/** Pure: "Asisten AI" for AI-authored events with no human author; otherwise the human's name (may be null). */
-export function eventAuthorLabel(ev: Pick<AreaStepEventRow, "source" | "author_name">): string | null {
-  if (ev.source === "ai") return ev.author_name ?? "Asisten AI";
-  return ev.author_name;
-}
-
-/** Pure: confidence 0–1 → fixed 2-decimal display string (e.g. 0.947 -> "0.95"), null when absent. */
-export function confidenceLabel(confidence: number | null): string | null {
-  if (confidence === null) return null;
-  return confidence.toFixed(2);
-}
-
-/** Pure: href for "dari kartu →", null when there's no resolvable card link. */
-export function cardLinkHref(cardLink: AreaStepEventRow["card_link"]): string | null {
-  if (!cardLink) return null;
-  return `/project/${cardLink.projectCode}/cards/${cardLink.cardSlug}`;
 }
 
 function StepHistory({

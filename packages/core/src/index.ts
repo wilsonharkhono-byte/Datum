@@ -514,3 +514,6 @@ export {
   type UpsertPushTokenResult,
   upsertPushToken,
 } from "./notifications/push-tokens";
+
+// ─── DB: shared "missing schema, degrade gracefully" detector ─────────────────
+export { isMissingSchemaError } from "./db/degrade";
