@@ -9,6 +9,7 @@
  *  - add-event submit calls createCardEvent with the built input
  *  - resolve calls resolveCardEvent
  *  - remove-member calls removeCardMember
+ *  - CardAreas link/unlink calls linkCardToArea / unlinkCardFromArea
  */
 
 import React from "react";
@@ -61,6 +62,9 @@ const mockGetCardComments = jest.fn();
 const mockGetCardMembers = jest.fn();
 const mockGetCardAttachments = jest.fn();
 const mockGetProjectStaff = jest.fn();
+const mockGetProjectAreas = jest.fn();
+const mockLinkCardToArea = jest.fn();
+const mockUnlinkCardFromArea = jest.fn();
 
 jest.mock("@datum/core", () => {
   const actual = jest.requireActual("@datum/core");
@@ -78,6 +82,9 @@ jest.mock("@datum/core", () => {
     getCardMembers:                    (...a: unknown[]) => mockGetCardMembers(...a),
     getCardAttachments:                (...a: unknown[]) => mockGetCardAttachments(...a),
     getProjectStaff:                   (...a: unknown[]) => mockGetProjectStaff(...a),
+    getProjectAreas:                   (...a: unknown[]) => mockGetProjectAreas(...a),
+    linkCardToArea:                    (...a: unknown[]) => mockLinkCardToArea(...a),
+    unlinkCardFromArea:                (...a: unknown[]) => mockUnlinkCardFromArea(...a),
   };
 });
 
@@ -151,6 +158,38 @@ const FIXTURE_MEMBER: CardMemberWithStaff = {
   staff: { id: "staff-uuid-other", full_name: "Budi Santoso", role: "pic" },
 } as unknown as CardMemberWithStaff;
 
+import type { Area } from "@datum/db";
+
+const AREA_LINKED: Area = {
+  id: "area-uuid-1",
+  project_id: PROJECT_ID,
+  area_code: "L1-KM01",
+  area_name: "Kamar Mandi Lt.1",
+  area_type: "bathroom",
+  floor: "Lt.1",
+  area_sqm: null,
+  sort_order: 1,
+  target_date: null,
+  finish_profile: {},
+  created_at: "2026-01-01T08:00:00Z",
+  updated_at: "2026-01-01T08:00:00Z",
+} as unknown as Area;
+
+const AREA_ADDABLE: Area = {
+  id: "area-uuid-2",
+  project_id: PROJECT_ID,
+  area_code: "L1-KT01",
+  area_name: "Kitchen Lt.1",
+  area_type: "kitchen",
+  floor: "Lt.1",
+  area_sqm: null,
+  sort_order: 2,
+  target_date: null,
+  finish_profile: {},
+  created_at: "2026-01-01T08:00:00Z",
+  updated_at: "2026-01-01T08:00:00Z",
+} as unknown as Area;
+
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
 function makeClient(seed?: () => void): QueryClient {
@@ -176,6 +215,8 @@ const { MobileAddEventForm } = require("./AddEventForm");
 const { ResolveButton } = require("./ResolveButton");
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { RemovableMemberRow } = require("./MemberPicker");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { CardAreas } = require("./CardAreas");
 
 // ─── CommentInput tests ───────────────────────────────────────────────────────
 
@@ -487,5 +528,106 @@ describe("RemovableMemberRow — remove member", () => {
       { wrapper: wrapper(qc) },
     );
     expect(queryByLabelText("Hapus Budi Santoso dari anggota")).toBeNull();
+  });
+});
+
+// ─── CardAreas — link / unlink area ──────────────────────────────────────────
+
+describe("CardAreas — link and unlink", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetProjectAreas.mockResolvedValue([AREA_LINKED, AREA_ADDABLE]);
+    mockLinkCardToArea.mockResolvedValue({ ok: true });
+    mockUnlinkCardFromArea.mockResolvedValue({ ok: true });
+  });
+
+  it("renders linked areas as chips and shows the picker affordance", () => {
+    const qc = makeClient();
+    const { getByText, getByLabelText } = render(
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[AREA_LINKED]} />,
+      { wrapper: wrapper(qc) },
+    );
+
+    expect(getByText("L1-KM01 · Kamar Mandi Lt.1 (Lt.1)")).toBeTruthy();
+    expect(getByLabelText("Tautkan area ke kartu")).toBeTruthy();
+  });
+
+  it("shows the empty state when no areas are linked", () => {
+    const qc = makeClient();
+    const { getByText } = render(
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[]} />,
+      { wrapper: wrapper(qc) },
+    );
+    expect(getByText("Belum ada area terkait.")).toBeTruthy();
+  });
+
+  it("opens the picker, lists only addable areas, and links on tap", async () => {
+    const qc = makeClient();
+    const invalidateSpy = jest.spyOn(qc, "invalidateQueries");
+
+    const { getByLabelText, findByLabelText, queryByLabelText } = render(
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[AREA_LINKED]} />,
+      { wrapper: wrapper(qc) },
+    );
+
+    fireEvent.press(getByLabelText("Tautkan area ke kartu"));
+
+    const addableOption = await findByLabelText("Tautkan area L1-KT01 · Kitchen Lt.1 (Lt.1)");
+    // The already-linked area must not appear in the picker.
+    expect(queryByLabelText("Tautkan area L1-KM01 · Kamar Mandi Lt.1 (Lt.1)")).toBeNull();
+
+    fireEvent.press(addableOption);
+
+    await waitFor(() => expect(mockLinkCardToArea).toHaveBeenCalledTimes(1));
+    expect(mockLinkCardToArea).toHaveBeenCalledWith(
+      expect.anything(), // supabase
+      expect.objectContaining({ cardId: CARD_ID, areaId: AREA_ADDABLE.id }),
+    );
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ["card-areas", CARD_ID] }),
+      ),
+    );
+  });
+
+  it("unlinks an area when its chip's remove button is pressed", async () => {
+    const qc = makeClient();
+    const invalidateSpy = jest.spyOn(qc, "invalidateQueries");
+
+    const { getByLabelText } = render(
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[AREA_LINKED]} />,
+      { wrapper: wrapper(qc) },
+    );
+
+    fireEvent.press(getByLabelText("Lepas tautan area L1-KM01"));
+
+    await waitFor(() => expect(mockUnlinkCardFromArea).toHaveBeenCalledTimes(1));
+    expect(mockUnlinkCardFromArea).toHaveBeenCalledWith(
+      expect.anything(), // supabase
+      expect.objectContaining({ cardId: CARD_ID, areaId: AREA_LINKED.id }),
+    );
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ["card-areas", CARD_ID] }),
+      ),
+    );
+  });
+
+  it("shows an inline error when linking fails", async () => {
+    mockLinkCardToArea.mockResolvedValue({ ok: false, error: "Area dan kartu harus berasal dari proyek yang sama" });
+    const qc = makeClient();
+
+    const { getByLabelText, findByLabelText, findByText } = render(
+      <CardAreas cardId={CARD_ID} projectId={PROJECT_ID} currentAreas={[AREA_LINKED]} />,
+      { wrapper: wrapper(qc) },
+    );
+
+    fireEvent.press(getByLabelText("Tautkan area ke kartu"));
+    const addableOption = await findByLabelText("Tautkan area L1-KT01 · Kitchen Lt.1 (Lt.1)");
+    fireEvent.press(addableOption);
+
+    await findByText("Area dan kartu harus berasal dari proyek yang sama");
   });
 });
