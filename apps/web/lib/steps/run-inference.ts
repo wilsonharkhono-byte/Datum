@@ -5,7 +5,7 @@ import { getCandidateStepsForCard, inferCardEventSteps } from "@/lib/steps/infer
 import { applyStepInference } from "@/lib/steps/mutations";
 import { selectApplicableMatches, summarizeEventText } from "@/lib/steps/infer";
 import { isMissingFunctionError } from "@/lib/cron/auth";
-import { recomputeProjectGatesSystem } from "@/lib/gates/recompute";
+import { recomputeProjectGatesSystem } from "@/lib/gates/recompute-system";
 
 const MIN_CONFIDENCE = 0.6;
 

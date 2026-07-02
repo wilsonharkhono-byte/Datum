@@ -3,7 +3,6 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { recomputeProjectGates as coreRecomputeProjectGates } from "@datum/core";
 
 // NOTE: recomputeProjectGates (the JS rule engine) is NOT web-only — its body
@@ -52,21 +51,8 @@ export async function recomputeProjectGates(
   return result;
 }
 
-/**
- * System-context variant for use inside `after()` background callbacks that
- * run without an end-user cookie session (e.g. post-inference gate refresh
- * using the service-role admin client). Skips the getUser() guard — the
- * admin client already bypasses RLS, so that check would always fail here.
- * Never call this from a path driven directly by end-user request input.
- */
-export async function recomputeProjectGatesSystem(
-  projectId:   string,
-  projectCode: string,
-): Promise<RecomputeResult> {
-  const admin = createSupabaseAdminClient();
-  const result = await coreRecomputeProjectGates(admin, projectId, projectCode, { skipAuthCheck: true });
-  if (result.ok) {
-    revalidatePath(`/project/${projectCode}/schedule`);
-  }
-  return result;
-}
+// NOTE: recomputeProjectGatesSystem (admin-client + skipAuthCheck variant for
+// use inside after() background callbacks with no end-user session) lives in
+// lib/gates/recompute-system.ts, NOT here — this file is "use server" and
+// every export becomes a client-callable action; that variant must never be
+// client-reachable. See recompute-system.ts's header comment.

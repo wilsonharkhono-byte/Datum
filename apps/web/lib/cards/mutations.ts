@@ -44,7 +44,7 @@ import {
   notifyPrincipalsOfHighRiskEvent,
 } from "@/lib/notifications/producers";
 import { sendExpoPush } from "@/lib/notifications/push-send";
-import { recomputeProjectGatesSystem } from "@/lib/gates/recompute";
+import { recomputeProjectGatesSystem } from "@/lib/gates/recompute-system";
 import { processPendingStepInference } from "@/lib/steps/run-inference";
 import { INFERABLE_KINDS } from "@/lib/steps/infer";
 import * as Sentry from "@sentry/nextjs";

@@ -39,6 +39,23 @@ export type ScheduleRecomputeResult =
  * readiness signals (lib/steps/signals.ts, lead-time based) mathematically
  * unable to fire. This is the one-shot backfill path for existing areas —
  * wired to the schedule page's "Hitung ulang jadwal" button below.
+ *
+ * Overwrite semantics: the underlying SQL function `compute_project_schedule`
+ * (packages/db/supabase/migrations/20260601000019_compute_area_gate_schedule.sql)
+ * unconditionally RECOMPUTES AND OVERWRITES target_start_date/target_end_date
+ * for every (area, gate) row in the project on every call — `on conflict
+ * (project_id, area_id, gate_code) do update set target_start_date =
+ * excluded.target_start_date, target_end_date = excluded.target_end_date`,
+ * no `where` guard, no check for prior manual edits. This is harmless today
+ * because nothing else ever writes those two columns — the PM-editable
+ * `areas.target_date` is a separate overlay column (see setAreaTargetDate /
+ * overlayAreaTargetDates) that this recompute does not touch and is not
+ * touched by. If a per-cell gate-target editor is ever added (i.e. something
+ * starts writing area_gate_status.target_start_date/target_end_date directly
+ * outside this recompute), this call must become conditional — e.g. an `on
+ * conflict ... do update ... where area_gate_status.target_start_date is
+ * null` guard in the migration, or an equivalent check here before invoking
+ * the RPC — or it will silently clobber that manual edit on the next click.
  */
 export async function recomputeProjectSchedule(formData: FormData): Promise<ScheduleRecomputeResult> {
   let input;

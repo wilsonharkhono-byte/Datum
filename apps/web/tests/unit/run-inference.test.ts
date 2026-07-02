@@ -7,12 +7,12 @@ vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/steps/infer-runner", () => ({ getCandidateStepsForCard: vi.fn(), inferCardEventSteps: vi.fn() }));
 vi.mock("@/lib/steps/mutations", () => ({ applyStepInference: vi.fn() }));
 vi.mock("@/lib/steps/infer", () => ({ selectApplicableMatches: vi.fn(), summarizeEventText: vi.fn() }));
-vi.mock("@/lib/gates/recompute", () => ({ recomputeProjectGatesSystem: vi.fn().mockResolvedValue({ ok: true, cellsUpdated: 0, ruleVersion: 2 }) }));
+vi.mock("@/lib/gates/recompute-system", () => ({ recomputeProjectGatesSystem: vi.fn().mockResolvedValue({ ok: true, cellsUpdated: 0, ruleVersion: 2 }) }));
 
 import { processPendingStepInference } from "@/lib/steps/run-inference";
 import { getCandidateStepsForCard, inferCardEventSteps } from "@/lib/steps/infer-runner";
 import { applyStepInference } from "@/lib/steps/mutations";
-import { recomputeProjectGatesSystem } from "@/lib/gates/recompute";
+import { recomputeProjectGatesSystem } from "@/lib/gates/recompute-system";
 
 function makeSupabase(
   rpcResult: { data: unknown; error: unknown },
