@@ -88,6 +88,19 @@ export function textField(payload: Record<string, unknown>, keys: string[]): str
   return null;
 }
 
+/**
+ * Fix 3 rework — format a decision outcome (captured via the "Tandai
+ * diputuskan" inline "Apa keputusannya?" input, round-tripped through
+ * record_revisions.reason by getDecisionOutcomesByCardEvent) for display on
+ * the timeline. Single source of truth for the "Keputusan: " label so the
+ * extraction prefix in getDecisionOutcomesByCardEvent and the render prefix
+ * here can't drift apart. Returns null for an empty/whitespace-only outcome.
+ */
+export function decisionOutcomeLine(outcome: string | null | undefined): string | null {
+  const trimmed = outcome?.trim();
+  return trimmed ? `Keputusan: ${trimmed}` : null;
+}
+
 /** Produce the one-liner summary text for a card event row.
  *  Covers all current and retired event kinds; retired kinds fall through
  *  to their historical display string so old timelines render correctly. */

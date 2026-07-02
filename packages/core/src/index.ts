@@ -108,6 +108,7 @@ export {
   getCardWithTimeline,
   getCardWithTimelineByProjectCode,
   getCardAttachments,
+  getDecisionOutcomesByCardEvent,
   getCardComments,
   getCardMembers,
   getProjectStaff,
@@ -124,6 +125,7 @@ export {
   safeHostname,
   valueLabel,
   textField,
+  decisionOutcomeLine,
 } from "./cards/event-render";
 
 // ─── Card event mutations ─────────────────────────────────────────────────────

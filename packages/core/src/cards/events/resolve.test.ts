@@ -73,7 +73,7 @@ describe("resolveCardEvent", () => {
     expect(args.p_new_status).toBe("decided");
   });
 
-  it("passes the reason through to the rpc", async () => {
+  it("passes the reason through to the rpc's p_reason param", async () => {
     const calls: unknown[] = [];
     const supabase = {
       rpc: (_fn: string, args: unknown) => {
@@ -91,7 +91,11 @@ describe("resolveCardEvent", () => {
     expect(args.p_reason).toBe("sudah dijawab");
   });
 
-  it("passes the outcome through to the rpc", async () => {
+  // Fix 3 rework: resolve_card_event has no p_outcome param (that would need
+  // a migration). `outcome` instead rides the RPC's existing p_reason param,
+  // prefixed "Keputusan: " so getDecisionOutcomesByCardEvent can read it back
+  // out of record_revisions.reason for the timeline.
+  it("folds the outcome into p_reason with a 'Keputusan: ' prefix, and sends no p_outcome arg", async () => {
     const calls: unknown[] = [];
     const supabase = {
       rpc: (_fn: string, args: unknown) => {
@@ -106,7 +110,49 @@ describe("resolveCardEvent", () => {
     );
 
     const args = calls[0] as Record<string, unknown>;
-    expect(args.p_outcome).toBe("pakai marmer putih");
+    expect(args.p_reason).toBe("Keputusan: pakai marmer putih");
+    expect("p_outcome" in args).toBe(false);
+  });
+
+  it("combines outcome and reason when both are supplied, decision line first", async () => {
+    const calls: unknown[] = [];
+    const supabase = {
+      rpc: (_fn: string, args: unknown) => {
+        calls.push(args);
+        return Promise.resolve({ error: null });
+      },
+    } as unknown;
+
+    await resolveCardEvent(
+      supabase as Parameters<typeof resolveCardEvent>[0],
+      {
+        eventId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        newStatus: "decided",
+        outcome: "pakai marmer putih",
+        reason: "klien sudah setuju",
+      },
+    );
+
+    const args = calls[0] as Record<string, unknown>;
+    expect(args.p_reason).toBe("Keputusan: pakai marmer putih — klien sudah setuju");
+  });
+
+  it("trims whitespace and omits p_reason entirely when outcome/reason are blank", async () => {
+    const calls: unknown[] = [];
+    const supabase = {
+      rpc: (_fn: string, args: unknown) => {
+        calls.push(args);
+        return Promise.resolve({ error: null });
+      },
+    } as unknown;
+
+    await resolveCardEvent(
+      supabase as Parameters<typeof resolveCardEvent>[0],
+      { eventId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890", newStatus: "decided", outcome: "   ", reason: "" },
+    );
+
+    const args = calls[0] as Record<string, unknown>;
+    expect(args.p_reason).toBeUndefined();
   });
 
   it("returns ok:false with the rpc error message", async () => {

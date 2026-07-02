@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarize, extractUrls, looksLikeImage, safeHostname, valueLabel, textField } from "./event-render";
+import { summarize, extractUrls, looksLikeImage, safeHostname, valueLabel, textField, decisionOutcomeLine } from "./event-render";
 import type { CardEvent } from "@datum/db";
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -58,6 +58,28 @@ describe("textField", () => {
   });
 });
 
+// ─── decisionOutcomeLine ────────────────────────────────────────────────────────
+// Fix 3 rework: single source of truth for the "Keputusan: " display prefix,
+// paired with getDecisionOutcomesByCardEvent's extraction of the same prefix
+// from record_revisions.reason (packages/core/src/cards/queries.ts).
+
+describe("decisionOutcomeLine", () => {
+  it("formats a non-empty outcome with the 'Keputusan: ' prefix", () => {
+    expect(decisionOutcomeLine("pakai marmer putih")).toBe("Keputusan: pakai marmer putih");
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(decisionOutcomeLine("  pakai marmer putih  ")).toBe("Keputusan: pakai marmer putih");
+  });
+
+  it("returns null for null, undefined, empty, or whitespace-only input", () => {
+    expect(decisionOutcomeLine(null)).toBeNull();
+    expect(decisionOutcomeLine(undefined)).toBeNull();
+    expect(decisionOutcomeLine("")).toBeNull();
+    expect(decisionOutcomeLine("   ")).toBeNull();
+  });
+});
+
 // ─── summarize ────────────────────────────────────────────────────────────────
 
 describe("summarize", () => {
@@ -92,7 +114,7 @@ describe("summarize", () => {
     expect(summarize(ev)).toBe("Lantai apa?");
   });
 
-  it("decision — outcome captured via proposed_spec still renders with a real topic", () => {
+  it("decision — a real topic with an empty proposed_spec still renders cleanly", () => {
     const ev = makeEvent("decision", { topic: "Marmer", proposed_spec: "" });
     expect(summarize(ev)).not.toContain("undefined");
   });

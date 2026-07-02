@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getCardWithTimelineByProjectCode, getCardAttachments, getCardMembers, getCardComments, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
+import { getCardWithTimelineByProjectCode, getCardAttachments, getDecisionOutcomesByCardEvent, getCardMembers, getCardComments, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
 import { getStepNamesByCardEvent } from "@/lib/steps/queries";
 import { getCardAreas } from "@/lib/cards/area-link-queries";
 import { getCardLinks } from "@/lib/cards/link-queries";
@@ -45,7 +45,7 @@ export default async function CardDetailPage({
   }
   const detail = detailRes.value;
 
-  const [attachmentsByEvent, memberRows, comments, candidates, topics, cardAreas, projectAreas, cardLinks, stepNamesByEvent] = await Promise.all([
+  const [attachmentsByEvent, memberRows, comments, candidates, topics, cardAreas, projectAreas, cardLinks, stepNamesByEvent, decisionOutcomesByEvent] = await Promise.all([
     getCardAttachments(supabase, detail.card.id),
     getCardMembers(supabase, detail.card.id),
     getCardComments(supabase, detail.card.id),
@@ -59,6 +59,12 @@ export default async function CardDetailPage({
     // is safe here (unlike the Rooms page's step-id fan-out): a card page has at most a
     // few dozen events, so the filter list stays well under the URL length limit.
     getStepNamesByCardEvent(supabase, detail.events.map((e) => e.id)),
+    // Fix 3 rework — decision outcome capture, plan-compliant (no migration):
+    // "Apa keputusannya?" text rides resolve_card_event's existing p_reason
+    // param into record_revisions.reason; this reads it back per event so
+    // the timeline can render "Keputusan: {text}". Same grouped-query shape
+    // as stepNamesByEvent above.
+    getDecisionOutcomesByCardEvent(supabase, detail.events.map((e) => e.id)),
   ]);
   const topicName = topics.find((t) => t.id === detail.card.topic_id)?.name ?? "—";
 
@@ -106,6 +112,7 @@ export default async function CardDetailPage({
             currentStaffId={currentStaffId}
             attachmentsByEvent={attachmentsByEvent}
             stepNamesByEvent={stepNamesByEvent}
+            decisionOutcomesByEvent={decisionOutcomesByEvent}
             candidates={candidates}
             header={
               <CardHeader

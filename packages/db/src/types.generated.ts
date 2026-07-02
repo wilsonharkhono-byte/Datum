@@ -3004,12 +3004,7 @@ export type Database = {
         Returns: undefined
       }
       resolve_card_event: {
-        Args: {
-          p_event_id: string
-          p_new_status: string
-          p_outcome?: string
-          p_reason?: string
-        }
+        Args: { p_event_id: string; p_new_status: string; p_reason?: string }
         Returns: undefined
       }
       seed_area_steps: { Args: { p_area_id: string }; Returns: undefined }

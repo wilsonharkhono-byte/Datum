@@ -29,6 +29,7 @@ export function CardDetailClient({
   currentStaffId,
   attachmentsByEvent,
   stepNamesByEvent,
+  decisionOutcomesByEvent,
   candidates,
   header,
   addEvent,
@@ -51,6 +52,9 @@ export function CardDetailClient({
   attachmentsByEvent: Map<string, CardAttachment[]>;
   /** card_event_id -> step names the AI wrote off that event (Task 4 attribution). */
   stepNamesByEvent: Map<string, string[]>;
+  /** card_event_id -> captured decision outcome text (Fix 3 rework — read back
+   *  from record_revisions.reason; see getDecisionOutcomesByCardEvent). */
+  decisionOutcomesByEvent: Map<string, string>;
   candidates: StaffLite[];
   // Server-rendered sections passed through unchanged (kept as RSC).
   header: ReactNode;
@@ -94,6 +98,7 @@ export function CardDetailClient({
             events={card.events}
             attachmentsByEvent={attachmentsByEvent}
             stepNamesByEvent={stepNamesByEvent}
+            decisionOutcomesByEvent={decisionOutcomesByEvent}
             projectCode={projectCode}
             cardSlug={slug}
           />
