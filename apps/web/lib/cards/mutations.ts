@@ -25,7 +25,10 @@ import {
   removeCardMember as coreRemoveCardMember,
   approveCardEventDraft as coreApproveCardEventDraft,
   rejectCardEventDraft as coreRejectCardEventDraft,
+  linkCardToArea as coreLinkCardToArea,
+  getProjectAreas,
 } from "@datum/core";
+import { suggestAreaForCard } from "@/lib/areas/match-hint";
 import {
   EVENT_KINDS,
   EventPayloadSchemas,
@@ -96,6 +99,26 @@ export async function createCard(formData: FormData): Promise<CreateCardResult> 
     title:     input.title,
   });
   if (!result.ok) return result;
+
+  // Card-create room inheritance: same deterministic matcher used at capture
+  // time (Task 5) — if the topic name room-matches an area, auto-link it so
+  // the card starts life on the readiness matrix. Never fails the create.
+  try {
+    const [{ data: topicRow }, areas] = await Promise.all([
+      supabase.from("topics").select("name").eq("id", input.topicId).maybeSingle(),
+      getProjectAreas(supabase, input.projectId),
+    ]);
+    const hint = suggestAreaForCard({
+      cardTitle: input.title,
+      topicName: topicRow?.name ?? null,
+      areas,
+    });
+    if (hint) {
+      await coreLinkCardToArea(supabase, { cardId: result.id, areaId: hint.area.id });
+    }
+  } catch (err) {
+    Sentry.captureException(err, { tags: { scope: "createCard.roomInheritance" } });
+  }
 
   revalidatePath(`/project/${input.projectCode}`);
   return result;
