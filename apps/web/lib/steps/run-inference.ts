@@ -14,7 +14,7 @@ function errMsg(e: unknown): string {
 }
 
 export type InferenceResult =
-  | { claimed: number; done: number; skipped: number; failed: number }
+  | { claimed: number; done: number; skipped: number; failed: number; recomputedProjects?: string[] }
   | { migrationPending: true };
 
 export async function processPendingStepInference(
@@ -139,6 +139,14 @@ export async function processPendingStepInference(
   // or the standalone cron route (app/api/cron/infer-card-steps) which has no
   // surrounding request to hang a recompute off of. Recompute here so both
   // callers self-heal, instead of duplicating this at every call site.
+  //
+  // recomputedProjects tracks which of those projects this call actually
+  // recomputed successfully (i.e. no error thrown below) — the after() hooks
+  // in lib/cards/mutations.ts thread this back to skip their own trailing
+  // unconditional recompute for the same project (Task 6.5: dedup the double
+  // recompute per request). A project that fails here is deliberately left
+  // out so the trailing unconditional recompute still gets a chance to run.
+  const recomputedProjects: string[] = [];
   for (const projectId of projectsToRecompute) {
     try {
       const { data: project } = await supabase
@@ -147,7 +155,10 @@ export async function processPendingStepInference(
         .eq("id", projectId)
         .maybeSingle();
       if (project?.project_code) {
-        await recomputeProjectGatesSystem(projectId, project.project_code);
+        const result = await recomputeProjectGatesSystem(projectId, project.project_code);
+        if (result.ok) {
+          recomputedProjects.push(projectId);
+        }
       }
     } catch (e) {
       console.warn(`[infer-card-steps] recompute failed for project ${projectId}: ${errMsg(e)}`);
@@ -160,5 +171,5 @@ export async function processPendingStepInference(
       `[infer-card-steps] summary: claimed=${claimed?.length ?? 0} done=${done} skipped=${skipped} failed=${failed}`,
     );
   }
-  return { claimed: claimed?.length ?? 0, done, skipped, failed };
+  return { claimed: claimed?.length ?? 0, done, skipped, failed, recomputedProjects };
 }

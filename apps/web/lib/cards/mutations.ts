@@ -270,14 +270,26 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   // writes AI step progress to, but we still recompute again unconditionally
   // afterward here — this covers non-inferable kinds too (e.g. a plain
   // "note", which the trigger stales but inference never touches).
+  //
+  // Task 6.5: avoid recomputing the same project twice in one request.
+  // processPendingStepInference returns the set of projects it already
+  // recomputed successfully — skip the trailing call for this project when
+  // it's in that set. If inference claimed nothing (or wasn't run because
+  // the kind isn't inferable), recomputedProjects is empty and the trailing
+  // recompute still fires unconditionally as before.
   after(async () => {
+    let recomputedProjects: string[] = [];
     try {
       if (INFERABLE_KINDS.has(input.eventKind)) {
-        await processPendingStepInference(createSupabaseAdminClient(), 5);
+        const inferenceResult = await processPendingStepInference(createSupabaseAdminClient(), 5);
+        if ("recomputedProjects" in inferenceResult && inferenceResult.recomputedProjects) {
+          recomputedProjects = inferenceResult.recomputedProjects;
+        }
       }
     } catch (e) {
       Sentry.captureException(e, { extra: { where: "createCardEvent.after.inference" } });
     }
+    if (recomputedProjects.includes(input.projectId)) return;
     try {
       await recomputeProjectGatesSystem(input.projectId, input.projectCode);
     } catch (e) {
@@ -919,18 +931,27 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
   // allowlist (see comment near GATE_RELEVANT_KINDS above). This path
   // previously never fired the fix applied to createCardEvent, so approved
   // drafts left "N stale" cells behind exactly like the direct-log path did.
+  //
+  // Task 6.5: same dedup as createCardEvent — skip the trailing unconditional
+  // recompute when processPendingStepInference already recomputed this
+  // project.
   if (result.projectCode) {
     const projectId = result.projectId;
     const projectCode = result.projectCode;
     const eventKind = result.eventKind;
     after(async () => {
+      let recomputedProjects: string[] = [];
       try {
         if (INFERABLE_KINDS.has(eventKind)) {
-          await processPendingStepInference(createSupabaseAdminClient(), 5);
+          const inferenceResult = await processPendingStepInference(createSupabaseAdminClient(), 5);
+          if ("recomputedProjects" in inferenceResult && inferenceResult.recomputedProjects) {
+            recomputedProjects = inferenceResult.recomputedProjects;
+          }
         }
       } catch (e) {
         Sentry.captureException(e, { extra: { where: "approveCardEventDraft.after.inference" } });
       }
+      if (recomputedProjects.includes(projectId)) return;
       try {
         await recomputeProjectGatesSystem(projectId, projectCode);
       } catch (e) {

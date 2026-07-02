@@ -72,7 +72,7 @@ describe("processPendingStepInference", () => {
   it("returns zero counts when the claim RPC returns an empty list", async () => {
     const supabase = makeSupabase({ data: [], error: null });
     const result = await processPendingStepInference(supabase, 5);
-    expect(result).toEqual({ claimed: 0, done: 0, skipped: 0, failed: 0 });
+    expect(result).toEqual({ claimed: 0, done: 0, skipped: 0, failed: 0, recomputedProjects: [] });
   });
 
   it("marks the event skipped with ai_step_error='not_progress' when the verdict says is_progress: false, without applying any step inference", async () => {
@@ -93,7 +93,7 @@ describe("processPendingStepInference", () => {
 
     const result = await processPendingStepInference(supabase, 5);
 
-    expect(result).toEqual({ claimed: 1, done: 0, skipped: 1, failed: 0 });
+    expect(result).toEqual({ claimed: 1, done: 0, skipped: 1, failed: 0, recomputedProjects: [] });
     expect(applyStepInference).not.toHaveBeenCalled();
     const calls = (supabase as any)._updateCalls as any[];
     expect(calls).toContainEqual(
@@ -119,7 +119,7 @@ describe("processPendingStepInference", () => {
 
     const result = await processPendingStepInference(supabase, 5);
 
-    expect(result).toEqual({ claimed: 1, done: 0, skipped: 1, failed: 0 });
+    expect(result).toEqual({ claimed: 1, done: 0, skipped: 1, failed: 0, recomputedProjects: [] });
     expect(inferCardEventSteps).not.toHaveBeenCalled();
     expect(applyStepInference).not.toHaveBeenCalled();
     const calls = (supabase as any)._updateCalls as any[];
@@ -156,7 +156,7 @@ describe("processPendingStepInference", () => {
 
     const result = await processPendingStepInference(supabase, 5);
 
-    expect(result).toEqual({ claimed: 1, done: 1, skipped: 0, failed: 0 });
+    expect(result).toEqual({ claimed: 1, done: 1, skipped: 0, failed: 0, recomputedProjects: ["p-1"] });
     expect(applyStepInference).toHaveBeenCalledTimes(1);
     expect(recomputeProjectGatesSystem).toHaveBeenCalledTimes(1);
     expect(recomputeProjectGatesSystem).toHaveBeenCalledWith("p-1", "BDG-H1");
@@ -181,7 +181,36 @@ describe("processPendingStepInference", () => {
 
     const result = await processPendingStepInference(supabase, 5);
 
-    expect(result).toEqual({ claimed: 2, done: 2, skipped: 0, failed: 0 });
+    expect(result).toEqual({ claimed: 2, done: 2, skipped: 0, failed: 0, recomputedProjects: ["p-1"] });
     expect(recomputeProjectGatesSystem).toHaveBeenCalledTimes(1);
+  });
+
+  // Task 6.5: mutations.ts after() hooks thread this set back to skip their
+  // own trailing unconditional recompute for the same project — so it must
+  // only ever list projects that were *successfully* recomputed here.
+  it("omits a project from recomputedProjects when recomputeProjectGatesSystem returns ok: false", async () => {
+    const claimedEvent = {
+      id: "ce-5",
+      card_id: "card-1",
+      project_id: "p-1",
+      occurred_at: "2026-07-02T10:00:00.000Z",
+      payload: { body: "waterproofing selesai" },
+    };
+    const supabase = makeSupabase({ data: [claimedEvent], error: null }, { projectCode: "BDG-H1" });
+    vi.mocked(getCandidateStepsForCard).mockResolvedValue([
+      { area_step_id: "as-1", step_code: "BW1", name: "Waterproofing", gate_code: "B", status: "not_started" },
+    ] as any);
+    vi.mocked(inferCardEventSteps).mockResolvedValue({
+      verdict: { is_progress: true, matches: [{ area_step_id: "as-1", status: "done", confidence: 0.9 }] },
+    } as any);
+    const { selectApplicableMatches } = await import("@/lib/steps/infer");
+    vi.mocked(selectApplicableMatches).mockReturnValue([
+      { area_step_id: "as-1", status: "done", confidence: 0.9 } as any,
+    ]);
+    vi.mocked(recomputeProjectGatesSystem).mockResolvedValueOnce({ ok: false, error: "boom" });
+
+    const result = await processPendingStepInference(supabase, 5);
+
+    expect(result).toMatchObject({ claimed: 1, done: 1, recomputedProjects: [] });
   });
 });
