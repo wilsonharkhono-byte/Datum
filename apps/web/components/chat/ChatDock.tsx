@@ -1,10 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { stripActionTail } from "@datum/core";
 import { useAssistant } from "./AssistantProvider";
 import { MessageList, type Message } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { SparkIcon, XIcon } from "@/components/icons/Icon";
 import { drain, enqueue, readQueue, remove } from "@/lib/assistant/offline-queue";
+import { isDuplicateSeed } from "@/lib/assistant/daily-brief";
+import type { ActionProposalType } from "@/lib/assistant/types";
 
 type Mode = "tanya" | "catat";
 
@@ -120,7 +123,21 @@ function isStoredMessage(v: unknown): v is Message {
   );
 }
 
-export function ChatDock({ projectId, projectCode }: { projectId: string; projectCode: string }) {
+/**
+ * `projectId`/`projectCode` are optional (Phase 3 Task 5, portfolio PM
+ * mode): omitted when the dock is mounted on /brief (the principal's
+ * cross-project assistant, no single project in scope). Portfolio mode:
+ *  - "Catat" mode is hidden — capturing a note has always required a
+ *    project to file it under; there is no cross-project equivalent.
+ *  - `/api/assistant/message` is called WITHOUT a `projectId`, which is
+ *    what puts the route into its own portfolio branch (retrieval.ts's
+ *    buildPortfolioContextBlock) and disables action-tail proposals server-side.
+ *  - The localStorage session key/scope becomes a fixed "portfolio" bucket
+ *    (distinct from any single project's key) so switching between /brief
+ *    and a project page never mixes chat histories.
+ */
+export function ChatDock({ projectId, projectCode }: { projectId?: string; projectCode?: string }) {
+  const isPortfolio = projectId === undefined;
   const [mode, setMode] = useState<Mode>("tanya");
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -131,7 +148,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   const [hydrated, setHydrated] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
 
-  const { pendingPrompt, clearPending } = useAssistant();
+  const { pendingSeed, clearPending } = useAssistant();
 
   // Offline-queue guards. busyRef mirrors `busy` so the window "online"
   // listener can tell whether a send is in progress without a fresh render;
@@ -142,7 +159,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   const busyRef = useRef(false);
   const inFlightIds = useRef<Set<string>>(new Set());
 
-  const storageKey = `datum.chat.${projectId}`;
+  // Offline-queue functions (enqueue/readQueue/drain/remove) key their
+  // localStorage bucket off a plain scope string — "portfolio" is a stable
+  // sentinel scope distinct from any real project uuid.
+  const queueScope = projectId ?? "portfolio";
+  const storageKey = `datum.chat.${queueScope}`;
 
   // ── Session persistence ────────────────────────────────────────────────
   useEffect(() => {
@@ -171,18 +192,39 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     } catch { /* quota exceeded / private mode — non-fatal */ }
   }, [messages, sessionId, hydrated, storageKey]);
 
-  // A seeded prompt (e.g. from the room "Tanya asisten" button, carried across
-  // navigation by AssistantProvider) opens the dock and auto-asks in tanya mode.
+  // A seeded prompt (e.g. from the room "Tanya asisten" button, or the daily
+  // brief notification link — carried across navigation by AssistantProvider)
+  // opens the dock. Two variants (see PendingSeed in AssistantProvider):
+  //  - "question": posts the text as a USER message and runs it (existing
+  //    "Tanya asisten" behavior).
+  //  - "assistant_message": posts the text directly as an ASSISTANT-authored
+  //    first message — no request sent, deterministic compose already
+  //    happened server-side in the cron (Task 4: daily brief). The user can
+  //    still type follow-ups afterward like any other conversation.
   useEffect(() => {
-    if (!pendingPrompt) return;
+    if (!pendingSeed) return;
     setMobileOpen(true);
     setMode("tanya");
-    setMessages((m) => [...m, { role: "user", content: pendingPrompt }]);
-    void run("tanya", pendingPrompt, null);
+    if (pendingSeed.kind === "assistant_message") {
+      // Fix 1 (reseed duplicates): localStorage hydration can already have
+      // today's digest in `messages` (e.g. an earlier /brief visit whose
+      // markNotificationRead round-trip hasn't landed yet, or failed) — skip
+      // the append rather than double-posting the identical bubble.
+      setMessages((m) => {
+        const existingContents = m
+          .filter((msg): msg is Extract<Message, { content: string }> => "content" in msg)
+          .map((msg) => msg.content);
+        if (isDuplicateSeed(existingContents, pendingSeed.text)) return m;
+        return [...m, { role: "assistant", content: pendingSeed.text }];
+      });
+    } else {
+      setMessages((m) => [...m, { role: "user", content: pendingSeed.text }]);
+      void run("tanya", pendingSeed.text, null);
+    }
     clearPending();
-    // Fire only when a new prompt arrives.
+    // Fire only when a new seed arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingPrompt]);
+  }, [pendingSeed]);
 
   function resetChat() {
     try { window.localStorage.removeItem(storageKey); } catch { /* ignore */ }
@@ -237,21 +279,37 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     };
 
     const handleEvent = (line: string) => {
-      let evt: { type?: string; text?: string; message?: string; sessionId?: string | null; citations?: { cardId: string; eventIds: string[] }[] };
+      let evt: {
+        type?: string;
+        text?: string;
+        message?: string;
+        sessionId?: string | null;
+        citations?: { cardId: string; eventIds: string[] }[];
+        action?: ActionProposalType | null;
+      };
       try { evt = JSON.parse(line); } catch { return; }
       if (evt.type === "delta") {
         appendDelta(evt.text ?? "");
       } else if (evt.type === "done") {
         finished = true;
         if (evt.sessionId) setSessionId(evt.sessionId);
+        // The action tail (Task 3) streamed in as raw text via `delta` events
+        // above (the server can't hold it back mid-stream), so the
+        // accumulated bubble content still has the raw <action>...</action>
+        // tag in it here. Finalize the bubble with that tail stripped and
+        // attach the server-parsed+validated `action` (if any) — this is the
+        // "client parses AFTER stream completion" step: MessageList's render
+        // also strips defensively, but stripping here keeps the *stored*
+        // message (localStorage, history) clean too.
         setMessages((m) => {
           const copy = m.slice();
           const last = copy[copy.length - 1];
           if (last && last.role === "assistant" && "content" in last && last.streaming) {
             copy[copy.length - 1] = {
               role: "assistant",
-              content: last.content,
+              content: stripActionTail(last.content),
               citations: evt.citations ?? [],
+              action: evt.action ?? null,
             };
           } else if (!started) {
             // Model produced no text at all — still surface an honest bubble.
@@ -285,6 +343,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   }
 
   async function runCatat(input: string, file: File | null) {
+    // Portfolio mode (no projectId) never shows the "Catat" tab (see the mode
+    // segmented control below), so this should be unreachable there — but
+    // fail loudly rather than silently sending projectId: undefined to a
+    // route that requires it, if some caller ever does reach it.
+    if (!projectId) throw new Error("Mode Catat membutuhkan proyek — tidak tersedia di asisten portofolio.");
     const res = await fetchWithRetry(
       "/api/assistant/capture",
       {
@@ -321,8 +384,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         // Never lose the text: park it in the offline queue (the user bubble
         // stays visible in the thread) and announce it with an amber bubble.
         // No "Coba lagi" here — the drain triggers re-send automatically.
-        await enqueue(projectId, { mode: runMode, text: input, ts: Date.now() });
-        setQueueCount((await readQueue(projectId)).length);
+        await enqueue(queueScope, { mode: runMode, text: input, ts: Date.now() });
+        setQueueCount((await readQueue(queueScope)).length);
         setMessages((m) => [...m, { role: "assistant" as const, content: QUEUED_NOTICE, queued: true }]);
       } else {
         const msg = `Gagal: ${e instanceof Error ? e.message : String(e)}`;
@@ -376,7 +439,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   // is what stops an overlapping drain from double-sending meanwhile.
   async function drainQueue() {
     if (drainingRef.current || busyRef.current) return;
-    const items = await drain(projectId);
+    const items = await drain(queueScope);
     setQueueCount(items.length);
     if (items.length === 0) return;
     drainingRef.current = true;
@@ -390,13 +453,13 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         try {
           if (item.mode === "tanya") await runTanya(item.text);
           else await runCatat(item.text, null);
-          await remove(projectId, item.id);
+          await remove(queueScope, item.id);
         } catch (e) {
           if (!(e instanceof NetworkError)) {
             // The server received and rejected this item — re-sending the
             // same payload won't succeed, so drop it (the text stays visible
             // in the thread) instead of wedging the queue head forever.
-            await remove(projectId, item.id);
+            await remove(queueScope, item.id);
             setMessages((m) => [...m, {
               role: "assistant" as const,
               content: `Gagal mengirim pesan tertunda: ${e instanceof Error ? e.message : String(e)}`,
@@ -406,7 +469,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           break; // stop on first failure; remaining items stay queued
         } finally {
           inFlightIds.current.delete(item.id);
-          setQueueCount((await readQueue(projectId)).length);
+          setQueueCount((await readQueue(queueScope)).length);
         }
       }
     } finally {
@@ -431,7 +494,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     const onOnline = () => { void drainQueueRef.current(); };
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [hydrated, projectId]);
+  }, [hydrated, queueScope]);
 
   const pending = pendingLabel !== null;
   const hasContent = messages.length > 0 || pending;
@@ -448,30 +511,35 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[var(--text-inverse)]">
           <div className="flex min-w-0 items-center gap-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)]">
-              <SparkIcon size={12} /> Asisten
+              <SparkIcon size={12} /> {isPortfolio ? "Asisten Portofolio" : "Asisten"}
             </span>
-            <div className="seg" role="tablist" aria-label="Mode asisten">
-              <button
-                type="button"
-                role="tab"
-                onClick={() => setMode("tanya")}
-                aria-label="Mode tanya"
-                aria-selected={mode === "tanya"}
-                className={`seg-btn${mode === "tanya" ? " seg-active" : ""}`}
-              >
-                Tanya
-              </button>
-              <button
-                type="button"
-                role="tab"
-                onClick={() => setMode("catat")}
-                aria-label="Mode catat"
-                aria-selected={mode === "catat"}
-                className={`seg-btn${mode === "catat" ? " seg-active" : ""}`}
-              >
-                Catat
-              </button>
-            </div>
+            {/* "Catat" (capture) has no cross-project equivalent — a note always
+                files under one specific project's card, so the mode toggle
+                collapses to Tanya-only in portfolio mode. */}
+            {!isPortfolio ? (
+              <div className="seg" role="tablist" aria-label="Mode asisten">
+                <button
+                  type="button"
+                  role="tab"
+                  onClick={() => setMode("tanya")}
+                  aria-label="Mode tanya"
+                  aria-selected={mode === "tanya"}
+                  className={`seg-btn${mode === "tanya" ? " seg-active" : ""}`}
+                >
+                  Tanya
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  onClick={() => setMode("catat")}
+                  aria-label="Mode catat"
+                  aria-selected={mode === "catat"}
+                  className={`seg-btn${mode === "catat" ? " seg-active" : ""}`}
+                >
+                  Catat
+                </button>
+              </div>
+            ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {queueCount > 0 ? (
@@ -504,9 +572,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
               </button>
             ) : (
               <span className="hidden text-[10px] uppercase tracking-[0.06em] text-[var(--text-inverse-secondary)] md:inline">
-                {mode === "tanya"
-                  ? "Bahasa Indonesia · jawaban dikutip dari kartu"
-                  : "AI memilih kartu + jenis aktivitas; Anda konfirmasi"}
+                {isPortfolio
+                  ? "Ringkasan lintas-proyek · Bahasa Indonesia"
+                  : mode === "tanya"
+                    ? "Bahasa Indonesia · jawaban dikutip dari kartu"
+                    : "AI memilih kartu + jenis aktivitas; Anda konfirmasi"}
               </span>
             )}
           </div>
@@ -522,6 +592,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             pending={pending}
             pendingLabel={pendingLabel ?? WAITING_LABEL}
             onRetry={lastFailed ? retryLast : null}
+            projectId={projectId ?? null}
           />
         ) : null}
 
@@ -532,9 +603,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             disabled={busy}
             acceptFiles={mode === "catat"}
             placeholder={
-              mode === "tanya"
-                ? "Tanya atau cari di kartu…"
-                : "Catat sesuatu atau drop file…"
+              isPortfolio
+                ? "Tanya tentang seluruh proyek…"
+                : mode === "tanya"
+                  ? "Tanya atau cari di kartu…"
+                  : "Catat sesuatu atau drop file…"
             }
           />
         </div>

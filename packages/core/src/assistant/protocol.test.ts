@@ -3,6 +3,7 @@ import {
   parseStreamLine,
   extractCitations,
   stripCitationTokens,
+  stripActionTail,
 } from "./protocol";
 
 const UUID = "00000000-0000-0000-0000-000000000001";
@@ -28,6 +29,7 @@ describe("parseStreamLine — done", () => {
       sessionId: UUID,
       citations: [{ cardId: UUID2, eventIds: [UUID3] }],
       usage: { input_tokens: 10, output_tokens: 20 },
+      action: null,
     };
     const result = parseStreamLine(JSON.stringify(done));
     expect(result).toEqual(done);
@@ -38,6 +40,21 @@ describe("parseStreamLine — done", () => {
       JSON.stringify({ type: "done", sessionId: null, citations: [], usage: { input_tokens: 0, output_tokens: 0 } }),
     );
     expect(result).toMatchObject({ type: "done", sessionId: null });
+  });
+
+  it("passes through an action payload when present", () => {
+    const action = { type: "remind", message: "Cek flood test" };
+    const result = parseStreamLine(
+      JSON.stringify({ type: "done", sessionId: null, citations: [], usage: { input_tokens: 0, output_tokens: 0 }, action }),
+    );
+    expect(result).toMatchObject({ type: "done", action });
+  });
+
+  it("defaults action to null when absent (back-compat with pre-Task-3 payloads)", () => {
+    const result = parseStreamLine(
+      JSON.stringify({ type: "done", sessionId: null, citations: [], usage: { input_tokens: 0, output_tokens: 0 } }),
+    );
+    expect(result).toMatchObject({ type: "done", action: null });
   });
 
   it("filters invalid citations", () => {
@@ -146,5 +163,32 @@ describe("stripCitationTokens", () => {
   it("does not modify text with no citation tokens", () => {
     const plain = "Tidak ada citation di sini.";
     expect(stripCitationTokens(plain)).toBe(plain);
+  });
+});
+
+describe("stripActionTail", () => {
+  it("removes a well-formed action tail", () => {
+    const text = `Jawaban lengkap.\n<action>{"type":"remind","message":"x"}</action>`;
+    expect(stripActionTail(text)).toBe("Jawaban lengkap.");
+  });
+
+  it("returns the text unchanged when there is no action tail", () => {
+    expect(stripActionTail("Jawaban tanpa aksi.")).toBe("Jawaban tanpa aksi.");
+  });
+
+  it("strips an unclosed/still-streaming tag through to the end", () => {
+    expect(stripActionTail(`Jawaban.\n<action>{"type":"rem`)).toBe("Jawaban.");
+  });
+
+  it("strips everything from the first <action> occurrence, including a second tail", () => {
+    const text =
+      `Jawaban.\n<action>{"type":"remind","message":"Pertama"}</action>` +
+      `<action>{"type":"remind","message":"Kedua"}</action>`;
+    expect(stripActionTail(text)).toBe("Jawaban.");
+  });
+
+  it("trims trailing whitespace left behind after stripping", () => {
+    const text = `Jawaban.   \n\n<action>{"type":"remind","message":"x"}</action>`;
+    expect(stripActionTail(text)).toBe("Jawaban.");
   });
 });

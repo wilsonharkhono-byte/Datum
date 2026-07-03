@@ -462,6 +462,7 @@ export {
   parseStreamLine,
   extractCitations,
   stripCitationTokens,
+  stripActionTail,
   type AssistantStreamEvent,
   type Citation,
 } from "./assistant/protocol";

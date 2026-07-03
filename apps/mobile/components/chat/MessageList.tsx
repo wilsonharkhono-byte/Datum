@@ -9,7 +9,7 @@
 
 import { useRef, useEffect } from "react";
 import { FlatList, View, ActivityIndicator } from "react-native";
-import { stripCitationTokens } from "@datum/core";
+import { stripCitationTokens, stripActionTail } from "@datum/core";
 import type { Citation } from "@datum/core";
 import type { Proposal } from "@datum/core";
 import { Text } from "@/components/ui/Text";
@@ -61,7 +61,12 @@ function AssistantBubble({
 }: {
   msg: Extract<ChatMessage, { role: "assistant" }>;
 }) {
-  const visibleText = stripCitationTokens(msg.content);
+  // Web's ChatDock finalizes the stored bubble with the action tail already
+  // stripped once a stream completes (see ChatDock.tsx), but mobile renders
+  // the raw accumulated stream text directly and has no action-chip UI yet
+  // (Phase 3 Task 3 docstring on stripActionTail) — strip both defensively
+  // here so a raw <action>...</action> tag never leaks into the bubble.
+  const visibleText = stripActionTail(stripCitationTokens(msg.content));
 
   if (msg.queued) {
     return (

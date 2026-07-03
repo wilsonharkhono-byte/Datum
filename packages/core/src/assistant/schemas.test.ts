@@ -16,8 +16,13 @@ describe("ChatRequest", () => {
     ).not.toThrow();
   });
 
-  it("rejects missing projectId", () => {
-    expect(() => ChatRequest.parse({ question: "Apa?" })).toThrow();
+  // Phase 3 Task 5 (portfolio PM mode): projectId is OPTIONAL — an absent
+  // projectId puts the assistant route into its cross-project /brief branch.
+  // Existing callers (web project pages, mobile) always send one and are
+  // unaffected; only a missing key is now valid, not a malformed one.
+  it("accepts a missing projectId (portfolio mode)", () => {
+    const parsed = ChatRequest.parse({ question: "Apa?" });
+    expect(parsed.projectId).toBeUndefined();
   });
 
   it("rejects non-uuid projectId", () => {

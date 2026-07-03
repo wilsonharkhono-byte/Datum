@@ -9,7 +9,11 @@
  * and then deduplicates + persists the intents as `notifications` rows.
  *
  * NOTE ON KIND: Uses the dedicated `readiness_reminder` notification_kind
- * (DB enum value added via migration 20260623000002).
+ * (DB enum value added via migration 20260623000002). Task 4's grouped daily
+ * digest (`groupIntentsByRecipient` / `DAILY_BRIEF_KIND` below) reuses the
+ * SAME kind — it is still, mechanically, a readiness reminder; only the
+ * cardinality (one row per person per day instead of one per signal) and the
+ * message (composed via `composePersonalBrief`) differ. No migration needed.
  *
  * NOTE ON PUSH: The cron route fans out Expo push notifications via
  * sendExpoPush for each newly-inserted (non-deduped) intent.
@@ -20,6 +24,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 import { getProjectStepSignals } from "@/lib/steps/queries";
 import type { StepSignalSeverity } from "@/lib/steps/signals";
+import { composePersonalBrief, roleLabel } from "@/lib/assistant/daily-brief";
 
 type Supa = SupabaseClient<Database>;
 
@@ -42,6 +47,32 @@ export type ReminderIntent = {
    * exists in the last 7 days.
    */
   dedupeKey: string;
+  /** The originating signal's severity — feeds the daily-brief escalation line. */
+  severity: StepSignalSeverity;
+  /**
+   * Roles this SAME signal was also escalated to beyond this recipient's base
+   * resolution (e.g. "high"/"critical" widened the ladder to site_supervisor/
+   * pic/principal — see `escalateRecipients`). Empty when the signal did not
+   * escalate. Per-item audience by staff id isn't cheaply retrievable here
+   * (the base vs. escalated split is role-shaped, not id-shaped, once
+   * de-duped across signals) — see `groupIntentsByRecipient` for how this
+   * feeds the digest's "juga dikirim ke" line.
+   *
+   * NOTE: this is the SAME array for every recipient of this signal — it is
+   * NOT pre-filtered to exclude the recipient's own role (an escalated
+   * site_supervisor's own role can appear here). `recipientStaffRole` below
+   * exists precisely so a consumer can filter it per-recipient before
+   * display — see `groupIntentsByRecipient`.
+   */
+  escalatedRoles: string[];
+  /**
+   * This recipient's own `staff.role` on the project, resolved from
+   * `members` (null when the recipient came from `project.principal_id` /
+   * `pic_id` fallback and isn't present in `members`). Used to filter this
+   * recipient's own role out of `escalatedRoles` before it's shown to them —
+   * see `groupIntentsByRecipient`.
+   */
+  recipientStaffRole: string | null;
 };
 
 // ─── Active-project enumerator ────────────────────────────────────────────────
@@ -233,6 +264,20 @@ export async function buildReadinessReminders(
       const base = resolveRecipients(row.tradeRole, members, project);
       const recipients = escalateRecipients(row.signal.severity, base, members, project);
 
+      // Roles this signal's escalation ladder ADDED beyond the base resolution
+      // (id -> staff_role via `members`; falls back to skip if the id is a
+      // project.principal_id/pic_id not present in `members`). Used only for
+      // the digest's "juga dikirim ke" transparency line — see
+      // `ReminderIntent.escalatedRoles` for why this is role-shaped, not id-shaped.
+      const escalatedRoles = recipients.length > base.length
+        ? [...new Set(
+            recipients
+              .filter((id) => !base.includes(id))
+              .map((id) => members.find((m) => m.staff_id === id)?.staff_role)
+              .filter((role): role is string => Boolean(role)),
+          )]
+        : [];
+
       for (const recipientStaffId of recipients) {
         const dedupeKey = [
           recipientStaffId,
@@ -249,12 +294,115 @@ export async function buildReadinessReminders(
           link,
           projectId: project.id,
           dedupeKey,
+          severity: row.signal.severity,
+          escalatedRoles,
+          recipientStaffRole: members.find((m) => m.staff_id === recipientStaffId)?.staff_role ?? null,
         });
       }
     }
   }
 
   return { intents, projectsScanned: projects.length, signalsFound };
+}
+
+// ─── Per-recipient digest grouping (Task 4: daily brief) ─────────────────────
+
+/** The dedicated notification_kind for a grouped daily digest (reuses READINESS_REMINDER_KIND — see module docstring below). */
+export const DAILY_BRIEF_KIND = READINESS_REMINDER_KIND;
+
+export type DailyDigestIntent = {
+  recipientStaffId: string;
+  kind: typeof DAILY_BRIEF_KIND;
+  /** Composed via `composePersonalBrief` — the notifications.summary. */
+  message: string;
+  /** Always /brief — the digest is cross-project, unlike a single-signal intent's project link. */
+  link: string;
+  /** Dedup key: one digest per (recipient, date) — see cron route's isAlreadyNotified call site for this kind. */
+  dedupeKey: string;
+  /** How many source signals this digest folds together — the cron uses this to pick digest vs. single-row delivery. */
+  itemCount: number;
+};
+
+/**
+ * Groups `ReminderIntent[]` by recipient and composes one digest per person
+ * via `composePersonalBrief` (pure — from `lib/assistant/daily-brief.ts`).
+ *
+ * `staffNames` maps staff id -> full_name (the cron route loads this once
+ * from the `staff` table before calling this function — keeps this function
+ * itself DB-free and unit-testable).
+ *
+ * `today` (YYYY-MM-DD) is folded into the dedup key so digests naturally
+ * roll over at midnight without a separate cleanup pass.
+ *
+ * Escalation transparency: for each recipient, the digest's "juga dikirim
+ * ke" line names the roles from the HIGHEST-SEVERITY item's escalation
+ * ladder (`escalatedRoles` on that item) — see `ReminderIntent.escalatedRoles`
+ * docstring for why this is a simplification (role-shaped, not a literal
+ * per-item audience list). `escalatedRoles` is the SAME array for every
+ * recipient of a signal, so an escalated recipient (e.g. the mandor added by
+ * a "high"-severity signal) would otherwise see their OWN role named in
+ * their own digest ("Juga dikirim ke: mandor, PIC"). We filter the
+ * recipient's own `recipientStaffRole` out of the escalation line before
+ * composing — they already know they were notified; the line is meant to
+ * tell them who ELSE was.
+ *
+ * Delivery-count policy (documented per Task 4 requirement #2): recipients
+ * with exactly ONE item keep their original single-signal `ReminderIntent`
+ * (no grouping benefit, and the specific project link is more useful than
+ * the generic /brief link) — this function only returns entries for
+ * recipients with 2+ items. The cron route is responsible for writing the
+ * single-item recipients' original rows unchanged.
+ */
+export function groupIntentsByRecipient(
+  intents: ReminderIntent[],
+  staffNames: Map<string, string>,
+  today: string,
+): DailyDigestIntent[] {
+  const byRecipient = new Map<string, ReminderIntent[]>();
+  for (const intent of intents) {
+    const list = byRecipient.get(intent.recipientStaffId) ?? [];
+    list.push(intent);
+    byRecipient.set(intent.recipientStaffId, list);
+  }
+
+  const SEVERITY_ORDER: Record<StepSignalSeverity, number> = {
+    critical: 0,
+    high: 1,
+    warning: 2,
+    info: 3,
+  };
+
+  const out: DailyDigestIntent[] = [];
+  for (const [recipientStaffId, items] of byRecipient) {
+    if (items.length <= 1) continue; // single-item recipients keep their original row (see docstring)
+
+    const sorted = [...items].sort(
+      (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
+    );
+    const ownRole = sorted[0]!.recipientStaffRole;
+    const escalatedTo = sorted[0]!.escalatedRoles
+      .filter((role) => role !== ownRole)
+      .map(roleLabel);
+    const name = staffNames.get(recipientStaffId) ?? "Tim";
+
+    const message = composePersonalBrief({
+      name,
+      items: sorted.map((i) => ({ message: i.message })),
+      escalatedTo,
+    });
+    if (!message) continue; // defensive — sorted is never empty here
+
+    out.push({
+      recipientStaffId,
+      kind: DAILY_BRIEF_KIND,
+      message,
+      link: "/brief",
+      dedupeKey: [recipientStaffId, today].join("|"),
+      itemCount: items.length,
+    });
+  }
+
+  return out;
 }
 
 // ─── Unconfirmed AI block notification (confirm-gate, Task 3) ────────────────

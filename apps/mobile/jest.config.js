@@ -1,5 +1,10 @@
 module.exports = {
   preset: "jest-expo",
+  // The first async test in a suite pays the one-time cost of transforming the
+  // react-native/expo module graph before its own logic runs; on slower CI
+  // runners that cold start alone can approach Jest's 5s default and flake the
+  // streaming-assistant tests. 20s gives headroom without masking real hangs.
+  testTimeout: 20000,
   testMatch: [
     "**/tests/**/*.test.tsx",
     "**/tests/**/*.test.ts",

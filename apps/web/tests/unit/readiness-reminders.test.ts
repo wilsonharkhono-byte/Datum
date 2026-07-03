@@ -24,7 +24,9 @@ import {
   getActiveProjects,
   getProjectMembers,
   READINESS_REMINDER_KIND,
+  DAILY_BRIEF_KIND,
   escalateRecipients,
+  groupIntentsByRecipient,
   resolveUnconfirmedBlockRecipients,
   buildUnconfirmedBlockIntents,
   loadUnconfirmedBlockIntents,
@@ -34,11 +36,13 @@ import {
   type ProjectMember,
   type ActiveProject,
   type UnconfirmedBlockContext,
+  type ReminderIntent,
 } from "@/lib/steps/reminders";
 import { sendExpoPush } from "@/lib/notifications/push-send";
 import {
   isCronAuthorized,
   isAlreadyNotified,
+  isDigestAlreadySentToday,
   jakartaToday,
   isMigrationPendingError,
 } from "@/app/api/cron/readiness-reminders/route";
@@ -244,6 +248,8 @@ describe("buildReadinessReminders", () => {
     expect(intent.link).toBe("/project/BDG-H1/schedule");
     expect(intent.message).toContain("Kamar Mandi A");
     expect(intent.message).toContain("Screed");
+    expect(intent.severity).toBeDefined();
+    expect(Array.isArray(intent.escalatedRoles)).toBe(true);
     expect(intent.projectId).toBe("proj-1");
   });
 
@@ -330,6 +336,238 @@ describe("buildReadinessReminders", () => {
   });
 });
 
+// ─── groupIntentsByRecipient (Task 4: daily brief digest) ────────────────────
+
+describe("groupIntentsByRecipient", () => {
+  const TODAY_LOCAL = "2026-07-10";
+
+  function makeIntent(overrides: Partial<ReminderIntent>): ReminderIntent {
+    return {
+      recipientStaffId: "staff-1",
+      kind: READINESS_REMINDER_KIND,
+      message: "Signal message",
+      link: "/project/BDG-H1/schedule",
+      projectId: "proj-1",
+      dedupeKey: "dedupe-1",
+      severity: "warning",
+      escalatedRoles: [],
+      recipientStaffRole: null,
+      ...overrides,
+    };
+  }
+
+  it("returns no digest for a recipient with exactly one item (single-item policy)", () => {
+    const intents = [makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1" })];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    expect(result).toEqual([]);
+  });
+
+  it("groups a recipient with 2+ items into ONE digest intent", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1", message: "Item A", severity: "warning" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2", message: "Item B", severity: "high" }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    expect(result).toHaveLength(1);
+    const digest = result[0]!;
+    expect(digest.recipientStaffId).toBe("staff-1");
+    expect(digest.kind).toBe(DAILY_BRIEF_KIND);
+    expect(digest.link).toBe("/brief");
+    expect(digest.itemCount).toBe(2);
+    expect(digest.message).toContain("Pagi Rani");
+    expect(digest.message).toContain("2 hal hari ini");
+  });
+
+  it("digest dedup key is (recipient, date)", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2" }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    expect(result[0]!.dedupeKey).toBe("staff-1|2026-07-10");
+  });
+
+  it("digest dedup key changes with the date (rolls over daily)", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2" }),
+    ];
+    const day1 = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), "2026-07-10");
+    const day2 = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), "2026-07-11");
+    expect(day1[0]!.dedupeKey).not.toBe(day2[0]!.dedupeKey);
+  });
+
+  it("orders items by severity (critical first) before composing", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1", message: "Warning item", severity: "warning" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2", message: "Critical item", severity: "critical" }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    const msg = result[0]!.message;
+    expect(msg.indexOf("Critical item")).toBeLessThan(msg.indexOf("Warning item"));
+  });
+
+  it("uses the highest-severity item's escalatedRoles for the 'juga dikirim ke' line", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1", severity: "warning", escalatedRoles: ["designer"] }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2", severity: "critical", escalatedRoles: ["principal", "pic"] }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    expect(result[0]!.message).toContain("Juga dikirim ke: principal, PIC.");
+    expect(result[0]!.message).not.toContain("designer");
+  });
+
+  // ── Regression: escalation transparency must not name the recipient's own role ──
+  //
+  // Drives through the REAL recipient/escalation split (buildReadinessReminders
+  // -> resolveRecipients -> escalateRecipients), not hand-constructed
+  // escalatedRoles. Two signals in one project:
+  //   - Signal A (area-1, "high" severity, designer trade_role): base
+  //     recipient is the designer; "high" widens the ladder to
+  //     site_supervisor + pic (escalateRecipients) — so the site_supervisor
+  //     receives this intent too, with escalatedRoles = [site_supervisor, pic]
+  //     attached identically to EVERY recipient, including themselves.
+  //   - Signal B (area-2, "warning" severity, site_supervisor trade_role): no
+  //     escalation; gives both the designer and the site_supervisor a SECOND
+  //     item each so they both cross the 2-item digest threshold.
+  //
+  // Expected: the escalated site_supervisor's digest must NOT name
+  // "site_supervisor"/"mandor" (their own role) in "Juga dikirim ke", while
+  // the base designer's digest still names the roles the signal escalated to.
+  it("excludes the recipient's own role from their digest's escalation line (real split)", async () => {
+    const project: ActiveProject = {
+      id: "proj-1",
+      project_code: "BDG-H1",
+      project_name: "Test Project",
+      principal_id: null,
+      pic_id: "staff-pic",
+    };
+
+    const highSeverityDesignerStep = {
+      id: "as-1",
+      step_code: "D1",
+      status: "in_progress",
+      planned_start: "2026-07-01",
+      planned_end: "2026-07-05", // past TODAY → behind_plan/high
+      actual_start: "2026-07-01",
+      actual_end: null,
+      blocking_reason: null,
+      last_progress_at: null,
+      area_id: "area-1",
+      trade_steps: {
+        name: "Desain interior",
+        step_type: "site_work",
+        trade_role: "designer",
+        lead_time_days: 0,
+        typical_duration_days: 3,
+      },
+    };
+    const warningSeveritySupervisorStep = {
+      id: "as-2",
+      step_code: "S1",
+      status: "not_started",
+      planned_start: "2026-07-01", // past TODAY, not started → behind_plan/warning
+      planned_end: "2026-07-20",
+      actual_start: null,
+      actual_end: null,
+      blocking_reason: null,
+      last_progress_at: null,
+      area_id: "area-2",
+      trade_steps: {
+        name: "Pasang bata",
+        step_type: "site_work",
+        trade_role: "site_supervisor",
+        lead_time_days: 0,
+        typical_duration_days: 3,
+      },
+    };
+
+    const designerMember = {
+      staff_id: "staff-designer",
+      role_on_project: "design",
+      staff: { role: "designer", active: true },
+    };
+    const supervisorMember = {
+      staff_id: "staff-supervisor",
+      role_on_project: "site",
+      staff: { role: "site_supervisor", active: true },
+    };
+    const picMember = {
+      staff_id: "staff-pic",
+      role_on_project: "pic",
+      staff: { role: "pic", active: true },
+    };
+
+    const supa = fakeClient([
+      { data: [project], error: null }, // projects
+      { data: [highSeverityDesignerStep, warningSeveritySupervisorStep], error: null }, // area_steps
+      { data: [], error: null }, // trade_step_deps
+      { data: [{ id: "area-1", area_name: "Ruang Tamu" }, { id: "area-2", area_name: "Kamar Mandi A" }], error: null }, // areas
+      { data: [designerMember, supervisorMember, picMember], error: null }, // project_staff
+    ]);
+
+    const { intents } = await buildReadinessReminders(supa, TODAY, NOW);
+
+    // Sanity: the "high" signal really did escalate the site_supervisor in
+    // (via the real escalateRecipients ladder), and escalatedRoles is
+    // attached identically to every recipient of that signal.
+    const supervisorOnDesignSignal = intents.find(
+      (i) => i.recipientStaffId === "staff-supervisor" && i.dedupeKey.includes("D1"),
+    );
+    expect(supervisorOnDesignSignal).toBeDefined();
+    expect(supervisorOnDesignSignal!.escalatedRoles).toContain("site_supervisor");
+
+    const staffNames = new Map([
+      ["staff-designer", "Dewi"],
+      ["staff-supervisor", "Budi"],
+    ]);
+    const digests = groupIntentsByRecipient(intents, staffNames, TODAY);
+
+    const supervisorDigest = digests.find((d) => d.recipientStaffId === "staff-supervisor");
+    const designerDigest = digests.find((d) => d.recipientStaffId === "staff-designer");
+
+    expect(supervisorDigest).toBeDefined();
+    expect(designerDigest).toBeDefined();
+
+    // The escalated site_supervisor must not see their own role named back
+    // to them in the transparency line.
+    expect(supervisorDigest!.message).not.toContain("mandor");
+    expect(supervisorDigest!.message).not.toContain("site_supervisor");
+
+    // The base designer (not escalated) still sees who the signal escalated to.
+    expect(designerDigest!.message).toContain("Juga dikirim ke:");
+    expect(designerDigest!.message).toContain("mandor");
+  });
+
+  it("falls back to a generic name when the recipient isn't in staffNames", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-unknown", dedupeKey: "k1" }),
+      makeIntent({ recipientStaffId: "staff-unknown", dedupeKey: "k2" }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map(), TODAY_LOCAL);
+    expect(result[0]!.message).toContain("Pagi Tim");
+  });
+
+  it("handles multiple recipients independently — mixes digest and single-item skip", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2" }),
+      makeIntent({ recipientStaffId: "staff-2", dedupeKey: "k3" }), // single item — no digest
+    ];
+    const result = groupIntentsByRecipient(
+      intents,
+      new Map([["staff-1", "Rani"], ["staff-2", "Budi"]]),
+      TODAY_LOCAL,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]!.recipientStaffId).toBe("staff-1");
+  });
+
+  it("returns an empty array for an empty intents list", () => {
+    expect(groupIntentsByRecipient([], new Map(), TODAY_LOCAL)).toEqual([]);
+  });
+});
+
 // ─── isAlreadyNotified ────────────────────────────────────────────────────────
 
 describe("isAlreadyNotified", () => {
@@ -360,6 +598,65 @@ describe("isAlreadyNotified", () => {
     const supa = fakeClient([{ data: null, error: { message: "db error" } }]);
     const result = await isAlreadyNotified(supa as any, INTENT, SEVEN_DAYS_AGO);
     expect(result).toBe(true); // err on the side of not duplicating
+  });
+});
+
+// ─── isDigestAlreadySentToday (Task 4: digest dedup) ──────────────────────────
+
+describe("isDigestAlreadySentToday", () => {
+  const TODAY_START_ISO = "2026-07-10T00:00:00+07:00";
+
+  const DIGEST_INTENT = {
+    recipientStaffId: "staff-1",
+    link: "/brief",
+    kind: DAILY_BRIEF_KIND,
+  };
+
+  it("returns true (skip) when a digest was already sent today", async () => {
+    const supa = fakeClient([{ data: [{ id: "notif-1" }], error: null }]);
+    const result = await isDigestAlreadySentToday(supa as any, DIGEST_INTENT, TODAY_START_ISO);
+    expect(result).toBe(true);
+  });
+
+  it("returns false (proceed) when no digest has been sent today, regardless of read state", async () => {
+    const supa = fakeClient([{ data: [], error: null }]);
+    const result = await isDigestAlreadySentToday(supa as any, DIGEST_INTENT, TODAY_START_ISO);
+    expect(result).toBe(false);
+  });
+
+  it("returns true (skip) when the dedup query itself errors", async () => {
+    const supa = fakeClient([{ data: null, error: { message: "db error" } }]);
+    const result = await isDigestAlreadySentToday(supa as any, DIGEST_INTENT, TODAY_START_ISO);
+    expect(result).toBe(true); // err on the side of not duplicating
+  });
+
+  it("filters on recipient, link, kind, and created_at >= start of today (no read_at filter)", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    let gteCall: [string, unknown] | null = null;
+    const supa = {
+      from(_table: string) {
+        const builder: any = {
+          select: () => builder,
+          eq: (col: string, val: unknown) => {
+            eqCalls.push([col, val]);
+            return builder;
+          },
+          gte: (col: string, val: unknown) => {
+            gteCall = [col, val];
+            return builder;
+          },
+          limit: () => Promise.resolve({ data: [], error: null }),
+        };
+        return builder;
+      },
+    } as any;
+
+    await isDigestAlreadySentToday(supa, DIGEST_INTENT, TODAY_START_ISO);
+
+    expect(eqCalls).toContainEqual(["recipient_staff_id", "staff-1"]);
+    expect(eqCalls).toContainEqual(["link", "/brief"]);
+    expect(eqCalls).toContainEqual(["kind", DAILY_BRIEF_KIND]);
+    expect(gteCall).toEqual(["created_at", TODAY_START_ISO]);
   });
 });
 
