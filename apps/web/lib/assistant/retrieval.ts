@@ -293,6 +293,7 @@ async function buildPmContextSections(
   projectId: string,
   today: string,
   question?: string,
+  nowIso?: string,
 ): Promise<string> {
   const areas = await getProjectAreas(supabase, projectId).catch(() => []);
   if (areas.length === 0) return "";
@@ -305,7 +306,7 @@ async function buildPmContextSections(
       () => new Map() as Awaited<ReturnType<typeof getRoomStepViews>>,
     ),
     getAreaStepEventsForAreas(supabase, areas.map((a) => a.id)).catch(() => new Map<string, AreaStepEventRow[]>()),
-    getProjectStepSignals(supabase, projectId, today).catch(() => [] as ProjectStepSignalRow[]),
+    getProjectStepSignals(supabase, projectId, today, nowIso).catch(() => [] as ProjectStepSignalRow[]),
     getProjectForecast(supabase, projectId, today).catch(
       () => ({ projectId, targetHandover: null, projectedHandover: null, slipDays: null, worstArea: null, areas: [] }) as ProjectForecast,
     ),
@@ -455,7 +456,7 @@ export async function retrieveProjectContext(
   // caller-scoped `supabase` client — never admin. Room-biased toward any
   // area named in the question. Degrades to "" on failure like the sections
   // above so a flaky source can't take down retrieval.
-  const pmContextPromise = buildPmContextSections(supabase, projectId, today, query).catch(() => "");
+  const pmContextPromise = buildPmContextSections(supabase, projectId, today, query, now.toISOString()).catch(() => "");
 
   // 1. Always: newest-active cards
   const { data: newest, error: nErr } = await supabase
