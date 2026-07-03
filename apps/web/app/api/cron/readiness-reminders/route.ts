@@ -11,13 +11,28 @@
  * Push delivery (Expo sendExpoPush) is NOT wired here — it lives on the mobile
  * branch. Once that branch merges, call sendExpoPush on each written intent
  * here after the INSERT succeeds.
+ *
+ * DIGEST (Task 4): intents are grouped per recipient via
+ * `groupIntentsByRecipient`. A recipient with 2+ signals today gets ONE
+ * digest notification (composed by `composePersonalBrief`, deep-linking to
+ * `/brief`) INSTEAD OF their N per-signal rows. A recipient with exactly one
+ * signal keeps their original single-signal row (specific project link is
+ * more useful than the generic /brief link for a single item, and grouping
+ * buys nothing at n=1) — see `groupIntentsByRecipient`'s docstring in
+ * lib/steps/reminders.ts for the full policy. Digest dedup key is
+ * (recipient, date) — one digest per person per day, independent of the
+ * existing per-signal dedup window below.
+ *
+ * This does NOT touch `notifyUnconfirmedAiBlock` (T3-P2's unconfirmed-block
+ * notification) — that path is event-driven (fires from applyStepInference,
+ * not from this cron) and stays a separate, ungrouped notification.
  */
 
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { buildReadinessReminders, READINESS_REMINDER_KIND } from "@/lib/steps/reminders";
-import type { ReminderIntent } from "@/lib/steps/reminders";
+import { buildReadinessReminders, READINESS_REMINDER_KIND, groupIntentsByRecipient } from "@/lib/steps/reminders";
+import type { ReminderIntent, DailyDigestIntent } from "@/lib/steps/reminders";
 import { sendExpoPush } from "@/lib/notifications/push-send";
 
 export const runtime = "nodejs";
@@ -91,6 +106,39 @@ export async function isAlreadyNotified(
   return (data?.length ?? 0) > 0;
 }
 
+// ─── Digest dedup helper (Task 4) ─────────────────────────────────────────────
+
+/**
+ * For a digest intent, check if today's digest was already sent to this
+ * recipient. Matching is by recipient_staff_id + link ("/brief", shared by
+ * every digest) + kind + created_at >= start of today (Jakarta) — a plain
+ * "already read?" check (like `isAlreadyNotified` above) would under-notify
+ * once the recipient reads today's digest and a NEW signal shows up later
+ * the same day, so this keys on the calendar day instead of read state.
+ *
+ * Exported for unit testing.
+ */
+export async function isDigestAlreadySentToday(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  intent: Pick<DailyDigestIntent, "recipientStaffId" | "link" | "kind">,
+  todayStartIso: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("notifications")
+    .select("id")
+    .eq("recipient_staff_id", intent.recipientStaffId)
+    .eq("link", intent.link)
+    .eq("kind", intent.kind)
+    .gte("created_at", todayStartIso)
+    .limit(1);
+
+  if (error) {
+    console.warn(`${LOG} digest dedup check failed: ${error.message}`);
+    return true; // err on the side of not duplicating
+  }
+  return (data?.length ?? 0) > 0;
+}
+
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function GET(req: Request) {
@@ -106,6 +154,8 @@ export async function GET(req: Request) {
   const sevenDaysAgo = new Date(
     new Date().getTime() - 7 * 24 * 60 * 60 * 1000,
   ).toISOString();
+  // Start of today, Jakarta local (UTC+7) — the digest dedup window.
+  const todayStartIso = new Date(`${today}T00:00:00+07:00`).toISOString();
 
   let buildResult: Awaited<ReturnType<typeof buildReadinessReminders>>;
 
@@ -124,11 +174,70 @@ export async function GET(req: Request) {
 
   const { intents, projectsScanned, signalsFound } = buildResult;
 
+  // Split: recipients with 2+ signals today get ONE digest instead of their
+  // per-signal rows; recipients with exactly 1 signal keep their original
+  // row (see groupIntentsByRecipient's docstring for the policy rationale).
+  const countByRecipient = new Map<string, number>();
+  for (const intent of intents) {
+    countByRecipient.set(intent.recipientStaffId, (countByRecipient.get(intent.recipientStaffId) ?? 0) + 1);
+  }
+  const digestRecipientIds = new Set(
+    [...countByRecipient.entries()].filter(([, n]) => n > 1).map(([id]) => id),
+  );
+  const singleItemIntents = intents.filter((i) => !digestRecipientIds.has(i.recipientStaffId));
+
+  let digests: DailyDigestIntent[] = [];
+  if (digestRecipientIds.size > 0) {
+    const { data: staffRows } = await admin
+      .from("staff")
+      .select("id, full_name")
+      .in("id", [...digestRecipientIds]);
+    const staffNames = new Map((staffRows ?? []).map((s) => [s.id, s.full_name]));
+    digests = groupIntentsByRecipient(intents, staffNames, today);
+  }
+
   let written = 0;
   let skippedDup = 0;
   let failed = 0;
 
-  for (const intent of intents) {
+  // ── Digest notifications (Task 4): one per recipient with 2+ signals ──────
+  for (const digest of digests) {
+    try {
+      const alreadyDone = await isDigestAlreadySentToday(admin, digest, todayStartIso);
+      if (alreadyDone) {
+        skippedDup++;
+        continue;
+      }
+
+      const { error: insertErr } = await admin.from("notifications").insert({
+        recipient_staff_id: digest.recipientStaffId,
+        kind: digest.kind,
+        summary: digest.message,
+        link: digest.link,
+        project_id: null, // digest is cross-project — no single project_id applies
+      });
+
+      if (insertErr) {
+        console.warn(`${LOG} digest insert failed for ${digest.dedupeKey}: ${insertErr.message}`);
+        failed++;
+      } else {
+        written++;
+        await sendExpoPush([digest.recipientStaffId], {
+          title: "Ringkasan harian",
+          body: digest.message,
+          data: { link: digest.link },
+        });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`${LOG} error processing digest ${digest.dedupeKey}: ${msg}`);
+      Sentry.captureException(err, { extra: { dedupeKey: digest.dedupeKey } });
+      failed++;
+    }
+  }
+
+  // ── Single-signal recipients: unchanged per-signal notification path ──────
+  for (const intent of singleItemIntents) {
     try {
       const alreadyDone = await isAlreadyNotified(admin, intent, sevenDaysAgo);
       if (alreadyDone) {
@@ -165,13 +274,15 @@ export async function GET(req: Request) {
 
   console.log(
     `${LOG} summary: projects_scanned=${projectsScanned} signals_found=${signalsFound} ` +
-    `intents=${intents.length} written=${written} skipped_dup=${skippedDup} failed=${failed}`,
+    `intents=${intents.length} digests=${digests.length} single=${singleItemIntents.length} ` +
+    `written=${written} skipped_dup=${skippedDup} failed=${failed}`,
   );
 
   return NextResponse.json({
     projectsScanned,
     signalsFound,
     intents: intents.length,
+    digests: digests.length,
     written,
     skippedDup,
     failed,

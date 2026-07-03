@@ -24,7 +24,9 @@ import {
   getActiveProjects,
   getProjectMembers,
   READINESS_REMINDER_KIND,
+  DAILY_BRIEF_KIND,
   escalateRecipients,
+  groupIntentsByRecipient,
   resolveUnconfirmedBlockRecipients,
   buildUnconfirmedBlockIntents,
   loadUnconfirmedBlockIntents,
@@ -34,11 +36,13 @@ import {
   type ProjectMember,
   type ActiveProject,
   type UnconfirmedBlockContext,
+  type ReminderIntent,
 } from "@/lib/steps/reminders";
 import { sendExpoPush } from "@/lib/notifications/push-send";
 import {
   isCronAuthorized,
   isAlreadyNotified,
+  isDigestAlreadySentToday,
   jakartaToday,
   isMigrationPendingError,
 } from "@/app/api/cron/readiness-reminders/route";
@@ -244,6 +248,8 @@ describe("buildReadinessReminders", () => {
     expect(intent.link).toBe("/project/BDG-H1/schedule");
     expect(intent.message).toContain("Kamar Mandi A");
     expect(intent.message).toContain("Screed");
+    expect(intent.severity).toBeDefined();
+    expect(Array.isArray(intent.escalatedRoles)).toBe(true);
     expect(intent.projectId).toBe("proj-1");
   });
 
@@ -330,6 +336,115 @@ describe("buildReadinessReminders", () => {
   });
 });
 
+// ─── groupIntentsByRecipient (Task 4: daily brief digest) ────────────────────
+
+describe("groupIntentsByRecipient", () => {
+  const TODAY_LOCAL = "2026-07-10";
+
+  function makeIntent(overrides: Partial<ReminderIntent>): ReminderIntent {
+    return {
+      recipientStaffId: "staff-1",
+      kind: READINESS_REMINDER_KIND,
+      message: "Signal message",
+      link: "/project/BDG-H1/schedule",
+      projectId: "proj-1",
+      dedupeKey: "dedupe-1",
+      severity: "warning",
+      escalatedRoles: [],
+      ...overrides,
+    };
+  }
+
+  it("returns no digest for a recipient with exactly one item (single-item policy)", () => {
+    const intents = [makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1" })];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    expect(result).toEqual([]);
+  });
+
+  it("groups a recipient with 2+ items into ONE digest intent", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1", message: "Item A", severity: "warning" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2", message: "Item B", severity: "high" }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    expect(result).toHaveLength(1);
+    const digest = result[0]!;
+    expect(digest.recipientStaffId).toBe("staff-1");
+    expect(digest.kind).toBe(DAILY_BRIEF_KIND);
+    expect(digest.link).toBe("/brief");
+    expect(digest.itemCount).toBe(2);
+    expect(digest.message).toContain("Pagi Rani");
+    expect(digest.message).toContain("2 hal hari ini");
+  });
+
+  it("digest dedup key is (recipient, date)", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2" }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    expect(result[0]!.dedupeKey).toBe("staff-1|2026-07-10");
+  });
+
+  it("digest dedup key changes with the date (rolls over daily)", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2" }),
+    ];
+    const day1 = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), "2026-07-10");
+    const day2 = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), "2026-07-11");
+    expect(day1[0]!.dedupeKey).not.toBe(day2[0]!.dedupeKey);
+  });
+
+  it("orders items by severity (critical first) before composing", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1", message: "Warning item", severity: "warning" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2", message: "Critical item", severity: "critical" }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    const msg = result[0]!.message;
+    expect(msg.indexOf("Critical item")).toBeLessThan(msg.indexOf("Warning item"));
+  });
+
+  it("uses the highest-severity item's escalatedRoles for the 'juga dikirim ke' line", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1", severity: "warning", escalatedRoles: ["designer"] }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2", severity: "critical", escalatedRoles: ["principal", "pic"] }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
+    expect(result[0]!.message).toContain("Juga dikirim ke: principal, PIC.");
+    expect(result[0]!.message).not.toContain("designer");
+  });
+
+  it("falls back to a generic name when the recipient isn't in staffNames", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-unknown", dedupeKey: "k1" }),
+      makeIntent({ recipientStaffId: "staff-unknown", dedupeKey: "k2" }),
+    ];
+    const result = groupIntentsByRecipient(intents, new Map(), TODAY_LOCAL);
+    expect(result[0]!.message).toContain("Pagi Tim");
+  });
+
+  it("handles multiple recipients independently — mixes digest and single-item skip", () => {
+    const intents = [
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k1" }),
+      makeIntent({ recipientStaffId: "staff-1", dedupeKey: "k2" }),
+      makeIntent({ recipientStaffId: "staff-2", dedupeKey: "k3" }), // single item — no digest
+    ];
+    const result = groupIntentsByRecipient(
+      intents,
+      new Map([["staff-1", "Rani"], ["staff-2", "Budi"]]),
+      TODAY_LOCAL,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]!.recipientStaffId).toBe("staff-1");
+  });
+
+  it("returns an empty array for an empty intents list", () => {
+    expect(groupIntentsByRecipient([], new Map(), TODAY_LOCAL)).toEqual([]);
+  });
+});
+
 // ─── isAlreadyNotified ────────────────────────────────────────────────────────
 
 describe("isAlreadyNotified", () => {
@@ -360,6 +475,65 @@ describe("isAlreadyNotified", () => {
     const supa = fakeClient([{ data: null, error: { message: "db error" } }]);
     const result = await isAlreadyNotified(supa as any, INTENT, SEVEN_DAYS_AGO);
     expect(result).toBe(true); // err on the side of not duplicating
+  });
+});
+
+// ─── isDigestAlreadySentToday (Task 4: digest dedup) ──────────────────────────
+
+describe("isDigestAlreadySentToday", () => {
+  const TODAY_START_ISO = "2026-07-10T00:00:00+07:00";
+
+  const DIGEST_INTENT = {
+    recipientStaffId: "staff-1",
+    link: "/brief",
+    kind: DAILY_BRIEF_KIND,
+  };
+
+  it("returns true (skip) when a digest was already sent today", async () => {
+    const supa = fakeClient([{ data: [{ id: "notif-1" }], error: null }]);
+    const result = await isDigestAlreadySentToday(supa as any, DIGEST_INTENT, TODAY_START_ISO);
+    expect(result).toBe(true);
+  });
+
+  it("returns false (proceed) when no digest has been sent today, regardless of read state", async () => {
+    const supa = fakeClient([{ data: [], error: null }]);
+    const result = await isDigestAlreadySentToday(supa as any, DIGEST_INTENT, TODAY_START_ISO);
+    expect(result).toBe(false);
+  });
+
+  it("returns true (skip) when the dedup query itself errors", async () => {
+    const supa = fakeClient([{ data: null, error: { message: "db error" } }]);
+    const result = await isDigestAlreadySentToday(supa as any, DIGEST_INTENT, TODAY_START_ISO);
+    expect(result).toBe(true); // err on the side of not duplicating
+  });
+
+  it("filters on recipient, link, kind, and created_at >= start of today (no read_at filter)", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    let gteCall: [string, unknown] | null = null;
+    const supa = {
+      from(_table: string) {
+        const builder: any = {
+          select: () => builder,
+          eq: (col: string, val: unknown) => {
+            eqCalls.push([col, val]);
+            return builder;
+          },
+          gte: (col: string, val: unknown) => {
+            gteCall = [col, val];
+            return builder;
+          },
+          limit: () => Promise.resolve({ data: [], error: null }),
+        };
+        return builder;
+      },
+    } as any;
+
+    await isDigestAlreadySentToday(supa, DIGEST_INTENT, TODAY_START_ISO);
+
+    expect(eqCalls).toContainEqual(["recipient_staff_id", "staff-1"]);
+    expect(eqCalls).toContainEqual(["link", "/brief"]);
+    expect(eqCalls).toContainEqual(["kind", DAILY_BRIEF_KIND]);
+    expect(gteCall).toEqual(["created_at", TODAY_START_ISO]);
   });
 });
 

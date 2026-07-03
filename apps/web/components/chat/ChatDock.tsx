@@ -133,7 +133,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   const [hydrated, setHydrated] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
 
-  const { pendingPrompt, clearPending } = useAssistant();
+  const { pendingSeed, clearPending } = useAssistant();
 
   // Offline-queue guards. busyRef mirrors `busy` so the window "online"
   // listener can tell whether a send is in progress without a fresh render;
@@ -173,18 +173,29 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     } catch { /* quota exceeded / private mode — non-fatal */ }
   }, [messages, sessionId, hydrated, storageKey]);
 
-  // A seeded prompt (e.g. from the room "Tanya asisten" button, carried across
-  // navigation by AssistantProvider) opens the dock and auto-asks in tanya mode.
+  // A seeded prompt (e.g. from the room "Tanya asisten" button, or the daily
+  // brief notification link — carried across navigation by AssistantProvider)
+  // opens the dock. Two variants (see PendingSeed in AssistantProvider):
+  //  - "question": posts the text as a USER message and runs it (existing
+  //    "Tanya asisten" behavior).
+  //  - "assistant_message": posts the text directly as an ASSISTANT-authored
+  //    first message — no request sent, deterministic compose already
+  //    happened server-side in the cron (Task 4: daily brief). The user can
+  //    still type follow-ups afterward like any other conversation.
   useEffect(() => {
-    if (!pendingPrompt) return;
+    if (!pendingSeed) return;
     setMobileOpen(true);
     setMode("tanya");
-    setMessages((m) => [...m, { role: "user", content: pendingPrompt }]);
-    void run("tanya", pendingPrompt, null);
+    if (pendingSeed.kind === "assistant_message") {
+      setMessages((m) => [...m, { role: "assistant", content: pendingSeed.text }]);
+    } else {
+      setMessages((m) => [...m, { role: "user", content: pendingSeed.text }]);
+      void run("tanya", pendingSeed.text, null);
+    }
     clearPending();
-    // Fire only when a new prompt arrives.
+    // Fire only when a new seed arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingPrompt]);
+  }, [pendingSeed]);
 
   function resetChat() {
     try { window.localStorage.removeItem(storageKey); } catch { /* ignore */ }
