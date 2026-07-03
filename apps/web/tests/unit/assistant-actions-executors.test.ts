@@ -35,6 +35,7 @@ import {
   resolveRemindRecipients,
   resolveAreaStepByName,
   resolveOpenDecisionEvent,
+  assertProjectMember,
   executeRemindAction,
   executeUpdateStepAction,
   executeRecordDecisionAction,
@@ -137,6 +138,76 @@ describe("executors reject when unauthenticated (no staff row)", () => {
       action: { type: "record_decision", cardSlug: "x", outcome: "Ya" },
     });
     expect(result).toEqual({ ok: false, error: "Harus masuk untuk mencatat keputusan" });
+    expect(resolveCardEvent).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Authorization: authenticated but non-member of the project ───────────
+// Fix 2 (launch-phase03 final wave): a `projectId` carried by the confirmed
+// action payload might not be one the caller is scoped to at all. Each
+// executor must reject BEFORE any resolve/write attempt with a clear error,
+// not fall through to a resolve-step "not found" that reads like a typo.
+
+describe("executors reject a non-member projectId (no write attempted)", () => {
+  // Predicate-aware: only a project_staff row exactly matching the caller's
+  // own staff_id is treated as membership. Any other query against
+  // project_staff (e.g. resolveRemindRecipients' recipient lookup) would
+  // never be reached — the membership check runs first and short-circuits.
+  function nonMemberClient(insertSpy?: (table: string, rows: unknown) => void) {
+    return fakeClient(
+      {
+        staff: constant(STAFF_ROW),
+        project_staff: (calls) => {
+          const staffFilter = calls.find((c) => c.fn === "eq" && c.args[0] === "staff_id");
+          const isCaller = staffFilter?.args[1] === "staff-1";
+          return isCaller ? { data: null, error: null } : { data: [], error: null };
+        },
+      },
+      { insertSpy },
+    );
+  }
+
+  it("assertProjectMember returns an error when no active project_staff row matches", async () => {
+    const client = fakeClient({ project_staff: constant(null) });
+    const result = await assertProjectMember(client, PROJECT_ID, "staff-1");
+    expect(result).toEqual({ ok: false, error: "Anda bukan anggota proyek ini" });
+  });
+
+  it("assertProjectMember returns ok when an active project_staff row matches", async () => {
+    const client = fakeClient({ project_staff: constant({ staff_id: "staff-1" }) });
+    const result = await assertProjectMember(client, PROJECT_ID, "staff-1");
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("executeRemindAction rejects a non-member projectId and performs no insert", async () => {
+    const insertSpy = vi.fn();
+    const client = nonMemberClient(insertSpy);
+    const result = await executeRemindAction(client, {
+      projectId: PROJECT_ID,
+      action: { type: "remind", recipientRole: "site_supervisor", message: "Cek flood test" },
+    });
+    expect(result).toEqual({ ok: false, error: "Anda bukan anggota proyek ini" });
+    expect(insertSpy).not.toHaveBeenCalled();
+    expect(sendExpoPush).not.toHaveBeenCalled();
+  });
+
+  it("executeUpdateStepAction rejects a non-member projectId and performs no write", async () => {
+    const client = nonMemberClient();
+    const result = await executeUpdateStepAction(client, {
+      projectId: PROJECT_ID,
+      action: { type: "update_step", areaName: "KM-1", stepName: "Keramik", status: "in_progress" },
+    });
+    expect(result).toEqual({ ok: false, error: "Anda bukan anggota proyek ini" });
+    expect(updateAreaStep).not.toHaveBeenCalled();
+  });
+
+  it("executeRecordDecisionAction rejects a non-member projectId and performs no write", async () => {
+    const client = nonMemberClient();
+    const result = await executeRecordDecisionAction(client, {
+      projectId: PROJECT_ID,
+      action: { type: "record_decision", cardSlug: "x", outcome: "Ya" },
+    });
+    expect(result).toEqual({ ok: false, error: "Anda bukan anggota proyek ini" });
     expect(resolveCardEvent).not.toHaveBeenCalled();
   });
 });
@@ -394,6 +465,7 @@ describe("executeUpdateStepAction", () => {
   it("calls updateAreaStep with the confirming user's staff id as loggedByStaffId", async () => {
     const client = fakeClient({
       staff: constant(STAFF_ROW),
+      project_staff: constant({ staff_id: "staff-1" }),
       areas: constant([AREA]),
       area_steps: (calls) => {
         const isRemoved = calls.some((c) => c.fn === "not");
@@ -416,6 +488,40 @@ describe("executeUpdateStepAction", () => {
         status: "blocked",
         loggedByStaffId: "staff-1",
         note: expect.stringContaining("via asisten"),
+      }),
+    );
+  });
+});
+
+// ─── record_decision execution: outcome carries the "(via asisten)" marker ─
+// Fix 4 (launch-phase03 final wave): consistent with executeUpdateStepAction's
+// note tagging — provenance without a schema change.
+
+describe("executeRecordDecisionAction", () => {
+  it("suffixes the outcome with '(via asisten)' before calling resolveCardEvent", async () => {
+    const client = fakeClient({
+      staff: constant(STAFF_ROW),
+      project_staff: constant({ staff_id: "staff-1" }),
+      cards: constant([
+        { id: "card-1", slug: "whastudio-42", title: "Marmer", project_id: PROJECT_ID, projects: { project_code: "WHA" } },
+      ]),
+      card_events: constant([
+        { id: "ev-1", card_id: "card-1", payload: { status: "needs_decision", topic: "Marmer" } },
+      ]),
+    });
+
+    const result = await executeRecordDecisionAction(client, {
+      projectId: PROJECT_ID,
+      action: { type: "record_decision", cardSlug: "whastudio-42", outcome: "Pakai marmer Carrara" },
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(resolveCardEvent).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        eventId: "ev-1",
+        newStatus: "decided",
+        outcome: "Pakai marmer Carrara (via asisten)",
       }),
     );
   });

@@ -6,6 +6,7 @@ import { MessageList, type Message } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { SparkIcon, XIcon } from "@/components/icons/Icon";
 import { drain, enqueue, readQueue, remove } from "@/lib/assistant/offline-queue";
+import { isDuplicateSeed } from "@/lib/assistant/daily-brief";
 import type { ActionProposalType } from "@/lib/assistant/types";
 
 type Mode = "tanya" | "catat";
@@ -205,7 +206,17 @@ export function ChatDock({ projectId, projectCode }: { projectId?: string; proje
     setMobileOpen(true);
     setMode("tanya");
     if (pendingSeed.kind === "assistant_message") {
-      setMessages((m) => [...m, { role: "assistant", content: pendingSeed.text }]);
+      // Fix 1 (reseed duplicates): localStorage hydration can already have
+      // today's digest in `messages` (e.g. an earlier /brief visit whose
+      // markNotificationRead round-trip hasn't landed yet, or failed) — skip
+      // the append rather than double-posting the identical bubble.
+      setMessages((m) => {
+        const existingContents = m
+          .filter((msg): msg is Extract<Message, { content: string }> => "content" in msg)
+          .map((msg) => msg.content);
+        if (isDuplicateSeed(existingContents, pendingSeed.text)) return m;
+        return [...m, { role: "assistant", content: pendingSeed.text }];
+      });
     } else {
       setMessages((m) => [...m, { role: "user", content: pendingSeed.text }]);
       void run("tanya", pendingSeed.text, null);

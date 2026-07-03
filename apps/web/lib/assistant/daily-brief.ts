@@ -113,12 +113,17 @@ export function composePersonalBrief({ name, items, escalatedTo }: ComposePerson
  * and testable without pulling in @datum/db types here.
  */
 export type DigestNotificationCandidate = {
+  id: string;
   kind: string;
   link: string;
   summary: string;
   read_at: string | null;
   created_at: string;
 };
+
+/** What `findTodaysUnreadDigest` hands back: the notification's id (so the
+ * caller can mark it read once it's been seeded) alongside its seed text. */
+export type UnreadDigest = { id: string; summary: string };
 
 /** The notification_kind + link the cron writes a daily digest under (mirrors DAILY_BRIEF_KIND / "/brief" in lib/steps/reminders.ts). */
 export const DIGEST_NOTIFICATION_KIND = "readiness_reminder" as const;
@@ -138,12 +143,17 @@ export const DIGEST_LINK = "/brief";
  * The page is responsible for fetching `notifications` (RLS-scoped to the
  * caller) and computing the Jakarta-local day boundaries; this function does
  * no I/O and no clock reads, so it's directly unit-testable.
+ *
+ * Returns the notification `id` alongside the seed text — the caller marks
+ * that row read once it has actually been seeded into the dock (see
+ * BriefDigestSeed.tsx), which is what stops every subsequent /brief load
+ * from re-seeding the same digest as a fresh chat bubble.
  */
 export function findTodaysUnreadDigest(
   notifications: DigestNotificationCandidate[],
   todayStartIso: string,
   tomorrowStartIso: string,
-): string | null {
+): UnreadDigest | null {
   const candidates = notifications
     .filter((n) => n.kind === DIGEST_NOTIFICATION_KIND)
     .filter((n) => n.link === DIGEST_LINK)
@@ -151,5 +161,22 @@ export function findTodaysUnreadDigest(
     .filter((n) => n.created_at >= todayStartIso && n.created_at < tomorrowStartIso)
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)); // newest first
 
-  return candidates[0]?.summary ?? null;
+  const top = candidates[0];
+  return top ? { id: top.id, summary: top.summary } : null;
+}
+
+/**
+ * Post-hydration duplicate guard for ChatDock's pendingSeed effect.
+ *
+ * `BriefDigestSeed` fires `openWithMessage(digestText)` once per mount, but
+ * ChatDock also hydrates any previously-persisted messages (localStorage)
+ * for the same dock on that same mount. If today's digest was already
+ * seeded into the conversation on an earlier /brief visit (before the
+ * notification row's markNotificationRead round-trip lands, or if that
+ * round-trip failed), hydration + a fresh seed would append the identical
+ * assistant bubble a second time. Pure string-equality check against the
+ * already-hydrated messages — no I/O, directly unit-testable.
+ */
+export function isDuplicateSeed(existingContents: string[], seedText: string): boolean {
+  return existingContents.includes(seedText);
 }

@@ -23,7 +23,7 @@ export async function getTodaysDigestCandidates(
 ): Promise<DigestNotificationCandidate[]> {
   const { data, error } = await supabase
     .from("notifications")
-    .select("kind, link, summary, read_at, created_at")
+    .select("id, kind, link, summary, read_at, created_at")
     .eq("kind", DIGEST_NOTIFICATION_KIND)
     .eq("link", DIGEST_LINK)
     .gte("created_at", todayStartIso)

@@ -112,6 +112,41 @@ export { stripActionTail } from "@datum/core";
 
 export type ActionExecResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * Explicit project-membership assertion (Fix 2, launch-phase03 final wave).
+ *
+ * Every executor is reachable with an arbitrary `projectId` carried by the
+ * confirmed action payload (see executeAction's docstring — args come from
+ * the parsed+displayed chip, which in turn came from the assistant's own
+ * reply text). RLS on `project_staff`/`areas`/`cards` etc. already stops a
+ * non-member from reading another project's rows, but several of these
+ * executors resolve-then-write (e.g. resolveAreaStepByName) and a caller who
+ * isn't scoped to the project at all should get a clear, explicit rejection
+ * BEFORE any resolve/write attempt — not silently fall through to a
+ * not-found error that looks like a typo rather than an authorization gap.
+ *
+ * Mirrors the `project_staff` lookup pattern resolveRemindRecipients already
+ * uses in this file (query by project_id, filter to currently-active rows
+ * via active_until IS NULL — same convention as
+ * packages/core/src/projects/member-write.ts's removeProjectMember).
+ */
+export async function assertProjectMember(
+  supabase: Supa,
+  projectId: string,
+  staffId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data, error } = await supabase
+    .from("project_staff")
+    .select("staff_id")
+    .eq("project_id", projectId)
+    .eq("staff_id", staffId)
+    .is("active_until", null)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "Anda bukan anggota proyek ini" };
+  return { ok: true };
+}
+
 // ─── remind ───────────────────────────────────────────────────────────────────
 
 /**
@@ -180,6 +215,9 @@ export async function executeRemindAction(
 ): Promise<ActionExecResult> {
   const staff = await getCurrentStaff(supabase);
   if (!staff) return { ok: false, error: "Harus masuk untuk mengirim pengingat" };
+
+  const membership = await assertProjectMember(supabase, args.projectId, staff.id);
+  if (!membership.ok) return membership;
 
   const resolved = await resolveRemindRecipients(supabase, args.projectId, {
     recipientRole: args.action.recipientRole,
@@ -276,6 +314,9 @@ export async function executeUpdateStepAction(
   const staff = await getCurrentStaff(supabase);
   if (!staff) return { ok: false, error: "Harus masuk untuk mengubah langkah" };
 
+  const membership = await assertProjectMember(supabase, args.projectId, staff.id);
+  if (!membership.ok) return membership;
+
   const resolved = await resolveAreaStepByName(supabase, args.projectId, {
     areaName: args.action.areaName,
     stepName: args.action.stepName,
@@ -365,7 +406,9 @@ export async function resolveOpenDecisionEvent(
  * resolve_card_event RPC wrapper (packages/core/src/cards/events/resolve.ts)
  * — same mutation P2-T6's "Tandai diputuskan" flow uses, called directly
  * (not through the FormData server action) since args here come from the
- * parsed+confirmed action, not a form. newStatus is fixed to "decided".
+ * parsed+confirmed action, not a form. newStatus is fixed to "decided". The
+ * outcome is tagged "(via asisten)" for provenance without a schema change —
+ * same convention executeUpdateStepAction uses for its note.
  */
 export async function executeRecordDecisionAction(
   supabase: Supa,
@@ -374,16 +417,21 @@ export async function executeRecordDecisionAction(
   const staff = await getCurrentStaff(supabase);
   if (!staff) return { ok: false, error: "Harus masuk untuk mencatat keputusan" };
 
+  const membership = await assertProjectMember(supabase, args.projectId, staff.id);
+  if (!membership.ok) return membership;
+
   const resolved = await resolveOpenDecisionEvent(supabase, args.projectId, {
     cardSlug: args.action.cardSlug,
     question: args.action.question,
   });
   if (!resolved.ok) return resolved;
 
+  const outcome = `${args.action.outcome} (via asisten)`;
+
   const result = await resolveCardEvent(supabase, {
     eventId: resolved.eventId,
     newStatus: "decided",
-    outcome: args.action.outcome,
+    outcome,
   });
   if (!result.ok) return result;
   return { ok: true };

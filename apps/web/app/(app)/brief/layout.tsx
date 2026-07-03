@@ -16,11 +16,14 @@ import { jakartaToday } from "@/lib/assistant/retrieval";
  * unchanged — the two never both mount on the same page.
  *
  * Also completes Task 4's deferred wiring: server-fetches today's still-unread
- * daily-digest notification (if any) for the current user and hands its text
- * to BriefDigestSeed, which seeds the dock with it as an assistant-authored
- * first message on mount. Best-effort — a query failure degrades to no seed
- * (the page still renders; the user can still open the dock and ask
- * manually), matching this codebase's other retrieval degrade-to-"" patterns.
+ * daily-digest notification (if any) for the current user and hands its id +
+ * text to BriefDigestSeed, which seeds the dock with the text as an
+ * assistant-authored first message on mount, then marks that notification
+ * id read (Fix 1: without this, every subsequent /brief load re-seeds the
+ * same digest as a fresh duplicate bubble). Best-effort — a query failure
+ * degrades to no seed (the page still renders; the user can still open the
+ * dock and ask manually), matching this codebase's other retrieval
+ * degrade-to-"" patterns.
  */
 export default async function BriefLayout({ children }: { children: ReactNode }) {
   const supabase = await createSupabaseServerClient();
@@ -30,13 +33,13 @@ export default async function BriefLayout({ children }: { children: ReactNode })
   const tomorrow = new Date(new Date(todayStartIso).getTime() + 24 * 60 * 60 * 1000);
   const tomorrowStartIso = tomorrow.toISOString();
 
-  const digestText = await getTodaysDigestCandidates(supabase, todayStartIso, tomorrowStartIso)
+  const digest = await getTodaysDigestCandidates(supabase, todayStartIso, tomorrowStartIso)
     .then((rows) => findTodaysUnreadDigest(rows, todayStartIso, tomorrowStartIso))
     .catch(() => null);
 
   return (
     <AssistantProvider>
-      <BriefDigestSeed digestText={digestText} />
+      <BriefDigestSeed notificationId={digest?.id ?? null} digestText={digest?.summary ?? null} />
       {children}
       <ChatDock />
     </AssistantProvider>

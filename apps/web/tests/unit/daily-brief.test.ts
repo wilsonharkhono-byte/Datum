@@ -11,6 +11,7 @@ import {
   composePersonalBrief,
   roleLabel,
   findTodaysUnreadDigest,
+  isDuplicateSeed,
   DIGEST_NOTIFICATION_KIND,
   DIGEST_LINK,
   type DigestNotificationCandidate,
@@ -146,6 +147,7 @@ describe("findTodaysUnreadDigest", () => {
 
   function candidate(overrides: Partial<DigestNotificationCandidate> = {}): DigestNotificationCandidate {
     return {
+      id: "11111111-1111-1111-1111-111111111111",
       kind: DIGEST_NOTIFICATION_KIND,
       link: DIGEST_LINK,
       summary: "Pagi Rani — 2 hal hari ini: 1) A. 2) B. Lihat: /brief",
@@ -159,9 +161,12 @@ describe("findTodaysUnreadDigest", () => {
     expect(findTodaysUnreadDigest([], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
   });
 
-  it("returns the summary of today's unread digest when present", () => {
+  it("returns the id + summary of today's unread digest when present", () => {
     const row = candidate();
-    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBe(row.summary);
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toEqual({
+      id: row.id,
+      summary: row.summary,
+    });
   });
 
   it("returns null when the matching row is already read", () => {
@@ -191,23 +196,51 @@ describe("findTodaysUnreadDigest", () => {
 
   it("includes a row exactly at today's start boundary (inclusive)", () => {
     const row = candidate({ created_at: TODAY_START_UTC });
-    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBe(row.summary);
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toEqual({
+      id: row.id,
+      summary: row.summary,
+    });
   });
 
   it("picks the newest matching row when multiple exist (shouldn't normally happen — one digest/day — but defensive)", () => {
     const older = candidate({
+      id: "22222222-2222-2222-2222-222222222222",
       summary: "OLDER",
       created_at: new Date("2026-07-02T02:00:00+07:00").toISOString(),
     });
     const newer = candidate({
+      id: "33333333-3333-3333-3333-333333333333",
       summary: "NEWER",
       created_at: new Date("2026-07-02T09:00:00+07:00").toISOString(),
     });
-    expect(findTodaysUnreadDigest([older, newer], TODAY_START_UTC, TOMORROW_START_UTC)).toBe("NEWER");
+    expect(findTodaysUnreadDigest([older, newer], TODAY_START_UTC, TOMORROW_START_UTC)).toEqual({
+      id: newer.id,
+      summary: "NEWER",
+    });
   });
 
   it("does not seed from an unrelated notification even if unread and today", () => {
     const row = candidate({ kind: "mention", link: "/project/WHA-01/cards/foo" });
     expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
+  });
+});
+
+describe("isDuplicateSeed", () => {
+  const SEED_TEXT = "Pagi Rani — 2 hal hari ini: 1) A. 2) B. Lihat: /brief";
+
+  it("returns false when there are no existing messages", () => {
+    expect(isDuplicateSeed([], SEED_TEXT)).toBe(false);
+  });
+
+  it("returns false when no existing message matches the seed text", () => {
+    expect(isDuplicateSeed(["Halo", "Ada yang bisa dibantu?"], SEED_TEXT)).toBe(false);
+  });
+
+  it("returns true when an existing message content exactly equals the seed text (post-hydration duplicate)", () => {
+    expect(isDuplicateSeed(["Halo", SEED_TEXT], SEED_TEXT)).toBe(true);
+  });
+
+  it("does not match on partial/substring overlap — exact equality only", () => {
+    expect(isDuplicateSeed([SEED_TEXT + " extra"], SEED_TEXT)).toBe(false);
   });
 });
