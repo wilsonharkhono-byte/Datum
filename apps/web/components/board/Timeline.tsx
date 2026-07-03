@@ -12,11 +12,17 @@ import { TimelineFilter } from "./TimelineFilter";
 export function Timeline({
   events,
   attachmentsByEvent,
+  stepNamesByEvent,
+  decisionOutcomesByEvent,
   projectCode,
   cardSlug,
 }: {
   events: CardEvent[];
   attachmentsByEvent: Map<string, CardAttachment[]>;
+  /** card_event_id -> step names the AI wrote off that event (Task 4 attribution). Optional so existing callers/tests don't need updating. */
+  stepNamesByEvent?: Map<string, string[]>;
+  /** card_event_id -> captured decision outcome text (Fix 3 rework). Optional so existing callers/tests don't need updating. */
+  decisionOutcomesByEvent?: Map<string, string>;
   projectCode: string;
   cardSlug: string;
 }) {
@@ -91,6 +97,8 @@ export function Timeline({
               key={ev.id}
               event={ev}
               attachments={attachmentsByEvent.get(ev.id) ?? []}
+              aiStepNames={stepNamesByEvent?.get(ev.id) ?? []}
+              decisionOutcome={decisionOutcomesByEvent?.get(ev.id) ?? null}
               projectCode={projectCode}
               cardSlug={cardSlug}
             />

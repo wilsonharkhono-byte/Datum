@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { GateCodes } from "@datum/types";
-import type { CardEvent } from "@datum/db";
+import type { CardEvent, Database } from "@datum/db";
 import type { DatumClient } from "../client";
 import { evaluateGate, RULE_VERSION } from "./readiness-rules";
+
+type AreaGateStatusInsert = Database["public"]["Tables"]["area_gate_status"]["Insert"];
 
 export const RecomputeInput = z.object({
   projectId:   z.string().uuid(),
@@ -99,31 +101,71 @@ export async function recomputeProjectGates(
     (passedCells ?? []).map((c) => `${c.area_id}|${c.gate_code}`),
   );
 
-  // 3. For each (area, gate), evaluate the rule and upsert area_gate_status
+  // 3. For each (area, gate), evaluate the rule and build the upsert row.
+  //    Stickiness is resolved per-cell right here — using the areas/events/
+  //    stickyPassed state already loaded above — BEFORE any write happens.
+  //
+  //    IMPORTANT: sticky-passed rows and non-sticky rows have DIFFERENT
+  //    column sets (sticky omits status/blocking_reason). supabase-js/
+  //    PostgREST serializes a single upsert array using the UNION of keys
+  //    across all row objects — any row missing a column that another row
+  //    in the same array carries gets that column implicitly NULL'd in the
+  //    generated INSERT, which violates the NOT NULL constraint on
+  //    status/blocking_reason and aborts the ENTIRE upsert (all-or-nothing).
+  //    So we split into two HOMOGENEOUS bulk upserts — one per column
+  //    shape — preserving both the exact per-cell guard semantics the old
+  //    sequential-upsert loop had AND the O(1)-round-trips intent of the
+  //    bulk upsert (now 2 instead of 1, still not A×8).
   const now = new Date().toISOString();
-  let cellsUpdated = 0;
+  const nonStickyRows: AreaGateStatusInsert[] = [];
+  const stickyRows: AreaGateStatusInsert[] = [];
   for (const area of areas) {
     const areaCardIds = cardsByArea.get(area.id) ?? [];
     const areaEvents = areaCardIds.flatMap((cid) => eventsByCard.get(cid) ?? []);
     for (const gate of GateCodes) {
       const result = evaluateGate(gate, { events: areaEvents });
       const isSticky = stickyPassed.has(`${area.id}|${gate}`);
-      const { error: uErr } = await sb.from("area_gate_status").upsert({
-        project_id:           projectId,
-        area_id:              area.id,
-        gate_code:            gate,
+      if (isSticky) {
         // Sticky-passed cells keep their confirmed status + blocking_reason;
-        // only recompute bookkeeping (score/last_recomputed_at/stale) refreshes.
-        ...(isSticky
-          ? {}
-          : { status: result.status, blocking_reason: result.blockingReason }),
-        readiness_score:      result.readinessScore,
-        last_recomputed_at:   now,
-        stale:                false,
-      }, { onConflict: "project_id,area_id,gate_code" });
-      if (uErr) return { ok: false, error: `${gate}/${area.id}: ${uErr.message}` };
-      cellsUpdated++;
+        // only recompute bookkeeping (score/last_recomputed_at/stale)
+        // refreshes. Every row here shares the exact same key set.
+        stickyRows.push({
+          project_id:           projectId,
+          area_id:              area.id,
+          gate_code:            gate,
+          readiness_score:      result.readinessScore,
+          last_recomputed_at:   now,
+          stale:                false,
+        });
+      } else {
+        nonStickyRows.push({
+          project_id:           projectId,
+          area_id:              area.id,
+          gate_code:            gate,
+          status:               result.status,
+          blocking_reason:      result.blockingReason,
+          readiness_score:      result.readinessScore,
+          last_recomputed_at:   now,
+          stale:                false,
+        });
+      }
     }
+  }
+
+  let cellsUpdated = 0;
+  if (nonStickyRows.length > 0) {
+    const { error: uErr } = await sb
+      .from("area_gate_status")
+      .upsert(nonStickyRows, { onConflict: "project_id,area_id,gate_code" });
+    if (uErr) return { ok: false, error: uErr.message };
+    cellsUpdated += nonStickyRows.length;
+  }
+  if (stickyRows.length > 0) {
+    const { error: uErr } = await sb
+      .from("area_gate_status")
+      .upsert(stickyRows, { onConflict: "project_id,area_id,gate_code" });
+    if (uErr) return { ok: false, error: uErr.message };
+    cellsUpdated += stickyRows.length;
   }
 
   // NOTE: projectCode is accepted so the web wrapper can call revalidatePath

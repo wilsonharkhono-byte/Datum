@@ -5,6 +5,7 @@ export {
   getCardWithTimeline,
   getCardWithTimelineByProjectCode,
   getCardAttachments,
+  getDecisionOutcomesByCardEvent,
   getCardComments,
   getCardMembers,
   getProjectStaff,

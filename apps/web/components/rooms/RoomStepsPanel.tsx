@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { StepDetail } from "@/components/schedule/StepDetail";
 import { AddStepForm } from "@/components/schedule/AddStepForm";
 import { restoreStep } from "@/lib/steps/actions";
-import type { getRoomStepView } from "@/lib/steps/queries";
+import { truncateNames } from "@/lib/steps/flags";
+import type { getRoomStepView, AreaStepEventRow } from "@/lib/steps/queries";
 
 type View = Awaited<ReturnType<typeof getRoomStepView>>;
+type StepEvents = Map<string, AreaStepEventRow[]>;
 const CHIP: Record<string, { label: string; cls: string }> = {
   not_started: { label: "Belum mulai", cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" },
   in_progress: { label: "Berjalan", cls: "bg-blue-100 text-blue-800" },
@@ -17,11 +19,26 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   done_with_defects: { label: "Selesai (ada defect)", cls: "bg-amber-100 text-amber-800" },
 };
 
-export function RoomStepsPanel({ areaId, view }: { areaId: string; view: View }) {
+export function RoomStepsPanel({
+  areaId,
+  view,
+  stepEvents,
+  autoOpenStepId,
+}: {
+  areaId: string;
+  view: View;
+  stepEvents?: StepEvents;
+  /** Step id to auto-open on mount (from a ?areaStep= deep link — see rooms/page.tsx). */
+  autoOpenStepId?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [showAll, setShowAll] = useState(false);
-  const [openStep, setOpenStep] = useState<string | null>(null);
+  // Start in the "all steps" view when deep-linking to a specific step — the target
+  // may not be in `view.active` (e.g. an unconfirmed block that's still "in_progress"
+  // with a note rather than a real `blocked` status), so only the grouped/full list
+  // is guaranteed to render every step regardless of status.
+  const [showAll, setShowAll] = useState(autoOpenStepId != null);
+  const [openStep, setOpenStep] = useState<string | null>(autoOpenStepId ?? null);
   const [showRemoved, setShowRemoved] = useState(false);
   const nameOf = (code: string | null) => view.steps.find((s) => s.step_code === code)?.name ?? code;
 
@@ -43,7 +60,7 @@ export function RoomStepsPanel({ areaId, view }: { areaId: string; view: View })
           {view.flags.readyToStart === s.step_code ? <span className="text-[10px] text-[var(--sand-dark)]">siap</span> : null}
           <span className="text-[var(--text-muted)]">{isOpen ? "▾" : "▸"}</span>
         </button>
-        {isOpen ? <StepDetail step={s} /> : null}
+        {isOpen ? <StepDetail step={s} events={stepEvents?.get(s.id)} /> : null}
       </div>
     );
   }
@@ -53,7 +70,11 @@ export function RoomStepsPanel({ areaId, view }: { areaId: string; view: View })
       {view.flags.readyToStart || view.flags.needsDecision.length > 0 ? (
         <div className="bg-[var(--sand-tint)] px-4 py-2 text-[11px] text-[var(--sand-dark)]">
           {view.flags.readyToStart ? <span className="mr-3">Siap dimulai: {nameOf(view.flags.readyToStart)}</span> : null}
-          {view.flags.needsDecision.length > 0 ? <span>Perlu keputusan: {view.flags.needsDecision.map(nameOf).join(", ")}</span> : null}
+          {view.flags.needsDecision.length > 0 ? (
+            <span>
+              Perlu keputusan: {truncateNames(view.flags.needsDecision.map((code) => nameOf(code) ?? code))}
+            </span>
+          ) : null}
         </div>
       ) : null}
 

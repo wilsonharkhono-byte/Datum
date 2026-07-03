@@ -13,12 +13,19 @@
  * the pure EVENT_CHIP map and the formatEventTime helper, which we re-implement
  * here at the same spec as the component. The real correctness guarantee is the
  * `pnpm --filter web build` step which compiles the whole component tree.
+ *
+ * eventAuthorLabel / confidenceLabel / cardLinkHref are no longer mirrored here —
+ * they're shared between StepDetail.tsx and the activity feed page via
+ * lib/steps/attribution.ts, so we import the real implementations directly.
  */
 
 import { describe, expect, it } from "vitest";
 import type { AreaStepEventRow } from "@/lib/steps/queries";
+import { eventAuthorLabel, confidenceLabel, cardLinkHref } from "@/lib/steps/attribution";
 
 // --- Mirror the display helpers from StepDetail.tsx so we can unit-test them ---
+// (StepDetail.tsx is a .tsx "use client" file — vitest's node-env transform for this
+// suite can't parse JSX, so we can't import it directly; see the module docstring above.)
 
 const EVENT_CHIP: Record<string, { label: string; cls: string }> = {
   not_started: { label: "Belum mulai", cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" },
@@ -47,7 +54,12 @@ function makeEvent(overrides: Partial<AreaStepEventRow> = {}): AreaStepEventRow 
     note: "tukang datang besok",
     percent_complete: null,
     occurred_at: "2026-06-20T10:00:00Z",
+    created_at: "2026-06-20T10:00:00Z",
     author_name: "Budi Santoso",
+    source: "human",
+    confidence: null,
+    card_event_id: null,
+    card_link: null,
     ...overrides,
   };
 }
@@ -140,6 +152,71 @@ describe("StepHistory display logic", () => {
     it("event without percent_complete is null (not shown)", () => {
       const ev = makeEvent({ percent_complete: null });
       expect(ev.percent_complete).toBeNull();
+    });
+  });
+
+  describe("eventAuthorLabel", () => {
+    it("returns the human author's name for source='human'", () => {
+      expect(eventAuthorLabel({ source: "human", author_name: "Sari" })).toBe("Sari");
+    });
+
+    it("returns null for source='human' with no author (unchanged blank behavior)", () => {
+      expect(eventAuthorLabel({ source: "human", author_name: null })).toBeNull();
+    });
+
+    it("returns 'Asisten AI' for source='ai' with no author (was blank before)", () => {
+      expect(eventAuthorLabel({ source: "ai", author_name: null })).toBe("Asisten AI");
+    });
+
+    it("prefers a real author_name over the 'Asisten AI' fallback when both are present on an AI row", () => {
+      expect(eventAuthorLabel({ source: "ai", author_name: "Budi" })).toBe("Budi");
+    });
+  });
+
+  describe("confidenceLabel", () => {
+    it("formats a confidence to 2 decimals", () => {
+      expect(confidenceLabel(0.947)).toBe("0.95");
+    });
+
+    it("formats a round confidence with trailing zero", () => {
+      expect(confidenceLabel(0.5)).toBe("0.50");
+    });
+
+    it("returns null when confidence is null (human events)", () => {
+      expect(confidenceLabel(null)).toBeNull();
+    });
+  });
+
+  describe("cardLinkHref", () => {
+    it("builds the origin-card href from projectCode + cardSlug", () => {
+      expect(cardLinkHref({ projectCode: "BDG-H1", cardSlug: "pasang-lantai" })).toBe(
+        "/project/BDG-H1/cards/pasang-lantai",
+      );
+    });
+
+    it("returns null when there is no card link", () => {
+      expect(cardLinkHref(null)).toBeNull();
+    });
+  });
+
+  describe("AI row integration", () => {
+    it("an AI event with no author renders chip-worthy 'Asisten AI' + formatted confidence + card href together", () => {
+      const ev = makeEvent({
+        source: "ai",
+        author_name: null,
+        confidence: 0.947,
+        card_link: { projectCode: "BDG-H1", cardSlug: "pasang-lantai" },
+      });
+      expect(eventAuthorLabel(ev)).toBe("Asisten AI");
+      expect(confidenceLabel(ev.confidence)).toBe("0.95");
+      expect(cardLinkHref(ev.card_link)).toBe("/project/BDG-H1/cards/pasang-lantai");
+    });
+
+    it("a human event never shows the AI chip fields (confidence/card_link null, author unchanged)", () => {
+      const ev = makeEvent({ source: "human", author_name: "Sari" });
+      expect(eventAuthorLabel(ev)).toBe("Sari");
+      expect(confidenceLabel(ev.confidence)).toBeNull();
+      expect(cardLinkHref(ev.card_link)).toBeNull();
     });
   });
 });

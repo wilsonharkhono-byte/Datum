@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeAreaFlags } from "@/lib/steps/flags";
+import { computeAreaFlags, truncateNames } from "@/lib/steps/flags";
 import type { TradeStepDep } from "@/lib/steps/types";
 
 type S = { step_code: string; step_type: string; status: string };
@@ -67,5 +67,34 @@ describe("computeAreaFlags", () => {
       { step_code: "B6", step_type: "site_work", status: "not_started" },
     ];
     expect(computeAreaFlags(steps, deps).readyToStart).toBe(null);
+  });
+});
+
+// Mobile-blob fix: "Perlu keputusan: <21 names>" used to join every name with
+// no cap, producing an unreadable wall of text on narrow screens. The flags
+// line must truncate to 3 named steps + "+N lainnya".
+describe("truncateNames", () => {
+  it("passes short lists through unchanged, joined with comma", () => {
+    expect(truncateNames(["Keramik", "Cat", "Lampu"])).toBe("Keramik, Cat, Lampu");
+    expect(truncateNames(["Keramik"])).toBe("Keramik");
+    expect(truncateNames([])).toBe("");
+  });
+
+  it("caps at 3 names + a '+N lainnya' suffix beyond that", () => {
+    const names = ["A", "B", "C", "D"];
+    expect(truncateNames(names)).toBe("A, B, C, +1 lainnya");
+  });
+
+  it("the exact live-bug shape: 21 names truncate to 3 + '+18 lainnya'", () => {
+    const names = Array.from({ length: 21 }, (_, i) => `Langkah ${i + 1}`);
+    expect(truncateNames(names)).toBe("Langkah 1, Langkah 2, Langkah 3, +18 lainnya");
+  });
+
+  it("exactly at the cap (3) shows no suffix", () => {
+    expect(truncateNames(["A", "B", "C"])).toBe("A, B, C");
+  });
+
+  it("respects a custom limit", () => {
+    expect(truncateNames(["A", "B", "C", "D", "E"], 2)).toBe("A, B, +3 lainnya");
   });
 });

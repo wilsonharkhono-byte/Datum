@@ -338,6 +338,60 @@ describe("BriefScreen", () => {
     });
   });
 
+  // ── Stale-card demotion (capStaleCards) ──────────────────────────────────
+  // Same render-level cap as web's /brief (see packages/core/src/advisor/stale-cap.ts):
+  // only the first 3 stale_card rows show in the advisor feed, the rest collapse
+  // into a "+N lainnya tanpa aktivitas" hint instead of drowning the feed.
+
+  it("caps stale_card rows at 3 and shows the hiddenStaleCount hint for the rest", async () => {
+    const staleItems = Array.from({ length: 5 }, (_, i) =>
+      makeAdvisorItem({
+        type: "stale_card",
+        score: 30,
+        title: `Tanpa aktivitas: Kartu ${i + 1}`,
+        href: `/project/ARIN-1/cards/arin-1-card-${i + 1}`,
+        projectCode: "ARIN-1",
+        dueLabel: undefined,
+      }),
+    );
+    mockGetAdvisorData.mockResolvedValue(makeAdvisorData(staleItems));
+    mockGetBriefData.mockResolvedValue(makeBriefData());
+
+    wrap(<BriefScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Tanpa aktivitas: Kartu 1")).toBeTruthy();
+      expect(screen.getByText("Tanpa aktivitas: Kartu 3")).toBeTruthy();
+      expect(screen.queryByText("Tanpa aktivitas: Kartu 4")).toBeNull();
+      expect(screen.queryByText("Tanpa aktivitas: Kartu 5")).toBeNull();
+      expect(screen.getByTestId("advisor-hidden-stale")).toBeTruthy();
+      expect(screen.getByText("+2 lainnya tanpa aktivitas")).toBeTruthy();
+    });
+  });
+
+  it("does not show the hiddenStaleCount hint when stale_card items are at or under the cap", async () => {
+    const staleItems = Array.from({ length: 2 }, (_, i) =>
+      makeAdvisorItem({
+        type: "stale_card",
+        score: 30,
+        title: `Tanpa aktivitas: Kartu ${i + 1}`,
+        href: `/project/ARIN-1/cards/arin-1-card-${i + 1}`,
+        projectCode: "ARIN-1",
+        dueLabel: undefined,
+      }),
+    );
+    mockGetAdvisorData.mockResolvedValue(makeAdvisorData(staleItems));
+    mockGetBriefData.mockResolvedValue(makeBriefData());
+
+    wrap(<BriefScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Tanpa aktivitas: Kartu 1")).toBeTruthy();
+      expect(screen.getByText("Tanpa aktivitas: Kartu 2")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("advisor-hidden-stale")).toBeNull();
+  });
+
   // ── Error state ──────────────────────────────────────────────────────────
 
   it("shows error state when advisor query rejects", async () => {

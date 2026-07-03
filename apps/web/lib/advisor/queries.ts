@@ -2,6 +2,8 @@
 export {
   getAdvisorData,
   getAdvisorItems,
+  capStaleCards,
   type GetAdvisorOpts,
   type AdvisorData,
+  type StaleCapResult,
 } from "@datum/core";

@@ -108,6 +108,7 @@ export {
   getCardWithTimeline,
   getCardWithTimelineByProjectCode,
   getCardAttachments,
+  getDecisionOutcomesByCardEvent,
   getCardComments,
   getCardMembers,
   getProjectStaff,
@@ -123,6 +124,8 @@ export {
   looksLikeImage,
   safeHostname,
   valueLabel,
+  textField,
+  decisionOutcomeLine,
 } from "./cards/event-render";
 
 // ─── Card event mutations ─────────────────────────────────────────────────────
@@ -225,6 +228,18 @@ export {
   type QuoteEvent,
 } from "./brief/bottlenecks";
 
+export {
+  getRecentPulse,
+  groupPulseEvents,
+  mapStepEventRow,
+  mapCardEventRow,
+  summarizePulseCardEvent,
+  type PulseEvent,
+  type PulseSource,
+  type PulseRoomGroup,
+  type PulseProjectGroup,
+} from "./brief/pulse";
+
 // ─── Advisor reads + ranking ──────────────────────────────────────────────────
 export {
   getAdvisorData,
@@ -239,6 +254,8 @@ export {
   dueLabelFor,
   ageLabelFor,
 } from "./advisor/rank";
+
+export { capStaleCards, type StaleCapResult } from "./advisor/stale-cap";
 
 export {
   type AdvisorItem,
@@ -385,6 +402,7 @@ export {
   relativeTimeId,
   type CellStatus,
   type RoomGateCell,
+  type RoomStepActivity,
   type RoomStage,
   type NextAction,
   type Room,
@@ -496,3 +514,6 @@ export {
   type UpsertPushTokenResult,
   upsertPushToken,
 } from "./notifications/push-tokens";
+
+// ─── DB: shared "missing schema, degrade gracefully" detector ─────────────────
+export { isMissingSchemaError } from "./db/degrade";

@@ -25,8 +25,15 @@ import {
   getProjectMembers,
   READINESS_REMINDER_KIND,
   escalateRecipients,
+  resolveUnconfirmedBlockRecipients,
+  buildUnconfirmedBlockIntents,
+  loadUnconfirmedBlockIntents,
+  isUnconfirmedBlockAlreadyNotified,
+  notifyUnconfirmedAiBlock,
+  UNCONFIRMED_BLOCK_KIND,
   type ProjectMember,
   type ActiveProject,
+  type UnconfirmedBlockContext,
 } from "@/lib/steps/reminders";
 import { sendExpoPush } from "@/lib/notifications/push-send";
 import {
@@ -58,6 +65,11 @@ function fakeClient(
       gte: () => builder,
       limit: () => builder,
       insert: () => Promise.resolve(resp),
+      // Callers that .maybeSingle()/.single() expect a single object (or
+      // null), not an array — unwrap the fixture's `data` array's first
+      // element if it's an array, otherwise pass it through as-is.
+      maybeSingle: () => Promise.resolve({ ...resp, data: Array.isArray(resp.data) ? (resp.data[0] ?? null) : resp.data }),
+      single: () => Promise.resolve({ ...resp, data: Array.isArray(resp.data) ? (resp.data[0] ?? null) : resp.data }),
       then: (resolve: (v: any) => void) => resolve(resp),
     };
     return builder;
@@ -448,5 +460,355 @@ describe("sendExpoPush mock", () => {
       sendExpoPush(["staff-1"], { title: "t", body: "b" }),
     ).resolves.toBeUndefined();
     expect(sendExpoPush).toBeDefined();
+  });
+});
+
+// ─── Unconfirmed AI block notification (Task 3: confirm-gate) ────────────────
+
+describe("resolveUnconfirmedBlockRecipients", () => {
+  it("unions trade-role recipients with card watchers, deduped", () => {
+    const result = resolveUnconfirmedBlockRecipients(
+      "site_supervisor",
+      MEMBERS,
+      PROJECT,
+      ["staff-watcher", "staff-supervisor"], // staff-supervisor also resolves via trade role
+    );
+    expect(result).toEqual(["staff-supervisor", "staff-watcher"]);
+  });
+
+  it("falls back to principal/pic when no trade-role match, still includes watchers", () => {
+    const result = resolveUnconfirmedBlockRecipients("estimator", MEMBERS, PROJECT, ["staff-watcher"]);
+    expect(result).toContain("staff-principal");
+    expect(result).toContain("staff-watcher");
+  });
+
+  it("returns just watchers when there are no members and no project fallback", () => {
+    const bare: ActiveProject = { ...PROJECT, principal_id: null, pic_id: null };
+    const result = resolveUnconfirmedBlockRecipients(null, [], bare, ["staff-watcher"]);
+    expect(result).toEqual(["staff-watcher"]);
+  });
+});
+
+describe("buildUnconfirmedBlockIntents", () => {
+  const ctx: UnconfirmedBlockContext = {
+    areaStepId: "as-1",
+    cardEventId: "ce-1",
+    projectId: "proj-1",
+    projectCode: "BDG-H1",
+    stepName: "Waterproofing",
+    stepTradeRole: "site_supervisor",
+    areaName: "Kamar Mandi A",
+  };
+
+  it("builds one intent per recipient with the expected message, link, and kind", () => {
+    const intents = buildUnconfirmedBlockIntents(ctx, ["staff-1", "staff-2"]);
+    expect(intents).toHaveLength(2);
+    expect(intents[0]!.message).toBe(
+      "AI mendeteksi kemungkinan terblokir: Waterproofing (Kamar Mandi A) — buka untuk konfirmasi",
+    );
+    expect(intents[0]!.link).toBe("/project/BDG-H1/rooms?areaStep=as-1");
+    expect(intents[0]!.kind).toBe(UNCONFIRMED_BLOCK_KIND);
+    expect(intents[0]!.projectId).toBe("proj-1");
+    expect(intents[0]!.cardEventId).toBe("ce-1");
+    expect(intents[0]!.areaStepId).toBe("as-1");
+  });
+
+  it("dedupeKey is deterministic per (recipient, areaStep, cardEvent)", () => {
+    const [a] = buildUnconfirmedBlockIntents(ctx, ["staff-1"]);
+    const [b] = buildUnconfirmedBlockIntents(ctx, ["staff-1"]);
+    expect(a!.dedupeKey).toBe(b!.dedupeKey);
+    expect(a!.dedupeKey).toBe("staff-1|as-1|ce-1");
+  });
+
+  it("returns an empty array for an empty recipient list", () => {
+    expect(buildUnconfirmedBlockIntents(ctx, [])).toEqual([]);
+  });
+});
+
+describe("loadUnconfirmedBlockIntents", () => {
+  it("returns [] when the area_step can't be resolved", async () => {
+    const supa = fakeClient([
+      { data: null, error: null }, // area_steps.maybeSingle -> null
+      { data: null, error: null }, // card_events
+      { data: [PROJECT], error: null }, // projects — never reached in practice but keep queue happy
+    ]);
+    const intents = await loadUnconfirmedBlockIntents(supa, {
+      areaStepId: "as-missing",
+      cardEventId: "ce-1",
+      projectId: "proj-1",
+    });
+    expect(intents).toEqual([]);
+  });
+
+  it("resolves step/area/project context and builds intents for trade-role + watcher recipients", async () => {
+    const stepData = {
+      area_id: "area-1",
+      trade_steps: { name: "Waterproofing", trade_role: "site_supervisor" },
+      areas: { area_name: "Kamar Mandi A" },
+    };
+    const memberRow = {
+      staff_id: "staff-supervisor",
+      role_on_project: "site",
+      staff: { role: "site_supervisor", active: true },
+    };
+
+    // Order matches Promise.all([area_steps, card_events, projects]) then
+    // Promise.all([getProjectMembers -> project_staff, card_members]).
+    // maybeSingle() unwraps a one-element array fixture to its single object.
+    const supa = fakeClient([
+      { data: [stepData], error: null }, // area_steps
+      { data: [{ card_id: "card-1" }], error: null }, // card_events
+      { data: [PROJECT], error: null }, // projects
+      { data: [memberRow], error: null }, // project_staff (getProjectMembers)
+      { data: [{ staff_id: "staff-watcher" }], error: null }, // card_members
+    ]);
+
+    const intents = await loadUnconfirmedBlockIntents(supa, {
+      areaStepId: "as-1",
+      cardEventId: "ce-1",
+      projectId: "proj-1",
+    });
+
+    const recipients = intents.map((i) => i.recipientStaffId).sort();
+    expect(recipients).toEqual(["staff-supervisor", "staff-watcher"]);
+    expect(intents[0]!.message).toContain("Waterproofing");
+    expect(intents[0]!.message).toContain("Kamar Mandi A");
+  });
+});
+
+describe("isUnconfirmedBlockAlreadyNotified", () => {
+  const INTENT = {
+    recipientStaffId: "staff-1",
+    areaStepId: "as-1",
+    cardEventId: "ce-1",
+    kind: UNCONFIRMED_BLOCK_KIND,
+    link: "/project/BDG-H1/rooms?areaStep=as-1",
+  };
+
+  it("returns true (skip) when a matching notification already exists for this card_event", async () => {
+    const supa = fakeClient([{ data: [{ id: "notif-1" }], error: null }]);
+    const result = await isUnconfirmedBlockAlreadyNotified(supa, INTENT);
+    expect(result).toBe(true);
+  });
+
+  it("returns false (proceed) when no matching notification exists", async () => {
+    const supa = fakeClient([{ data: [], error: null }]);
+    const result = await isUnconfirmedBlockAlreadyNotified(supa, INTENT);
+    expect(result).toBe(false);
+  });
+
+  it("returns true (skip) on a dedup query error — err on the side of not duplicating", async () => {
+    const supa = fakeClient([{ data: null, error: { message: "db error" } }]);
+    const result = await isUnconfirmedBlockAlreadyNotified(supa, INTENT);
+    expect(result).toBe(true);
+  });
+
+  it("filters on link (which carries area_step_id) in addition to recipient/card_event_id/kind", async () => {
+    // Regression for the review finding: the old query only filtered on
+    // (recipient_staff_id, card_event_id, kind) — omitting area_step_id (via
+    // link) meant a card event blocking TWO area_steps for the same recipient
+    // would look like a dup of itself and drop the second notification.
+    const eqCalls: Array<[string, unknown]> = [];
+    const supa = {
+      from(_table: string) {
+        const builder: any = {
+          select: () => builder,
+          eq: (col: string, val: unknown) => {
+            eqCalls.push([col, val]);
+            return builder;
+          },
+          limit: () => Promise.resolve({ data: [], error: null }),
+        };
+        return builder;
+      },
+    } as any;
+
+    await isUnconfirmedBlockAlreadyNotified(supa, INTENT);
+
+    expect(eqCalls).toContainEqual(["recipient_staff_id", "staff-1"]);
+    expect(eqCalls).toContainEqual(["card_event_id", "ce-1"]);
+    expect(eqCalls).toContainEqual(["link", "/project/BDG-H1/rooms?areaStep=as-1"]);
+    expect(eqCalls).toContainEqual(["kind", UNCONFIRMED_BLOCK_KIND]);
+  });
+});
+
+describe("notifyUnconfirmedAiBlock", () => {
+  it("inserts exactly once per recipient and skips already-notified ones (dedup on card_event_id)", async () => {
+    const stepData = {
+      area_id: "area-1",
+      trade_steps: { name: "Waterproofing", trade_role: "site_supervisor" },
+      areas: { area_name: "Kamar Mandi A" },
+    };
+    const memberRow = {
+      staff_id: "staff-supervisor",
+      role_on_project: "site",
+      staff: { role: "site_supervisor", active: true },
+    };
+
+    const inserted: any[] = [];
+    let idx = 0;
+    const responses = [
+      { data: stepData, error: null }, // area_steps
+      { data: { card_id: "card-1" }, error: null }, // card_events
+      { data: PROJECT, error: null }, // projects
+      { data: [memberRow], error: null }, // project_staff
+      { data: [{ staff_id: "staff-watcher" }], error: null }, // card_members
+      // dedup check for the first recipient: already notified
+      { data: [{ id: "notif-existing" }], error: null },
+      // dedup check for the second recipient: not yet notified
+      { data: [], error: null },
+    ];
+    const supa = {
+      from(table: string) {
+        if (table === "notifications" && responses[idx]?.data !== undefined && idx >= 5) {
+          // dedup-check calls land here too; handled generically below
+        }
+        const resp = responses[idx++] ?? { data: [], error: null };
+        const builder: any = {
+          select: () => builder,
+          eq: () => builder,
+          in: () => builder,
+          is: () => builder,
+          limit: () => builder,
+          maybeSingle: () => Promise.resolve(resp),
+          insert: (row: any) => {
+            inserted.push(row);
+            return Promise.resolve({ error: null });
+          },
+          then: (resolve: (v: any) => void) => resolve(resp),
+        };
+        return builder;
+      },
+    } as any;
+
+    await notifyUnconfirmedAiBlock(supa, {
+      areaStepId: "as-1",
+      cardEventId: "ce-1",
+      projectId: "proj-1",
+    });
+
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      kind: UNCONFIRMED_BLOCK_KIND,
+      project_id: "proj-1",
+      card_event_id: "ce-1",
+      link: "/project/BDG-H1/rooms?areaStep=as-1",
+    });
+  });
+
+  it("regression: one card event blocking TWO area_steps for the same recipient writes TWO notifications, and a re-run doesn't duplicate either", async () => {
+    // Reproduces the review finding directly: a single card note can match
+    // more than one area_step (e.g. "kamar mandi A & B kena rembes air" blocks
+    // both bathrooms' waterproofing steps). Both intents share the same
+    // recipient + card_event_id + kind — only `link` (area_step-specific)
+    // tells them apart. Model this by calling notifyUnconfirmedAiBlock twice
+    // (once per area_step, as applyStepInference does per matched step) against
+    // a shared notifications store, then a third "re-run" pass over both.
+    const notificationsStore: any[] = [];
+
+    function makeSupaFor(areaStepId: string, stepName: string) {
+      const stepData = {
+        area_id: "area-1",
+        trade_steps: { name: stepName, trade_role: "site_supervisor" },
+        areas: { area_name: "Kamar Mandi" },
+      };
+      const memberRow = {
+        staff_id: "staff-supervisor",
+        role_on_project: "site",
+        staff: { role: "site_supervisor", active: true },
+      };
+      let idx = 0;
+      const responses = [
+        { data: stepData, error: null }, // area_steps
+        { data: { card_id: "card-1" }, error: null }, // card_events
+        { data: PROJECT, error: null }, // projects
+        { data: [memberRow], error: null }, // project_staff
+        { data: [], error: null }, // card_members (no extra watchers)
+      ];
+      return {
+        from(table: string) {
+          if (table === "notifications") {
+            const builder: any = {
+              select: () => builder,
+              eq(this: any, col: string, val: unknown) {
+                this._filters = { ...(this._filters ?? {}), [col]: val };
+                return builder;
+              },
+              limit: () =>
+                Promise.resolve({
+                  data: notificationsStore.filter(
+                    (n) =>
+                      n.recipient_staff_id === builder._filters.recipient_staff_id &&
+                      n.card_event_id === builder._filters.card_event_id &&
+                      n.link === builder._filters.link &&
+                      n.kind === builder._filters.kind,
+                  ),
+                  error: null,
+                }),
+              insert: (row: any) => {
+                notificationsStore.push(row);
+                return Promise.resolve({ error: null });
+              },
+            };
+            return builder;
+          }
+          const resp = responses[idx++] ?? { data: [], error: null };
+          const builder: any = {
+            select: () => builder,
+            eq: () => builder,
+            in: () => builder,
+            is: () => builder,
+            maybeSingle: () => Promise.resolve(resp),
+            then: (resolve: (v: any) => void) => resolve(resp),
+          };
+          return builder;
+        },
+      } as any;
+    }
+
+    // First pass: card event "ce-shared" blocks two distinct area_steps for
+    // the same recipient (staff-supervisor resolves via trade role both times).
+    await notifyUnconfirmedAiBlock(makeSupaFor("as-1", "Waterproofing"), {
+      areaStepId: "as-1",
+      cardEventId: "ce-shared",
+      projectId: "proj-1",
+    });
+    await notifyUnconfirmedAiBlock(makeSupaFor("as-2", "Waterproofing"), {
+      areaStepId: "as-2",
+      cardEventId: "ce-shared",
+      projectId: "proj-1",
+    });
+
+    expect(notificationsStore).toHaveLength(2);
+    expect(new Set(notificationsStore.map((n) => n.link))).toEqual(
+      new Set(["/project/BDG-H1/rooms?areaStep=as-1", "/project/BDG-H1/rooms?areaStep=as-2"]),
+    );
+    expect(notificationsStore.every((n) => n.recipient_staff_id === "staff-supervisor")).toBe(true);
+    expect(notificationsStore.every((n) => n.card_event_id === "ce-shared")).toBe(true);
+
+    // Re-run: same two (areaStep, cardEvent) pairs again — must not duplicate either.
+    await notifyUnconfirmedAiBlock(makeSupaFor("as-1", "Waterproofing"), {
+      areaStepId: "as-1",
+      cardEventId: "ce-shared",
+      projectId: "proj-1",
+    });
+    await notifyUnconfirmedAiBlock(makeSupaFor("as-2", "Waterproofing"), {
+      areaStepId: "as-2",
+      cardEventId: "ce-shared",
+      projectId: "proj-1",
+    });
+
+    expect(notificationsStore).toHaveLength(2);
+  });
+
+  it("never throws even when the underlying client errors", async () => {
+    const supa = {
+      from() {
+        throw new Error("boom");
+      },
+    } as any;
+    await expect(
+      notifyUnconfirmedAiBlock(supa, { areaStepId: "as-1", cardEventId: "ce-1", projectId: "proj-1" }),
+    ).resolves.toBeUndefined();
   });
 });

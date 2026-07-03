@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getProjectStepActivity, groupByDay } from "@/lib/activity/step-activity";
+import { getProjectStepActivity, groupByDay, type StepActivityItem } from "@/lib/activity/step-activity";
+import { eventAuthorLabel, confidenceLabel, cardLinkHref } from "@/lib/steps/attribution";
 
 const CHIP: Record<string, { label: string; cls: string }> = {
   not_started: { label: "Belum mulai", cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" },
@@ -8,6 +9,11 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   blocked: { label: "Terblokir", cls: "bg-red-100 text-red-800" },
   done: { label: "Selesai", cls: "bg-green-100 text-green-800" },
 };
+
+/** Adapts StepActivityItem's camelCase author field to the shared eventAuthorLabel's shape. */
+function itemAuthorLabel(it: Pick<StepActivityItem, "source" | "authorName">): string | null {
+  return eventAuthorLabel({ source: it.source, author_name: it.authorName });
+}
 
 export default async function ProjectActivityPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -38,17 +44,32 @@ export default async function ProjectActivityPage({ params }: { params: Promise<
           <ol className="space-y-2">
             {g.items.map((it) => {
               const chip = CHIP[it.status] ?? { label: it.status, cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" };
+              const isAi = it.source === "ai";
+              const author = itemAuthorLabel(it);
+              const confidence = confidenceLabel(it.confidence);
+              const href = cardLinkHref(it.cardLink);
               return (
                 <li key={it.id} className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px]">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${chip.cls}`}>{chip.label}</span>
+                    {isAi ? (
+                      <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800">
+                        AI
+                      </span>
+                    ) : null}
                     <span className="text-[var(--foreground)]">{it.areaName} · {it.stepName}</span>
                     {it.percentComplete !== null ? <span className="text-[10px] text-[var(--text-muted)]">{it.percentComplete}%</span> : null}
                     <span className="flex-1" />
                     <span className="text-[10px] text-[var(--text-muted)]">
                       {new Date(it.occurredAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}
-                      {it.authorName ? ` · ${it.authorName}` : ""}
+                      {author ? ` · ${author}` : ""}
+                      {confidence ? ` · ${confidence}` : ""}
                     </span>
+                    {href ? (
+                      <Link href={href} className="text-[10px] text-[var(--sand-dark)] underline hover:text-[var(--foreground)]">
+                        dari kartu →
+                      </Link>
+                    ) : null}
                   </div>
                   {it.note ? <p className="mt-1 text-[12px] text-[var(--foreground)]">{it.note}</p> : null}
                 </li>

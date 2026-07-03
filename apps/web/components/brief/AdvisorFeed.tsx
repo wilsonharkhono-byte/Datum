@@ -8,8 +8,23 @@ import { GateAdvanceConfirmAction } from "@/components/gates/GateAdvanceConfirm"
  *
  * `gate_ready` rows render an inline client island ("Tandai selesai") that
  * opens the confirm sheet — the row itself stays server-rendered.
+ *
+ * `hiddenStaleCount`: when the caller has already capped "Tanpa aktivitas"
+ * (stale_card) rows before passing `items` here (see `capStaleCards` in
+ * @datum/core advisor/stale-cap.ts), this renders a "+N lainnya tanpa
+ * aktivitas — lihat semua →" line. No dedicated stale-cards page exists, so
+ * `showAllStaleHref` points at the brief's own uncapped view (`?stale=semua`);
+ * without it the line degrades to a plain count.
  */
-export function AdvisorFeed({ items }: { items: AdvisorItem[] }) {
+export function AdvisorFeed({
+  items,
+  hiddenStaleCount = 0,
+  showAllStaleHref,
+}: {
+  items: AdvisorItem[];
+  hiddenStaleCount?: number;
+  showAllStaleHref?: string;
+}) {
   return (
     <section className="rounded border border-[#B5AFA8] bg-[#FDFAF6] p-4">
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">
@@ -52,6 +67,19 @@ export function AdvisorFeed({ items }: { items: AdvisorItem[] }) {
           ))}
         </ol>
       )}
+      {hiddenStaleCount > 0 ? (
+        <p className="mt-2 text-[10px] uppercase tracking-wide text-[#847E78]">
+          +{hiddenStaleCount} lainnya tanpa aktivitas
+          {showAllStaleHref ? (
+            <>
+              {" — "}
+              <Link href={showAllStaleHref} className="text-[#7A6B56] hover:underline">
+                lihat semua →
+              </Link>
+            </>
+          ) : null}
+        </p>
+      ) : null}
     </section>
   );
 }

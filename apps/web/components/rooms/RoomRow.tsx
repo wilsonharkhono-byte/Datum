@@ -7,9 +7,10 @@ import { relativeTimeId } from "@/lib/rooms/derive";
 import { StageChip } from "./StageChip";
 import { RoomStepsPanel } from "./RoomStepsPanel";
 import { RoomAssistantButton } from "./RoomAssistantButton";
-import type { getRoomStepView } from "@/lib/steps/queries";
+import type { getRoomStepView, AreaStepEventRow } from "@/lib/steps/queries";
 
 type StepView = Awaited<ReturnType<typeof getRoomStepView>>;
+type StepEvents = Map<string, AreaStepEventRow[]>;
 
 const ACTION_TONE: Record<Room["action"]["tone"], string> = {
   urgent: "text-[#C62828]",
@@ -32,13 +33,21 @@ export function RoomRow({
   projectCode,
   now,
   stepView,
+  stepEvents,
+  autoExpand,
+  autoOpenStepId,
 }: {
   room: Room;
   projectCode: string;
   now: number;
   stepView?: StepView;
+  stepEvents?: StepEvents;
+  /** Pre-expand this row on mount (from a ?areaStep= deep link — see rooms/page.tsx). */
+  autoExpand?: boolean;
+  /** Step id within this room's panel to auto-open, same deep link. */
+  autoOpenStepId?: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(autoExpand ?? false);
   const rel = relativeTimeId(room.lastActivityAt, now);
   const hasSteps = (stepView?.steps.length ?? 0) > 0;
 
@@ -99,7 +108,7 @@ export function RoomRow({
       {/* ── Expanded step panel ─────────────────────────────────────────── */}
       {expanded && stepView && hasSteps ? (
         <div>
-          <RoomStepsPanel areaId={room.areaId} view={stepView} />
+          <RoomStepsPanel areaId={room.areaId} view={stepView} stepEvents={stepEvents} autoOpenStepId={autoOpenStepId} />
           <div className="flex justify-end border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2">
             <RoomAssistantButton areaName={room.areaName} view={stepView} />
           </div>

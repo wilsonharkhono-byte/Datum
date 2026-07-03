@@ -9,6 +9,7 @@ import {
 } from "./bottlenecks";
 import { ACTOR_LABELS } from "../cards/labels";
 import { compareEventTime, type OrderableEvent } from "../cards/event-order";
+import { getRecentPulse, groupPulseEvents, type PulseProjectGroup } from "./pulse";
 
 export type BriefItem = {
   id: string;
@@ -28,6 +29,13 @@ export type BriefData = {
   expiringQuotes:  { count: number; items: BriefItem[] };
   gateRisks:       GateRisk[];
   staleByProject:  { projectCode: string; projectName: string; staleCount: number }[];
+  /**
+   * "DENYUT KEMARIN–HARI INI" — 48h step + card events, grouped project →
+   * room/card. OPTIONAL so existing BriefData fixtures/consumers (notably
+   * mobile's EMPTY_BRIEF test constant) keep typechecking without updating —
+   * this repo's convention for extending shared core types (see CLAUDE.md).
+   */
+  pulse?: PulseProjectGroup[];
 };
 
 const TOP_N = 5;
@@ -61,6 +69,7 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     { data: decEvs, count: decCount },
     { data: vendorEvs },
     { data: gateRows },
+    pulseEvents,
   ] = await Promise.all([
     // 1. Pending drafts (card_event drafts)
     supabase
@@ -141,6 +150,9 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
         projects:project_id (project_code, project_name)
       `)
       .or("target_start_date.not.is.null,stale.eq.true"),
+    // 9. The pulse — 48h step + card events, cross-project, time-windowed
+    //    (see pulse.ts for why: no unbounded .in() over project/card ids).
+    getRecentPulse(supabase),
   ]);
 
   const pendingDrafts = {
@@ -314,5 +326,11 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
     .map((v) => ({ projectCode: v.code, projectName: v.name, staleCount: v.n }))
     .sort((a, b) => b.staleCount - a.staleCount);
 
-  return { pendingDrafts, blockers, defects, decisionsNeeded, awaitingClient, expiringQuotes, gateRisks, staleByProject };
+  // 9. The pulse — pure grouping (project → room/card, capped ~10 rows total).
+  const pulse = groupPulseEvents(pulseEvents);
+
+  return {
+    pendingDrafts, blockers, defects, decisionsNeeded, awaitingClient, expiringQuotes,
+    gateRisks, staleByProject, pulse,
+  };
 }

@@ -20,6 +20,15 @@ export type RoomGateCell = {
   status: CellStatus;
 };
 
+/** Statuses that count as "live activity" on a trade step. */
+const STEP_ACTIVE_STATUSES = new Set(["in_progress", "blocked", "stalled"]);
+
+/** Minimal per-step input for one area (from area_steps, joined to its template's gate_code). */
+export type RoomStepActivity = {
+  gate_code: GateCode;
+  status: string;
+};
+
 /** A→H index, used for "furthest" comparisons and progress. */
 const GATE_ORDER: Record<GateCode, number> = Object.fromEntries(
   GateCodes.map((g, i) => [g, i]),
@@ -35,11 +44,17 @@ export type RoomStage =
  *   1. The furthest (latest A→H) gate that is in_progress or blocked — that is
  *      where the live work sits.
  *   2. Otherwise the furthest gate already passed — the room is between stages.
- *   3. Otherwise nothing has started.
+ *   3. Otherwise, when `steps` is given: the furthest gate with an actual
+ *      trade step in_progress/blocked/stalled (area_gate_status cells are
+ *      derived from card_events and can lag or go stale — e.g. every cell
+ *      still `not_started` while BW2/BW3 wet-work is live — so live step
+ *      activity is the fallback source of truth, never a fresher-but-wrong
+ *      gate label like "Gate H · Serah Terima" on a room mid gate-B).
+ *   4. Otherwise nothing has started.
  * not_started / not_applicable / ready_for_handoff cells never define the
  * stage on their own (handoff readiness is surfaced via next-action instead).
  */
-export function deriveStage(cells: RoomGateCell[]): RoomStage {
+export function deriveStage(cells: RoomGateCell[], steps?: RoomStepActivity[]): RoomStage {
   let active: { gate: GateCode; status: "in_progress" | "blocked" } | null = null;
   let passed: GateCode | null = null;
 
@@ -57,6 +72,18 @@ export function deriveStage(cells: RoomGateCell[]): RoomStage {
 
   if (active) return { kind: "active", gate: active.gate, status: active.status };
   if (passed) return { kind: "passed", gate: passed };
+
+  if (steps) {
+    let stepActive: GateCode | null = null;
+    for (const s of steps) {
+      if (!STEP_ACTIVE_STATUSES.has(s.status)) continue;
+      if (stepActive === null || GATE_ORDER[s.gate_code] > GATE_ORDER[stepActive]) {
+        stepActive = s.gate_code;
+      }
+    }
+    if (stepActive) return { kind: "active", gate: stepActive, status: "in_progress" };
+  }
+
   return { kind: "none" };
 }
 

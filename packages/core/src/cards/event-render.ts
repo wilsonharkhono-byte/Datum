@@ -71,14 +71,52 @@ export function safeHostname(u: string): string {
   }
 }
 
+/**
+ * Renderer-tolerance helper: return the first non-empty string value among
+ * `keys` on `payload`, or null if none match. Used so the timeline never
+ * prints the literal "undefined" — a malformed/legacy payload missing its
+ * primary field (e.g. a decision with no `topic`) used to render
+ * `String(undefined)` verbatim ("undefined — ..."). Callers fall back through
+ * a small chain of plausible fields (question → summary → body →
+ * description) before giving up.
+ */
+export function textField(payload: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = payload[k];
+    if (typeof v === "string" && v.trim().length > 0) return v;
+  }
+  return null;
+}
+
+/**
+ * Fix 3 rework — format a decision outcome (captured via the "Tandai
+ * diputuskan" inline "Apa keputusannya?" input, round-tripped through
+ * record_revisions.reason by getDecisionOutcomesByCardEvent) for display on
+ * the timeline. Single source of truth for the "Keputusan: " label so the
+ * extraction prefix in getDecisionOutcomesByCardEvent and the render prefix
+ * here can't drift apart. Returns null for an empty/whitespace-only outcome.
+ */
+export function decisionOutcomeLine(outcome: string | null | undefined): string | null {
+  const trimmed = outcome?.trim();
+  return trimmed ? `Keputusan: ${trimmed}` : null;
+}
+
 /** Produce the one-liner summary text for a card event row.
  *  Covers all current and retired event kinds; retired kinds fall through
  *  to their historical display string so old timelines render correctly. */
 export function summarize(ev: CardEvent): string {
   const p = ev.payload as Record<string, unknown>;
   switch (ev.event_kind) {
-    case "decision":
-      return `${String(p.topic)} — ${String(p.proposed_spec ?? p.current_spec ?? "")}`;
+    case "decision": {
+      // topic is the primary field, but malformed/legacy payloads can miss
+      // it — fall back through question → summary → body → description
+      // rather than ever printing "undefined". The spec half is already
+      // optional-safe (proposed_spec ?? current_spec ?? "").
+      const topic = textField(p, ["topic", "question", "summary", "body", "description"]);
+      const spec = textField(p, ["proposed_spec", "current_spec"]);
+      if (topic === null) return spec ?? "";
+      return spec ? `${topic} — ${spec}` : topic;
+    }
     case "drawing":
       return String(p.description ?? p.drawing_code ?? "");
     case "vendor": {
@@ -117,11 +155,11 @@ export function summarize(ev: CardEvent): string {
     case "photo":
       return String(p.caption ?? "(foto)");
     case "document":
-      return String(p.title);
+      return textField(p, ["title", "description", "summary", "body"]) ?? "";
     case "client_request":
-      return String(p.request_text);
+      return textField(p, ["request_text", "question", "summary", "body", "description"]) ?? "";
     case "note":
-      return String(p.body);
+      return textField(p, ["body", "summary", "description"]) ?? "";
     // Retired kinds — kept for historical event display
     case "survey":
       return [p.vendor_name, p.location]

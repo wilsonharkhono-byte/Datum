@@ -38,3 +38,20 @@ export function computeAreaFlags(steps: FlagStep[], deps: TradeStepDep[]): AreaF
 
   return { readyToStart, needsDecision, blocked };
 }
+
+const DEFAULT_TRUNCATE_LIMIT = 3;
+
+/**
+ * Join up to `limit` names with ", ", appending "+N lainnya" for the rest.
+ * Mobile-blob fix: the room flags line ("Perlu keputusan: <names>") used to
+ * join every gating step name with no cap — a room with 21 open
+ * decision/procurement gates rendered an unreadable wall of text on narrow
+ * screens. Named steps are capped at 3 (the room-glance surface only needs
+ * enough to orient; "Lihat semua langkah" already exists for the full list).
+ */
+export function truncateNames(names: string[], limit: number = DEFAULT_TRUNCATE_LIMIT): string {
+  if (names.length <= limit) return names.join(", ");
+  const shown = names.slice(0, limit).join(", ");
+  const rest = names.length - limit;
+  return `${shown}, +${rest} lainnya`;
+}

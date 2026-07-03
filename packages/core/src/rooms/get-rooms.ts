@@ -9,6 +9,7 @@ import {
   sortRoomsByUrgency,
   type Room,
   type RoomGateCell,
+  type RoomStepActivity,
 } from "./derive";
 
 export type { Room } from "./derive";
@@ -53,6 +54,25 @@ export async function getProjectRooms(
     cellsByArea.set(cell.area_id, arr);
   }
 
+  // Per-area trade-step activity — the fallback signal deriveStage uses when
+  // area_gate_status has no active/passed cell (that table is derived from
+  // card_events and can go stale relative to the live area_steps work log;
+  // see deriveStage's docstring for the live-bug this fixes).
+  const stepsByArea = new Map<string, RoomStepActivity[]>();
+  const { data: stepRows } = await sb
+    .from("area_steps")
+    .select("area_id, status, trade_steps:step_code (gate_code)")
+    .eq("project_id", project.id)
+    .is("removed_at", null);
+  for (const row of stepRows ?? []) {
+    const areaId = (row as { area_id: string }).area_id;
+    const gate = (row as { trade_steps: { gate_code: string } | null }).trade_steps?.gate_code;
+    if (!gate) continue;
+    const arr = stepsByArea.get(areaId) ?? [];
+    arr.push({ gate_code: gate as GateCode, status: (row as { status: string }).status });
+    stepsByArea.set(areaId, arr);
+  }
+
   // Per-area card activity: how many cards link to the area and the freshest
   // last_event_at among them. One join keeps this to a single round-trip.
   const areaIds = matrix.areas.map((a) => a.id);
@@ -77,7 +97,7 @@ export async function getProjectRooms(
 
   const rooms: Room[] = matrix.areas.map((area) => {
     const cells = cellsByArea.get(area.id) ?? [];
-    const stage = deriveStage(cells);
+    const stage = deriveStage(cells, stepsByArea.get(area.id));
     const blockers = blockerCount(cells);
     const activeCards = cardCountByArea.get(area.id) ?? 0;
     const handoverReady = isHandoverReady(cells, stage);

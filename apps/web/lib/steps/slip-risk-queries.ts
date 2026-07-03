@@ -31,7 +31,10 @@ export async function getProjectsSlipRisk(
       const forecast = await getProjectForecast(supabase, p.id, today);
       return {
         project: { id: p.id, code: p.project_code, name: p.project_name },
-        risk: summarizeProjectRisk(signals),
+        // Forecast slip is folded into the level here (not just displayed
+        // alongside it) — see slip-risk.ts's B5 docstring for why silent
+        // signals + a real forecast slip must never render as "Aman".
+        risk: summarizeProjectRisk(signals, forecast.slipDays),
         signalCount: signals.length,
         forecast,
       };

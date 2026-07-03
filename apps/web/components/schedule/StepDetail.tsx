@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitStepUpdate, submitCheckpointResult, removeStep } from "@/lib/steps/actions";
 import type { AreaStepRow, AreaStepEventRow } from "@/lib/steps/queries";
+import { eventAuthorLabel, confidenceLabel, cardLinkHref } from "@/lib/steps/attribution";
 
 const STATUS_LABEL: Record<string, string> = {
   not_started: "Belum mulai",
@@ -25,7 +27,17 @@ function formatEventTime(isoString: string): string {
   return new Date(isoString).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function StepHistory({ events }: { events: AreaStepEventRow[] }) {
+function StepHistory({
+  events,
+  pending,
+  onBenar,
+  onKoreksi,
+}: {
+  events: AreaStepEventRow[];
+  pending: boolean;
+  onBenar: (ev: AreaStepEventRow) => void;
+  onKoreksi: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? events : events.slice(0, HISTORY_PREVIEW);
   const hasMore = events.length > HISTORY_PREVIEW;
@@ -42,24 +54,61 @@ function StepHistory({ events }: { events: AreaStepEventRow[] }) {
           <ol className="flex flex-col gap-2">
             {shown.map((ev) => {
               const chip = EVENT_CHIP[ev.status] ?? EVENT_CHIP.not_started!;
+              const isAi = ev.source === "ai";
+              const author = eventAuthorLabel(ev);
+              const confidence = confidenceLabel(ev.confidence);
+              const href = cardLinkHref(ev.card_link);
               return (
                 <li key={ev.id} className="flex flex-col gap-0.5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${chip.cls}`}>
                       {chip.label}
                     </span>
+                    {isAi ? (
+                      <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800">
+                        AI
+                      </span>
+                    ) : null}
                     {ev.percent_complete !== null ? (
                       <span className="text-[10px] text-[var(--text-muted)]">{ev.percent_complete}%</span>
                     ) : null}
                     <span className="text-[10px] text-[var(--text-muted)]">
                       {formatEventTime(ev.occurred_at)}
                     </span>
-                    {ev.author_name ? (
-                      <span className="text-[10px] text-[var(--text-muted)]">· {ev.author_name}</span>
+                    {author ? (
+                      <span className="text-[10px] text-[var(--text-muted)]">· {author}</span>
+                    ) : null}
+                    {confidence ? (
+                      <span className="text-[10px] text-[var(--text-muted)]">· {confidence}</span>
+                    ) : null}
+                    {href ? (
+                      <Link href={href} className="text-[10px] text-[var(--sand-dark)] underline hover:text-[var(--foreground)]">
+                        dari kartu →
+                      </Link>
                     ) : null}
                   </div>
                   {ev.note ? (
                     <p className="ml-1 text-[12px] text-[var(--foreground)]">{ev.note}</p>
+                  ) : null}
+                  {isAi ? (
+                    <div className="ml-1 mt-0.5 flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => onBenar(ev)}
+                        className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] font-semibold text-green-800 hover:border-green-700 disabled:opacity-50 md:min-h-0"
+                      >
+                        Benar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={onKoreksi}
+                        className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--sand-dark)] hover:border-[var(--sand-dark)] disabled:opacity-50 md:min-h-0"
+                      >
+                        Koreksi
+                      </button>
+                    </div>
                   ) : null}
                 </li>
               );
@@ -80,11 +129,66 @@ function StepHistory({ events }: { events: AreaStepEventRow[] }) {
   );
 }
 
+/** Pure: true when the step has an AI event newer than `nowIso` — a manual status set now would NOT outrank it. */
+export function hasNewerAiEvent(events: Pick<AreaStepEventRow, "source" | "occurred_at">[], nowIso: string): boolean {
+  return events.some((e) => e.source === "ai" && e.occurred_at > nowIso);
+}
+
+/**
+ * Pure: true when the step's *governing* event (the newest by occurred_at,
+ * ties broken by created_at — mirrors `latest()` in lib/steps/status.ts) is
+ * an AI-sourced "blocked" — i.e. the confirm-gate in lib/steps/status.ts
+ * projected this step as in_progress-with-note instead of a real `blocked`,
+ * and it's still awaiting a human "Benar"/"Koreksi". Once a human event lands
+ * at/after it (e.g. via Benar), that human event becomes the governing one
+ * (same occurred_at >= comparison the server's precedence uses) and this
+ * returns false — matching the server projection.
+ */
+export function isUnconfirmedBlock(
+  events: Pick<AreaStepEventRow, "source" | "status" | "occurred_at" | "created_at">[],
+): boolean {
+  if (events.length === 0) return false;
+  const governing = [...events]
+    .sort((a, b) =>
+      a.occurred_at === b.occurred_at
+        ? a.created_at.localeCompare(b.created_at)
+        : a.occurred_at.localeCompare(b.occurred_at),
+    )
+    .at(-1)!;
+  return governing.source === "ai" && governing.status === "blocked";
+}
+
+/**
+ * Pure: the note to send when a human hits "Benar" on an AI history row.
+ *
+ * For a blocked AI row, the projection derives `blockingReason` from the latest
+ * event's note (see lib/steps/status.ts `payload.blocked_on ?? payload.description`
+ * — read here via the row's `note` field). Sending a generic "Dikonfirmasi" note
+ * unconditionally would become the newest human event and overwrite that reason
+ * with the confirmation text, destroying the "why" the room is blocked.
+ *
+ * So for blocked rows: carry the AI event's own note forward when it has one;
+ * otherwise fall back to the step's current `blocking_reason` (still on the
+ * step even though this event's note is empty); otherwise "Dikonfirmasi".
+ * Non-blocked rows are unaffected — always "Dikonfirmasi".
+ */
+export function benarNote(
+  ev: Pick<AreaStepEventRow, "status" | "note">,
+  currentBlockingReason: string | null,
+): string {
+  if (ev.status === "blocked") return ev.note ?? currentBlockingReason ?? "Dikonfirmasi";
+  return "Dikonfirmasi";
+}
+
 export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: AreaStepEventRow[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const statusButtonsRef = useRef<HTMLDivElement | null>(null);
+
+  const overrideHint = hasNewerAiEvent(events, new Date().toISOString());
+  const unconfirmedBlock = isUnconfirmedBlock(events);
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>) {
     setError(null);
@@ -105,6 +209,27 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
     run(() => submitStepUpdate({ areaStepId: step.id, status }));
   }
 
+  /**
+   * "Benar" on an AI history row: write a human-authored confirming event with
+   * the same status — cheap, locks it in via the newest-information-wins rule.
+   * For a blocked row, carry the blocking reason forward (see `benarNote`)
+   * instead of overwriting it with a generic confirmation note.
+   */
+  function confirmAiEvent(ev: AreaStepEventRow) {
+    run(() =>
+      submitStepUpdate({
+        areaStepId: step.id,
+        status: ev.status as "not_started" | "in_progress" | "blocked" | "done",
+        note: benarNote(ev, step.blocking_reason),
+      }),
+    );
+  }
+
+  /** "Koreksi" on an AI history row: reveal the existing status buttons so the human can pick a different status. */
+  function focusStatusButtons() {
+    statusButtonsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   function remove() {
     if (!window.confirm("Hapus langkah ini dari ruang ini? Bisa dipulihkan nanti.")) return;
     run(() => removeStep({ areaStepId: step.id }));
@@ -117,7 +242,15 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
         {step.assigned_trade ? <span>· {step.assigned_trade}</span> : null}
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-1.5">
+      {unconfirmedBlock ? (
+        <p className="mb-2 -mt-1">
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+            Kemungkinan terblokir — belum dikonfirmasi
+          </span>
+        </p>
+      ) : null}
+
+      <div ref={statusButtonsRef} className="mb-3 flex flex-wrap gap-1.5">
         {(["not_started", "in_progress", "blocked", "done"] as const).map((s) => (
           <button key={s} type="button" disabled={pending} onClick={() => setStatus(s)}
             className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:border-[var(--sand-dark)] disabled:opacity-50 md:min-h-0">
@@ -125,6 +258,12 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
           </button>
         ))}
       </div>
+
+      {overrideHint ? (
+        <p className="mb-3 -mt-2 text-[11px] text-[var(--sand-dark)]">
+          Update AI yang lebih baru akan diabaikan
+        </p>
+      ) : null}
 
       <div className="mb-3 flex items-center gap-1.5">
         <input value={note} disabled={pending} onChange={(e) => setNote(e.target.value)}
@@ -159,7 +298,7 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
 
       {error ? <p className="mt-2 text-[11px] text-red-700">{error}</p> : null}
 
-      <StepHistory events={events} />
+      <StepHistory events={events} pending={pending} onBenar={confirmAiEvent} onKoreksi={focusStatusButtons} />
     </div>
   );
 }
