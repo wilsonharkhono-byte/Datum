@@ -351,6 +351,7 @@ describe("groupIntentsByRecipient", () => {
       dedupeKey: "dedupe-1",
       severity: "warning",
       escalatedRoles: [],
+      recipientStaffRole: null,
       ...overrides,
     };
   }
@@ -414,6 +415,128 @@ describe("groupIntentsByRecipient", () => {
     const result = groupIntentsByRecipient(intents, new Map([["staff-1", "Rani"]]), TODAY_LOCAL);
     expect(result[0]!.message).toContain("Juga dikirim ke: principal, PIC.");
     expect(result[0]!.message).not.toContain("designer");
+  });
+
+  // ── Regression: escalation transparency must not name the recipient's own role ──
+  //
+  // Drives through the REAL recipient/escalation split (buildReadinessReminders
+  // -> resolveRecipients -> escalateRecipients), not hand-constructed
+  // escalatedRoles. Two signals in one project:
+  //   - Signal A (area-1, "high" severity, designer trade_role): base
+  //     recipient is the designer; "high" widens the ladder to
+  //     site_supervisor + pic (escalateRecipients) — so the site_supervisor
+  //     receives this intent too, with escalatedRoles = [site_supervisor, pic]
+  //     attached identically to EVERY recipient, including themselves.
+  //   - Signal B (area-2, "warning" severity, site_supervisor trade_role): no
+  //     escalation; gives both the designer and the site_supervisor a SECOND
+  //     item each so they both cross the 2-item digest threshold.
+  //
+  // Expected: the escalated site_supervisor's digest must NOT name
+  // "site_supervisor"/"mandor" (their own role) in "Juga dikirim ke", while
+  // the base designer's digest still names the roles the signal escalated to.
+  it("excludes the recipient's own role from their digest's escalation line (real split)", async () => {
+    const project: ActiveProject = {
+      id: "proj-1",
+      project_code: "BDG-H1",
+      project_name: "Test Project",
+      principal_id: null,
+      pic_id: "staff-pic",
+    };
+
+    const highSeverityDesignerStep = {
+      id: "as-1",
+      step_code: "D1",
+      status: "in_progress",
+      planned_start: "2026-07-01",
+      planned_end: "2026-07-05", // past TODAY → behind_plan/high
+      actual_start: "2026-07-01",
+      actual_end: null,
+      blocking_reason: null,
+      last_progress_at: null,
+      area_id: "area-1",
+      trade_steps: {
+        name: "Desain interior",
+        step_type: "site_work",
+        trade_role: "designer",
+        lead_time_days: 0,
+        typical_duration_days: 3,
+      },
+    };
+    const warningSeveritySupervisorStep = {
+      id: "as-2",
+      step_code: "S1",
+      status: "not_started",
+      planned_start: "2026-07-01", // past TODAY, not started → behind_plan/warning
+      planned_end: "2026-07-20",
+      actual_start: null,
+      actual_end: null,
+      blocking_reason: null,
+      last_progress_at: null,
+      area_id: "area-2",
+      trade_steps: {
+        name: "Pasang bata",
+        step_type: "site_work",
+        trade_role: "site_supervisor",
+        lead_time_days: 0,
+        typical_duration_days: 3,
+      },
+    };
+
+    const designerMember = {
+      staff_id: "staff-designer",
+      role_on_project: "design",
+      staff: { role: "designer", active: true },
+    };
+    const supervisorMember = {
+      staff_id: "staff-supervisor",
+      role_on_project: "site",
+      staff: { role: "site_supervisor", active: true },
+    };
+    const picMember = {
+      staff_id: "staff-pic",
+      role_on_project: "pic",
+      staff: { role: "pic", active: true },
+    };
+
+    const supa = fakeClient([
+      { data: [project], error: null }, // projects
+      { data: [highSeverityDesignerStep, warningSeveritySupervisorStep], error: null }, // area_steps
+      { data: [], error: null }, // trade_step_deps
+      { data: [{ id: "area-1", area_name: "Ruang Tamu" }, { id: "area-2", area_name: "Kamar Mandi A" }], error: null }, // areas
+      { data: [designerMember, supervisorMember, picMember], error: null }, // project_staff
+    ]);
+
+    const { intents } = await buildReadinessReminders(supa, TODAY, NOW);
+
+    // Sanity: the "high" signal really did escalate the site_supervisor in
+    // (via the real escalateRecipients ladder), and escalatedRoles is
+    // attached identically to every recipient of that signal.
+    const supervisorOnDesignSignal = intents.find(
+      (i) => i.recipientStaffId === "staff-supervisor" && i.dedupeKey.includes("D1"),
+    );
+    expect(supervisorOnDesignSignal).toBeDefined();
+    expect(supervisorOnDesignSignal!.escalatedRoles).toContain("site_supervisor");
+
+    const staffNames = new Map([
+      ["staff-designer", "Dewi"],
+      ["staff-supervisor", "Budi"],
+    ]);
+    const digests = groupIntentsByRecipient(intents, staffNames, TODAY);
+
+    const supervisorDigest = digests.find((d) => d.recipientStaffId === "staff-supervisor");
+    const designerDigest = digests.find((d) => d.recipientStaffId === "staff-designer");
+
+    expect(supervisorDigest).toBeDefined();
+    expect(designerDigest).toBeDefined();
+
+    // The escalated site_supervisor must not see their own role named back
+    // to them in the transparency line.
+    expect(supervisorDigest!.message).not.toContain("mandor");
+    expect(supervisorDigest!.message).not.toContain("site_supervisor");
+
+    // The base designer (not escalated) still sees who the signal escalated to.
+    expect(designerDigest!.message).toContain("Juga dikirim ke:");
+    expect(designerDigest!.message).toContain("mandor");
   });
 
   it("falls back to a generic name when the recipient isn't in staffNames", () => {

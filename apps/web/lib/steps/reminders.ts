@@ -57,8 +57,22 @@ export type ReminderIntent = {
    * (the base vs. escalated split is role-shaped, not id-shaped, once
    * de-duped across signals) — see `groupIntentsByRecipient` for how this
    * feeds the digest's "juga dikirim ke" line.
+   *
+   * NOTE: this is the SAME array for every recipient of this signal — it is
+   * NOT pre-filtered to exclude the recipient's own role (an escalated
+   * site_supervisor's own role can appear here). `recipientStaffRole` below
+   * exists precisely so a consumer can filter it per-recipient before
+   * display — see `groupIntentsByRecipient`.
    */
   escalatedRoles: string[];
+  /**
+   * This recipient's own `staff.role` on the project, resolved from
+   * `members` (null when the recipient came from `project.principal_id` /
+   * `pic_id` fallback and isn't present in `members`). Used to filter this
+   * recipient's own role out of `escalatedRoles` before it's shown to them —
+   * see `groupIntentsByRecipient`.
+   */
+  recipientStaffRole: string | null;
 };
 
 // ─── Active-project enumerator ────────────────────────────────────────────────
@@ -282,6 +296,7 @@ export async function buildReadinessReminders(
           dedupeKey,
           severity: row.signal.severity,
           escalatedRoles,
+          recipientStaffRole: members.find((m) => m.staff_id === recipientStaffId)?.staff_role ?? null,
         });
       }
     }
@@ -323,7 +338,13 @@ export type DailyDigestIntent = {
  * ke" line names the roles from the HIGHEST-SEVERITY item's escalation
  * ladder (`escalatedRoles` on that item) — see `ReminderIntent.escalatedRoles`
  * docstring for why this is a simplification (role-shaped, not a literal
- * per-item audience list).
+ * per-item audience list). `escalatedRoles` is the SAME array for every
+ * recipient of a signal, so an escalated recipient (e.g. the mandor added by
+ * a "high"-severity signal) would otherwise see their OWN role named in
+ * their own digest ("Juga dikirim ke: mandor, PIC"). We filter the
+ * recipient's own `recipientStaffRole` out of the escalation line before
+ * composing — they already know they were notified; the line is meant to
+ * tell them who ELSE was.
  *
  * Delivery-count policy (documented per Task 4 requirement #2): recipients
  * with exactly ONE item keep their original single-signal `ReminderIntent`
@@ -358,7 +379,10 @@ export function groupIntentsByRecipient(
     const sorted = [...items].sort(
       (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
     );
-    const escalatedTo = sorted[0]!.escalatedRoles.map(roleLabel);
+    const ownRole = sorted[0]!.recipientStaffRole;
+    const escalatedTo = sorted[0]!.escalatedRoles
+      .filter((role) => role !== ownRole)
+      .map(roleLabel);
     const name = staffNames.get(recipientStaffId) ?? "Tim";
 
     const message = composePersonalBrief({
