@@ -19,6 +19,7 @@ import {
   getGateCheckpoints,
   getProjectRooms,
   getProjectAreas,
+  getCardAreas,
   getProjectMembers,
   getAvailableStaff,
   getProjectBySlug,
@@ -91,6 +92,15 @@ export function useCardAttachments(cardId: string | undefined) {
     queryKey: ["card-attachments", cardId],
     enabled: !!cardId,
     queryFn: () => getCardAttachments(supabase, cardId!),
+  });
+}
+
+/** Load areas linked to a card. Disabled until cardId is known. */
+export function useCardAreas(cardId: string | undefined) {
+  return useQuery({
+    queryKey: ["card-areas", cardId],
+    enabled: !!cardId,
+    queryFn: () => getCardAreas(supabase, cardId!),
   });
 }
 

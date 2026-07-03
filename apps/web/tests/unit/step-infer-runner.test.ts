@@ -11,7 +11,7 @@ it("returns a parsed verdict from the model response", async () => {
   const fakeClient = {
     messages: {
       create: async () => ({
-        content: [{ type: "text", text: JSON.stringify({ matches: [{ step_code: "BW1", status: "done", blocked_on: null, confidence: 0.95 }] }) }],
+        content: [{ type: "text", text: JSON.stringify({ is_progress: true, matches: [{ step_code: "BW1", status: "done", blocked_on: null, confidence: 0.95 }] }) }],
         usage: { input_tokens: 10, output_tokens: 5 },
       }),
     },

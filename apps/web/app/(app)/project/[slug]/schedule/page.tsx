@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { fetchMatrix } from "@/lib/matrix/fetch-matrix";
 import { AreaGateMatrix } from "@/components/matrix/area-gate-matrix";
 import { RecomputeButton } from "@/components/schedule/RecomputeButton";
+import { RecomputeScheduleButton } from "@/components/schedule/RecomputeScheduleButton";
 import { RULE_VERSION } from "@/lib/gates/readiness-rules";
 import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
@@ -66,7 +67,10 @@ export default async function ProjectSchedulePage({
         <Link href={`/project/${project.project_code}`} className="text-xs text-[var(--text-muted)] hover:underline">
           ← {project.project_code} Board
         </Link>
-        <RecomputeButton projectId={project.id} projectCode={project.project_code} />
+        <div className="flex flex-wrap items-center gap-2">
+          <RecomputeScheduleButton projectId={project.id} projectCode={project.project_code} />
+          <RecomputeButton projectId={project.id} projectCode={project.project_code} />
+        </div>
       </div>
 
       {staleCount && staleCount > 0 ? (

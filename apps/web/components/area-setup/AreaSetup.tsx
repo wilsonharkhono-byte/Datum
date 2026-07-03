@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { applyAreaProposal } from "@/lib/areas/suggest-mutations";
 import type { ApplyAreaProposalResult } from "@datum/core";
 import type { AreaProposal, AreaType } from "@/lib/areas/extract";
+import { BACKFILL_CARD_CAP } from "@/lib/areas/backfill-selection";
 import { CheckIcon, XIcon, SparkIcon } from "@/components/icons/Icon";
 
 // Confidence below this is shown but unchecked by default.
@@ -53,11 +54,16 @@ type AssignmentDraft = {
 export function AreaSetup({
   projectId,
   projectCode,
+  mode = "suggest",
   onClose,
   onApplied,
 }: {
   projectId: string;
   projectCode: string;
+  // "suggest" (default): newest-active cards, linked or not — the original
+  // assisted-setup flow. "backfill": ACTIVE cards with NO area link at all,
+  // capped — the settings Areas tab "Tautkan kartu ke ruangan (AI)" action.
+  mode?: "suggest" | "backfill";
   onClose: () => void;
   // Parent can refresh after a successful apply (router.refresh()).
   onApplied?: () => void;
@@ -68,6 +74,10 @@ export function AreaSetup({
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
   const [cardsById, setCardsById] = useState<Map<string, CardLite>>(new Map());
   const [result, setResult] = useState<ApplyAreaProposalResult | null>(null);
+  const [backfillInfo, setBackfillInfo] = useState<{
+    totalUnlinked: number;
+    capped: boolean;
+  } | null>(null);
   // Guard against setState after unmount (the fetch can outlive a quick close).
   const aliveRef = useRef(true);
 
@@ -78,15 +88,21 @@ export function AreaSetup({
       const res = await fetch("/api/areas/suggest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, mode }),
       });
       const data: {
         ok?: boolean;
         error?: string;
         proposal?: AreaProposal;
         cards?: CardLite[];
+        totalUnlinked?: number;
+        capped?: boolean;
       } = await res.json().catch(() => ({}));
       if (!aliveRef.current) return;
+
+      if (mode === "backfill" && typeof data.totalUnlinked === "number") {
+        setBackfillInfo({ totalUnlinked: data.totalUnlinked, capped: !!data.capped });
+      }
 
       if (!res.ok || !data.ok || !data.proposal) {
         setError(
@@ -104,7 +120,7 @@ export function AreaSetup({
       setError("Gagal menghubungi server. Coba lagi.");
       setPhase("error");
     }
-  }, [projectId]);
+  }, [projectId, mode]);
 
   function hydrate(proposal: AreaProposal, cards: CardLite[]) {
     setCardsById(new Map(cards.map((c) => [c.id, c])));
@@ -244,7 +260,9 @@ export function AreaSetup({
           <div className="inline-flex items-center gap-2">
             <SparkIcon size={16} />
             <span className="text-[11px] font-bold uppercase tracking-[0.12em]">
-              Deteksi ruangan otomatis
+              {mode === "backfill"
+                ? "Tautkan kartu ke ruangan (AI)"
+                : "Deteksi ruangan otomatis"}
             </span>
           </div>
           <button
@@ -257,6 +275,16 @@ export function AreaSetup({
             <XIcon size={16} />
           </button>
         </div>
+
+        {/* Backfill count/cap notice */}
+        {mode === "backfill" && backfillInfo && phase !== "loading" ? (
+          <div className="border-b border-[var(--border)] bg-[var(--sand-tint)] px-4 py-2 text-[11px] text-[var(--sand-dark)]">
+            {backfillInfo.totalUnlinked} kartu belum tertaut
+            {backfillInfo.capped
+              ? ` — menganalisis ${BACKFILL_CARD_CAP} kartu pertama (batch berikutnya bisa dijalankan lagi setelah ini diterapkan).`
+              : "."}
+          </div>
+        ) : null}
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 py-4">

@@ -16,6 +16,8 @@ import {
   deleteComment,
   addCardMember,
   removeCardMember,
+  linkCardToArea,
+  unlinkCardFromArea,
   type CreateCardEventInputType,
   type ResolveEventInputType,
   type CardMemberRole,
@@ -310,6 +312,46 @@ export function useRemoveMember(cardId: string) {
       return res;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["card-members", cardId] }),
+  });
+}
+
+// ─── Card-detail: area link mutations ────────────────────────────────────────
+
+/**
+ * Link a card to an area. Returns the AreaLinkResult (does NOT throw on a
+ * business-logic failure — callers check res.ok) since CardAreas surfaces
+ * the error message inline rather than via mutation.isError.
+ * Invalidates card-areas + the project's areas (matrix reads off areas),
+ * plus board (per-card deadline badge) and rooms (Ruangan screen) — both
+ * derive from card_areas via computeCardDeadlines/fetchMatrix.
+ */
+export function useLinkCardArea(cardId: string, projectId: string, code: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { areaId: string }) => linkCardToArea(supabase, { cardId, ...args }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["card-areas", cardId] });
+      void qc.invalidateQueries({ queryKey: keys.areas(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.board(code) });
+      void qc.invalidateQueries({ queryKey: keys.rooms(code) });
+    },
+  });
+}
+
+/**
+ * Unlink a card from an area. Same non-throwing result convention as
+ * useLinkCardArea. Same invalidation set (card-areas + areas + board + rooms).
+ */
+export function useUnlinkCardArea(cardId: string, projectId: string, code: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { areaId: string }) => unlinkCardFromArea(supabase, { cardId, ...args }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["card-areas", cardId] });
+      void qc.invalidateQueries({ queryKey: keys.areas(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.board(code) });
+      void qc.invalidateQueries({ queryKey: keys.rooms(code) });
+    },
   });
 }
 
