@@ -1,10 +1,20 @@
 /**
  * Tests for `composePersonalBrief` and `roleLabel` — pure Bahasa digest
  * compose (Task 4, launch-phase03). No DB, no model call.
+ *
+ * Also `findTodaysUnreadDigest` (Task 5) — the pure decision the /brief
+ * layout uses to pick which notification (if any) seeds the portfolio dock.
  */
 
 import { describe, expect, it } from "vitest";
-import { composePersonalBrief, roleLabel } from "@/lib/assistant/daily-brief";
+import {
+  composePersonalBrief,
+  roleLabel,
+  findTodaysUnreadDigest,
+  DIGEST_NOTIFICATION_KIND,
+  DIGEST_LINK,
+  type DigestNotificationCandidate,
+} from "@/lib/assistant/daily-brief";
 
 describe("composePersonalBrief", () => {
   it("returns null when there are no items", () => {
@@ -127,5 +137,77 @@ describe("roleLabel", () => {
 
   it("falls back to the raw string for unknown roles", () => {
     expect(roleLabel("carpenter")).toBe("carpenter");
+  });
+});
+
+describe("findTodaysUnreadDigest", () => {
+  const TODAY_START_UTC = new Date("2026-07-02T00:00:00+07:00").toISOString();
+  const TOMORROW_START_UTC = new Date("2026-07-03T00:00:00+07:00").toISOString();
+
+  function candidate(overrides: Partial<DigestNotificationCandidate> = {}): DigestNotificationCandidate {
+    return {
+      kind: DIGEST_NOTIFICATION_KIND,
+      link: DIGEST_LINK,
+      summary: "Pagi Rani — 2 hal hari ini: 1) A. 2) B. Lihat: /brief",
+      read_at: null,
+      created_at: new Date("2026-07-02T02:00:00+07:00").toISOString(), // within today's window
+      ...overrides,
+    };
+  }
+
+  it("returns null for an empty list", () => {
+    expect(findTodaysUnreadDigest([], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
+  });
+
+  it("returns the summary of today's unread digest when present", () => {
+    const row = candidate();
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBe(row.summary);
+  });
+
+  it("returns null when the matching row is already read", () => {
+    const row = candidate({ read_at: new Date("2026-07-02T03:00:00+07:00").toISOString() });
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
+  });
+
+  it("ignores rows with a different notification kind", () => {
+    const row = candidate({ kind: "watcher_event" });
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
+  });
+
+  it("ignores rows with a different link (not the cross-project /brief digest)", () => {
+    const row = candidate({ link: "/project/WHA-01/rooms" });
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
+  });
+
+  it("ignores rows from before today's window (yesterday's digest)", () => {
+    const row = candidate({ created_at: new Date("2026-07-01T08:00:00+07:00").toISOString() });
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
+  });
+
+  it("ignores rows from tomorrow's window (boundary is exclusive)", () => {
+    const row = candidate({ created_at: TOMORROW_START_UTC });
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
+  });
+
+  it("includes a row exactly at today's start boundary (inclusive)", () => {
+    const row = candidate({ created_at: TODAY_START_UTC });
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBe(row.summary);
+  });
+
+  it("picks the newest matching row when multiple exist (shouldn't normally happen — one digest/day — but defensive)", () => {
+    const older = candidate({
+      summary: "OLDER",
+      created_at: new Date("2026-07-02T02:00:00+07:00").toISOString(),
+    });
+    const newer = candidate({
+      summary: "NEWER",
+      created_at: new Date("2026-07-02T09:00:00+07:00").toISOString(),
+    });
+    expect(findTodaysUnreadDigest([older, newer], TODAY_START_UTC, TOMORROW_START_UTC)).toBe("NEWER");
+  });
+
+  it("does not seed from an unrelated notification even if unread and today", () => {
+    const row = candidate({ kind: "mention", link: "/project/WHA-01/cards/foo" });
+    expect(findTodaysUnreadDigest([row], TODAY_START_UTC, TOMORROW_START_UTC)).toBeNull();
   });
 });

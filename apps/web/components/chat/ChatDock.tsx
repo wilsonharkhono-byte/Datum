@@ -122,7 +122,21 @@ function isStoredMessage(v: unknown): v is Message {
   );
 }
 
-export function ChatDock({ projectId, projectCode }: { projectId: string; projectCode: string }) {
+/**
+ * `projectId`/`projectCode` are optional (Phase 3 Task 5, portfolio PM
+ * mode): omitted when the dock is mounted on /brief (the principal's
+ * cross-project assistant, no single project in scope). Portfolio mode:
+ *  - "Catat" mode is hidden — capturing a note has always required a
+ *    project to file it under; there is no cross-project equivalent.
+ *  - `/api/assistant/message` is called WITHOUT a `projectId`, which is
+ *    what puts the route into its own portfolio branch (retrieval.ts's
+ *    buildPortfolioContextBlock) and disables action-tail proposals server-side.
+ *  - The localStorage session key/scope becomes a fixed "portfolio" bucket
+ *    (distinct from any single project's key) so switching between /brief
+ *    and a project page never mixes chat histories.
+ */
+export function ChatDock({ projectId, projectCode }: { projectId?: string; projectCode?: string }) {
+  const isPortfolio = projectId === undefined;
   const [mode, setMode] = useState<Mode>("tanya");
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -144,7 +158,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   const busyRef = useRef(false);
   const inFlightIds = useRef<Set<string>>(new Set());
 
-  const storageKey = `datum.chat.${projectId}`;
+  // Offline-queue functions (enqueue/readQueue/drain/remove) key their
+  // localStorage bucket off a plain scope string — "portfolio" is a stable
+  // sentinel scope distinct from any real project uuid.
+  const queueScope = projectId ?? "portfolio";
+  const storageKey = `datum.chat.${queueScope}`;
 
   // ── Session persistence ────────────────────────────────────────────────
   useEffect(() => {
@@ -314,6 +332,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   }
 
   async function runCatat(input: string, file: File | null) {
+    // Portfolio mode (no projectId) never shows the "Catat" tab (see the mode
+    // segmented control below), so this should be unreachable there — but
+    // fail loudly rather than silently sending projectId: undefined to a
+    // route that requires it, if some caller ever does reach it.
+    if (!projectId) throw new Error("Mode Catat membutuhkan proyek — tidak tersedia di asisten portofolio.");
     const res = await fetchWithRetry(
       "/api/assistant/capture",
       {
@@ -350,8 +373,8 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         // Never lose the text: park it in the offline queue (the user bubble
         // stays visible in the thread) and announce it with an amber bubble.
         // No "Coba lagi" here — the drain triggers re-send automatically.
-        await enqueue(projectId, { mode: runMode, text: input, ts: Date.now() });
-        setQueueCount((await readQueue(projectId)).length);
+        await enqueue(queueScope, { mode: runMode, text: input, ts: Date.now() });
+        setQueueCount((await readQueue(queueScope)).length);
         setMessages((m) => [...m, { role: "assistant" as const, content: QUEUED_NOTICE, queued: true }]);
       } else {
         const msg = `Gagal: ${e instanceof Error ? e.message : String(e)}`;
@@ -405,7 +428,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
   // is what stops an overlapping drain from double-sending meanwhile.
   async function drainQueue() {
     if (drainingRef.current || busyRef.current) return;
-    const items = await drain(projectId);
+    const items = await drain(queueScope);
     setQueueCount(items.length);
     if (items.length === 0) return;
     drainingRef.current = true;
@@ -419,13 +442,13 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         try {
           if (item.mode === "tanya") await runTanya(item.text);
           else await runCatat(item.text, null);
-          await remove(projectId, item.id);
+          await remove(queueScope, item.id);
         } catch (e) {
           if (!(e instanceof NetworkError)) {
             // The server received and rejected this item — re-sending the
             // same payload won't succeed, so drop it (the text stays visible
             // in the thread) instead of wedging the queue head forever.
-            await remove(projectId, item.id);
+            await remove(queueScope, item.id);
             setMessages((m) => [...m, {
               role: "assistant" as const,
               content: `Gagal mengirim pesan tertunda: ${e instanceof Error ? e.message : String(e)}`,
@@ -435,7 +458,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           break; // stop on first failure; remaining items stay queued
         } finally {
           inFlightIds.current.delete(item.id);
-          setQueueCount((await readQueue(projectId)).length);
+          setQueueCount((await readQueue(queueScope)).length);
         }
       }
     } finally {
@@ -460,7 +483,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
     const onOnline = () => { void drainQueueRef.current(); };
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [hydrated, projectId]);
+  }, [hydrated, queueScope]);
 
   const pending = pendingLabel !== null;
   const hasContent = messages.length > 0 || pending;
@@ -477,30 +500,35 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[var(--text-inverse)]">
           <div className="flex min-w-0 items-center gap-3">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)]">
-              <SparkIcon size={12} /> Asisten
+              <SparkIcon size={12} /> {isPortfolio ? "Asisten Portofolio" : "Asisten"}
             </span>
-            <div className="seg" role="tablist" aria-label="Mode asisten">
-              <button
-                type="button"
-                role="tab"
-                onClick={() => setMode("tanya")}
-                aria-label="Mode tanya"
-                aria-selected={mode === "tanya"}
-                className={`seg-btn${mode === "tanya" ? " seg-active" : ""}`}
-              >
-                Tanya
-              </button>
-              <button
-                type="button"
-                role="tab"
-                onClick={() => setMode("catat")}
-                aria-label="Mode catat"
-                aria-selected={mode === "catat"}
-                className={`seg-btn${mode === "catat" ? " seg-active" : ""}`}
-              >
-                Catat
-              </button>
-            </div>
+            {/* "Catat" (capture) has no cross-project equivalent — a note always
+                files under one specific project's card, so the mode toggle
+                collapses to Tanya-only in portfolio mode. */}
+            {!isPortfolio ? (
+              <div className="seg" role="tablist" aria-label="Mode asisten">
+                <button
+                  type="button"
+                  role="tab"
+                  onClick={() => setMode("tanya")}
+                  aria-label="Mode tanya"
+                  aria-selected={mode === "tanya"}
+                  className={`seg-btn${mode === "tanya" ? " seg-active" : ""}`}
+                >
+                  Tanya
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  onClick={() => setMode("catat")}
+                  aria-label="Mode catat"
+                  aria-selected={mode === "catat"}
+                  className={`seg-btn${mode === "catat" ? " seg-active" : ""}`}
+                >
+                  Catat
+                </button>
+              </div>
+            ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {queueCount > 0 ? (
@@ -533,9 +561,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
               </button>
             ) : (
               <span className="hidden text-[10px] uppercase tracking-[0.06em] text-[var(--text-inverse-secondary)] md:inline">
-                {mode === "tanya"
-                  ? "Bahasa Indonesia · jawaban dikutip dari kartu"
-                  : "AI memilih kartu + jenis aktivitas; Anda konfirmasi"}
+                {isPortfolio
+                  ? "Ringkasan lintas-proyek · Bahasa Indonesia"
+                  : mode === "tanya"
+                    ? "Bahasa Indonesia · jawaban dikutip dari kartu"
+                    : "AI memilih kartu + jenis aktivitas; Anda konfirmasi"}
               </span>
             )}
           </div>
@@ -551,7 +581,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             pending={pending}
             pendingLabel={pendingLabel ?? WAITING_LABEL}
             onRetry={lastFailed ? retryLast : null}
-            projectId={projectId}
+            projectId={projectId ?? null}
           />
         ) : null}
 
@@ -562,9 +592,11 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             disabled={busy}
             acceptFiles={mode === "catat"}
             placeholder={
-              mode === "tanya"
-                ? "Tanya atau cari di kartu…"
-                : "Catat sesuatu atau drop file…"
+              isPortfolio
+                ? "Tanya tentang seluruh proyek…"
+                : mode === "tanya"
+                  ? "Tanya atau cari di kartu…"
+                  : "Catat sesuatu atau drop file…"
             }
           />
         </div>

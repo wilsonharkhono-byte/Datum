@@ -33,9 +33,16 @@ export async function fetchRecentMessages(
   return data.reverse();
 }
 
+/**
+ * `projectId: null` (Phase 3 Task 5, portfolio mode) is valid — the schema's
+ * `assistant_sessions.project_id` column is nullable and its RLS insert
+ * policy explicitly allows `project_id is null` (own-staff-id ownership is
+ * enough); see 20260601000007_assistant_audit_tables.sql. A cross-project
+ * /brief session simply has no single project to scope to.
+ */
 export async function ensureSession(
   supabase: SupabaseClient<Database>,
-  args: { staffId: string; projectId: string; sessionId?: string },
+  args: { staffId: string; projectId: string | null; sessionId?: string },
 ): Promise<string> {
   if (args.sessionId) return args.sessionId;
   const { data, error } = await supabase
@@ -52,7 +59,7 @@ export async function recordExchange(
   args: {
     sessionId: string;
     staffId: string;
-    projectId: string;
+    projectId: string | null;
     question: string;
     answer: string;
     citations: { cardId: string; eventIds: string[] }[];

@@ -103,3 +103,53 @@ export function composePersonalBrief({ name, items, escalatedTo }: ComposePerson
   const suffix = ` … Lihat: ${BRIEF_LINK}`;
   return base.slice(0, MAX_CHARS - suffix.length) + suffix;
 }
+
+// ─── Digest-seed presence (Phase 3 Task 5 — completes T4's deferred wiring) ──
+
+/**
+ * A row shape the /brief page needs to decide whether to seed the dock with
+ * today's digest as an assistant-authored first message. Deliberately a
+ * narrow subset of `Notification` (not the full DB row) so this stays pure
+ * and testable without pulling in @datum/db types here.
+ */
+export type DigestNotificationCandidate = {
+  kind: string;
+  link: string;
+  summary: string;
+  read_at: string | null;
+  created_at: string;
+};
+
+/** The notification_kind + link the cron writes a daily digest under (mirrors DAILY_BRIEF_KIND / "/brief" in lib/steps/reminders.ts). */
+export const DIGEST_NOTIFICATION_KIND = "readiness_reminder" as const;
+export const DIGEST_LINK = "/brief";
+
+/**
+ * Pure decision: does this list of the user's recent notifications contain
+ * today's still-unread digest, and if so what's its seed text?
+ *
+ * Picks the newest matching (kind=readiness_reminder, link=/brief,
+ * created_at falls within [todayStartIso, tomorrowStartIso)) row that is
+ * still unread (`read_at === null`) — a read digest has already been seen,
+ * so it should not re-seed the dock on every subsequent /brief visit that
+ * day. Returns `null` when there is nothing to seed (no digest today, or
+ * today's digest was already read).
+ *
+ * The page is responsible for fetching `notifications` (RLS-scoped to the
+ * caller) and computing the Jakarta-local day boundaries; this function does
+ * no I/O and no clock reads, so it's directly unit-testable.
+ */
+export function findTodaysUnreadDigest(
+  notifications: DigestNotificationCandidate[],
+  todayStartIso: string,
+  tomorrowStartIso: string,
+): string | null {
+  const candidates = notifications
+    .filter((n) => n.kind === DIGEST_NOTIFICATION_KIND)
+    .filter((n) => n.link === DIGEST_LINK)
+    .filter((n) => n.read_at === null)
+    .filter((n) => n.created_at >= todayStartIso && n.created_at < tomorrowStartIso)
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)); // newest first
+
+  return candidates[0]?.summary ?? null;
+}

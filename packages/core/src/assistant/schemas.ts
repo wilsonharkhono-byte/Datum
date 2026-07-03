@@ -12,9 +12,15 @@ import { z } from "zod";
 /**
  * Body sent to POST /api/assistant/message.
  * Moved from apps/web/lib/assistant/types.ts.
+ *
+ * `projectId` is OPTIONAL (Phase 3 Task 5, portfolio PM mode): when absent,
+ * the route builds a cross-project PORTFOLIO KONTEKS instead of a single
+ * project's context — see apps/web/lib/assistant/retrieval.ts's
+ * buildPortfolioContextBlock. Existing callers (web project pages, mobile)
+ * always send a projectId and are unaffected.
  */
 export const ChatRequest = z.object({
-  projectId: z.string().uuid(),
+  projectId: z.string().uuid().optional(),
   question: z.string().min(1).max(2000),
   sessionId: z.string().uuid().optional(),
 });

@@ -9,10 +9,16 @@ import {
   formatProcurement,
   formatForecast,
   matchAreaIdsInQuestion,
+  formatPortfolioContext,
+  buildPortfolioContextBlock,
+  MAX_PORTFOLIO_PROJECTS,
   type CardWithEvents,
   type RoomStepContext,
+  type PortfolioProjectRow,
 } from "@/lib/assistant/retrieval";
 import type { AreaStepRow, AreaStepEventRow } from "@/lib/steps/queries";
+import type { ProjectForecast } from "@/lib/steps/forecast-queries";
+import type { ProjectRisk } from "@/lib/steps/slip-risk";
 
 describe("buildContextBlock", () => {
   const cards: CardWithEvents[] = [
@@ -283,7 +289,7 @@ function fakeClient(
       const calls: Call[] = [];
       const responder = responders[table];
       const resolve = () => (responder ? responder(calls) : { data: [], error: null });
-      const chain = ["select", "eq", "in", "or", "not", "contains", "order", "limit", "is"];
+      const chain = ["select", "eq", "neq", "in", "or", "not", "contains", "order", "limit", "is"];
       const builder: any = {};
       for (const fn of chain) {
         builder[fn] = (...args: unknown[]) => {
@@ -471,5 +477,176 @@ describe("retrieveProjectContext + buildContextBlock — PM context sections", (
       expect(aLine).toContain("[RISIKO LEAD TIME]");
       expect(bLine).not.toContain("[RISIKO LEAD TIME]");
     });
+  });
+});
+
+// ─── Portfolio (cross-project) context — Phase 3 Task 5 ──────────────────────
+
+function forecast(overrides: Partial<ProjectForecast> = {}): ProjectForecast {
+  return {
+    projectId: "p", targetHandover: null, projectedHandover: null,
+    slipDays: null, worstArea: null, areas: [], ...overrides,
+  };
+}
+
+function risk(overrides: Partial<ProjectRisk> = {}): ProjectRisk {
+  return { level: "on_track", behindCount: 0, atRiskCount: 0, bottleneck: null, ...overrides };
+}
+
+function portfolioRow(overrides: Partial<PortfolioProjectRow> = {}): PortfolioProjectRow {
+  return {
+    project: { id: "p1", code: "P01", name: "Proyek A" },
+    risk: risk(),
+    forecast: forecast(),
+    openDecisionCount: 0,
+    ...overrides,
+  };
+}
+
+describe("formatPortfolioContext", () => {
+  it("returns empty string for no rows", () => {
+    expect(formatPortfolioContext([], 0)).toBe("");
+  });
+
+  it("renders risk level, project name+code, slip, bottleneck, and open-decision count", () => {
+    const row = portfolioRow({
+      project: { id: "p1", code: "WHA-01", name: "Rumah Pak Budi" },
+      risk: risk({ level: "behind", bottleneck: { areaName: "Kamar Mandi Utama", stepName: "Waterproofing", message: "terlambat 5 hari", severity: "high" } }),
+      forecast: forecast({ slipDays: 12 }),
+      openDecisionCount: 3,
+    });
+    const ctx = formatPortfolioContext([row], 1);
+
+    expect(ctx).toContain("PORTOFOLIO PROYEK");
+    expect(ctx).toContain("[TERLAMBAT]");
+    expect(ctx).toContain("Rumah Pak Budi (WHA-01)");
+    expect(ctx).toContain("perkiraan mundur 12 hari");
+    expect(ctx).toContain("Kamar Mandi Utama · Waterproofing — terlambat 5 hari");
+    expect(ctx).toContain("3 keputusan terbuka");
+  });
+
+  it("labels on_track vs at_risk levels distinctly", () => {
+    const onTrack = formatPortfolioContext([portfolioRow({ risk: risk({ level: "on_track" }) })], 1);
+    const atRisk = formatPortfolioContext([portfolioRow({ risk: risk({ level: "at_risk" }) })], 1);
+    expect(onTrack).toContain("[SESUAI JADWAL]");
+    expect(atRisk).toContain("[BERISIKO]");
+  });
+
+  it("shows 'sesuai target' when slipDays is 0, and omits the slip line when null", () => {
+    const zero = formatPortfolioContext([portfolioRow({ forecast: forecast({ slipDays: 0 }) })], 1);
+    expect(zero).toContain("sesuai target");
+
+    const nullSlip = formatPortfolioContext([portfolioRow({ forecast: forecast({ slipDays: null }) })], 1);
+    expect(nullSlip).not.toContain("sesuai target");
+    expect(nullSlip).not.toContain("perkiraan mundur");
+  });
+
+  it("omits the bottleneck line when there is no signal", () => {
+    const ctx = formatPortfolioContext([portfolioRow({ risk: risk({ bottleneck: null }) })], 1);
+    expect(ctx).not.toContain("·  ·"); // no dangling separator
+  });
+
+  it("appends '+N lainnya' when rows are capped below the true active count", () => {
+    const ctx = formatPortfolioContext([portfolioRow()], 18);
+    expect(ctx).toContain("+17 proyek lainnya");
+  });
+
+  it("omits the '+N lainnya' tail when nothing was capped", () => {
+    const ctx = formatPortfolioContext([portfolioRow()], 1);
+    expect(ctx).not.toContain("lainnya");
+  });
+
+  it("always includes the open-decision count, even when zero", () => {
+    const ctx = formatPortfolioContext([portfolioRow({ openDecisionCount: 0 })], 1);
+    expect(ctx).toContain("0 keputusan terbuka");
+  });
+});
+
+describe("buildPortfolioContextBlock — orchestrator (caps, RLS passthrough, decision counts)", () => {
+  /** Minimal area_steps/trade_step_deps/area_gate_status fixtures so getProjectStepSignals/getProjectForecast resolve cleanly with zero signals. */
+  const emptyStepsResponders = {
+    area_steps: constant([]),
+    trade_step_deps: constant([]),
+    areas: constant([]),
+    area_gate_status: constant([]),
+  };
+
+  function projectsResponder(projects: { id: string; project_code: string; project_name: string }[]): Responder {
+    return constant(projects);
+  }
+
+  it("returns a friendly empty message when there are no RLS-visible active projects", async () => {
+    const supa = fakeClient({ projects: projectsResponder([]), ...emptyStepsResponders, card_events: constant([]) });
+    const ctx = await buildPortfolioContextBlock(supa, "2026-07-02", "2026-07-02T00:00:00.000Z");
+    expect(ctx).toContain("Tidak ada proyek aktif");
+  });
+
+  it("passes the caller-supplied (RLS-scoped) client through to the projects + decision-count queries — never a hardcoded admin client", async () => {
+    const seenTables: string[] = [];
+    const supa = fakeClient(
+      {
+        projects: projectsResponder([{ id: "p1", project_code: "P01", project_name: "Proyek A" }]),
+        ...emptyStepsResponders,
+        card_events: constant([]),
+      },
+      { onFrom: (t) => seenTables.push(t) },
+    );
+    await buildPortfolioContextBlock(supa, "2026-07-02", "2026-07-02T00:00:00.000Z");
+
+    expect(seenTables).toContain("projects");
+    expect(seenTables).toContain("card_events");
+  });
+
+  it("caps to MAX_PORTFOLIO_PROJECTS BEFORE fetching open-decision counts (bounded fan-out)", async () => {
+    const manyProjects = Array.from({ length: 20 }, (_, i) => ({
+      id: `p${i}`, project_code: `P${i}`, project_name: `Proyek ${i}`,
+    }));
+    let decisionCountQueryProjectIds: unknown[] = [];
+    const supa = fakeClient({
+      projects: projectsResponder(manyProjects),
+      ...emptyStepsResponders,
+      card_events: (calls) => {
+        const inCall = calls.find((c) => c.fn === "in" && c.args[0] === "project_id");
+        decisionCountQueryProjectIds = (inCall?.args[1] as unknown[]) ?? [];
+        return { data: [], error: null };
+      },
+    });
+
+    const ctx = await buildPortfolioContextBlock(supa, "2026-07-02", "2026-07-02T00:00:00.000Z");
+
+    // Only the capped 15 ids were ever sent to the decision-count query.
+    expect(decisionCountQueryProjectIds.length).toBe(MAX_PORTFOLIO_PROJECTS);
+    // The uncapped remainder (20 - 15 = 5) is surfaced as a "+N lainnya" tail.
+    expect(ctx).toContain("+5 proyek lainnya");
+  });
+
+  it("groups open-decision counts by project (never leaks one project's count onto another)", async () => {
+    const supa = fakeClient({
+      projects: projectsResponder([
+        { id: "p1", project_code: "P01", project_name: "Proyek A" },
+        { id: "p2", project_code: "P02", project_name: "Proyek B" },
+      ]),
+      ...emptyStepsResponders,
+      card_events: constant([
+        { project_id: "p1" }, { project_id: "p1" }, { project_id: "p2" },
+      ]),
+    });
+
+    const ctx = await buildPortfolioContextBlock(supa, "2026-07-02", "2026-07-02T00:00:00.000Z");
+    const lines = ctx.split("\n");
+    const aIdx = lines.findIndex((l) => l.includes("Proyek A"));
+    const bIdx = lines.findIndex((l) => l.includes("Proyek B"));
+    expect(lines[aIdx + 1]).toContain("2 keputusan terbuka");
+    expect(lines[bIdx + 1]).toContain("1 keputusan terbuka");
+  });
+
+  it("degrades to the empty-portfolio message when getProjectsSlipRisk's underlying query errors", async () => {
+    const supa = fakeClient({
+      projects: constant(null, { message: "boom" }),
+      ...emptyStepsResponders,
+      card_events: constant([]),
+    });
+    const ctx = await buildPortfolioContextBlock(supa, "2026-07-02", "2026-07-02T00:00:00.000Z");
+    expect(ctx).toContain("Tidak ada proyek aktif");
   });
 });

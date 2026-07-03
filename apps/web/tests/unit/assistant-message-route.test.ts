@@ -16,6 +16,7 @@ const {
   mockCreateSupabaseClientForRequest,
   mockRetrieveProjectContext,
   mockBuildContextBlock,
+  mockBuildPortfolioContextBlock,
   mockStreamAssistant,
   mockFetchRecentMessages,
   mockEnsureSession,
@@ -34,6 +35,7 @@ const {
     mockCreateSupabaseClientForRequest: vi.fn().mockResolvedValue(mockSupabaseClient),
     mockRetrieveProjectContext: vi.fn(),
     mockBuildContextBlock: vi.fn(),
+    mockBuildPortfolioContextBlock: vi.fn(),
     mockStreamAssistant: vi.fn(),
     mockFetchRecentMessages: vi.fn(),
     mockEnsureSession: vi.fn(),
@@ -49,6 +51,8 @@ vi.mock("@/lib/supabase/from-request", () => ({
 vi.mock("@/lib/assistant/retrieval", () => ({
   retrieveProjectContext: mockRetrieveProjectContext,
   buildContextBlock: mockBuildContextBlock,
+  buildPortfolioContextBlock: mockBuildPortfolioContextBlock,
+  jakartaToday: () => "2026-07-02",
 }));
 
 vi.mock("@/lib/assistant/anthropic", () => ({
@@ -111,6 +115,7 @@ describe("POST /api/assistant/message — history wiring", () => {
     mockSupabaseClient.__staffMaybeSingle.mockResolvedValue({ data: { id: "staff-1" }, error: null });
     mockRetrieveProjectContext.mockResolvedValue([]);
     mockBuildContextBlock.mockReturnValue("KONTEKS PALSU");
+    mockBuildPortfolioContextBlock.mockResolvedValue("PORTOFOLIO PALSU");
     mockFetchRecentMessages.mockResolvedValue([]);
     mockStreamAssistant.mockReturnValue(fakeStream());
     mockEnsureSession.mockResolvedValue(SESSION_ID);
@@ -167,6 +172,7 @@ describe("POST /api/assistant/message — action tail (Task 3)", () => {
     mockSupabaseClient.__staffMaybeSingle.mockResolvedValue({ data: { id: "staff-1" }, error: null });
     mockRetrieveProjectContext.mockResolvedValue([]);
     mockBuildContextBlock.mockReturnValue("KONTEKS PALSU");
+    mockBuildPortfolioContextBlock.mockResolvedValue("PORTOFOLIO PALSU");
     mockFetchRecentMessages.mockResolvedValue([]);
     mockEnsureSession.mockResolvedValue(SESSION_ID);
     mockRecordExchange.mockResolvedValue(undefined);
@@ -233,6 +239,97 @@ describe("POST /api/assistant/message — action tail (Task 3)", () => {
     expect(mockRecordExchange).toHaveBeenCalledWith(
       mockSupabaseClient,
       expect.objectContaining({ answer: "Jawaban." }),
+    );
+  });
+});
+
+// ─── Portfolio mode (Phase 3 Task 5): projectId optional ─────────────────────
+
+describe("POST /api/assistant/message — portfolio mode (no projectId)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    mockSupabaseClient.__staffMaybeSingle.mockResolvedValue({ data: { id: "staff-1" }, error: null });
+    mockRetrieveProjectContext.mockResolvedValue([]);
+    mockBuildContextBlock.mockReturnValue("KONTEKS PALSU");
+    mockBuildPortfolioContextBlock.mockResolvedValue("PORTOFOLIO PALSU");
+    mockFetchRecentMessages.mockResolvedValue([]);
+    mockStreamAssistant.mockReturnValue(fakeStream());
+    mockEnsureSession.mockResolvedValue(SESSION_ID);
+    mockRecordExchange.mockResolvedValue(undefined);
+  });
+
+  it("accepts a request with no projectId at all (still 2xx, no validation error)", async () => {
+    const req = makeRequest({ question: "Proyek mana paling berisiko?" });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+  });
+
+  it("routes to buildPortfolioContextBlock (not retrieveProjectContext/buildContextBlock) when projectId is absent", async () => {
+    const req = makeRequest({ question: "Apa 3 hal terpenting hari ini?" });
+    const res = await POST(req);
+    await drainNdjson(res);
+
+    expect(mockBuildPortfolioContextBlock).toHaveBeenCalledWith(mockSupabaseClient, "2026-07-02", expect.any(String));
+    expect(mockRetrieveProjectContext).not.toHaveBeenCalled();
+    expect(mockBuildContextBlock).not.toHaveBeenCalled();
+    expect(mockStreamAssistant).toHaveBeenCalledWith(
+      expect.objectContaining({ contextBlock: "PORTOFOLIO PALSU" }),
+    );
+  });
+
+  it("still routes to the single-project branch when projectId IS given (no regression)", async () => {
+    const req = makeRequest({ projectId: PROJECT_ID, question: "Halo" });
+    const res = await POST(req);
+    await drainNdjson(res);
+
+    expect(mockRetrieveProjectContext).toHaveBeenCalledWith(mockSupabaseClient, PROJECT_ID, "Halo");
+    expect(mockBuildPortfolioContextBlock).not.toHaveBeenCalled();
+  });
+
+  it("passes projectId: null through to ensureSession/recordExchange in portfolio mode", async () => {
+    const req = makeRequest({ question: "Halo portofolio" });
+    const res = await POST(req);
+    await drainNdjson(res);
+
+    expect(mockEnsureSession).toHaveBeenCalledWith(
+      mockSupabaseClient,
+      expect.objectContaining({ projectId: null }),
+    );
+    expect(mockRecordExchange).toHaveBeenCalledWith(
+      mockSupabaseClient,
+      expect.objectContaining({ projectId: null }),
+    );
+  });
+
+  it("rejects an invalid projectId (present but malformed) even though projectId itself is optional", async () => {
+    const req = makeRequest({ projectId: "not-a-uuid", question: "Halo" });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("strips a portfolio-mode action tail server-side — done.action is always null even when the model proposes one", async () => {
+    const raw = `Baik.\n<action>{"type":"remind","message":"Cek flood test"}</action>`;
+    mockStreamAssistant.mockReturnValue({
+      on: vi.fn(),
+      finalMessage: vi.fn().mockResolvedValue({
+        content: [{ type: "text", text: raw }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }),
+      abort: vi.fn(),
+    });
+
+    const req = makeRequest({ question: "Ingatkan semua mandor" });
+    const res = await POST(req);
+    const events = await drainNdjson(res);
+
+    const done = events.find((e) => e.type === "done");
+    expect(done!.action).toBeNull();
+    // The raw tag is still stripped from the persisted/displayed text even
+    // though the action itself is discarded.
+    expect(mockRecordExchange).toHaveBeenCalledWith(
+      mockSupabaseClient,
+      expect.objectContaining({ answer: "Baik." }),
     );
   });
 });

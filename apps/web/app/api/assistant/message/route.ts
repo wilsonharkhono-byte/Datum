@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { createSupabaseClientForRequest } from "@/lib/supabase/from-request";
-import { retrieveProjectContext, buildContextBlock } from "@/lib/assistant/retrieval";
+import { retrieveProjectContext, buildContextBlock, buildPortfolioContextBlock, jakartaToday } from "@/lib/assistant/retrieval";
 import {
   streamAssistant,
   extractCitations,
@@ -21,6 +21,16 @@ import { parseActionTail, stripActionTail } from "@/lib/assistant/actions";
  * Pre-stream failures (auth, validation, retrieval, not-configured) are plain
  * JSON responses with real HTTP status codes, so the client can decide whether
  * to auto-retry (5xx / network) or not (4xx).
+ *
+ * Portfolio mode (Phase 3 Task 5): `projectId` is optional. When absent, this
+ * is the principal's cross-project /brief assistant — retrieval builds a
+ * PORTFOLIO KONTEKS (buildPortfolioContextBlock) instead of a single
+ * project's cards/steps context. Action proposals are DISABLED in this mode
+ * (see the parseActionTail call below): every executor in actions.ts takes a
+ * mandatory `projectId` (there is no "cross-project remind/update/decide"),
+ * so a portfolio-mode action tail is stripped server-side and never reaches
+ * the client — cheaper and more robust than trying to steer the model away
+ * from ever proposing one via the (byte-stable, cached) system prompt.
  */
 
 function errorMessage(e: unknown): string {
@@ -54,11 +64,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // 1. Retrieval — pull cards + events for context
+  // 1. Retrieval — pull cards + events for context, OR (no projectId) the
+  // cross-project PORTFOLIO KONTEKS for the principal's /brief question.
+  const { projectId } = parsed;
+  const isPortfolio = projectId === undefined;
   let contextBlock: string;
   try {
-    const cards = await retrieveProjectContext(supabase, parsed.projectId, parsed.question);
-    contextBlock = buildContextBlock(cards);
+    if (projectId === undefined) {
+      const now = new Date();
+      contextBlock = await buildPortfolioContextBlock(supabase, jakartaToday(now), now.toISOString());
+    } else {
+      const cards = await retrieveProjectContext(supabase, projectId, parsed.question);
+      contextBlock = buildContextBlock(cards);
+    }
   } catch (e) {
     console.error("[assistant/message] retrieval failed", e);
     return NextResponse.json(
@@ -125,7 +143,13 @@ export async function POST(req: Request) {
           // citations, the persisted transcript) should ever see the raw tag.
           // Invalid/absent tails silently parse to null; the client-side
           // parse in ChatDock is a defensive fallback for the same text.
-          const action = parseActionTail(rawAnswer);
+          //
+          // Portfolio mode (no projectId): actions are disabled outright — every
+          // executor requires a projectId (see actions.ts's executeAction), so a
+          // parsed action here can never be confirmed successfully. Force it to
+          // null (and still strip the raw tag from the displayed/stored text)
+          // rather than send the client a chip that always errors on tap.
+          const action = isPortfolio ? null : parseActionTail(rawAnswer);
           const answer = stripActionTail(rawAnswer);
           const citations = extractCitations(answer);
 
@@ -135,10 +159,10 @@ export async function POST(req: Request) {
           let sessionId: string | null = parsed.sessionId ?? null;
           try {
             sessionId = await ensureSession(supabase, {
-              staffId: staff.id, projectId: parsed.projectId, sessionId: parsed.sessionId,
+              staffId: staff.id, projectId: parsed.projectId ?? null, sessionId: parsed.sessionId,
             });
             await recordExchange(supabase, {
-              sessionId, staffId: staff.id, projectId: parsed.projectId,
+              sessionId, staffId: staff.id, projectId: parsed.projectId ?? null,
               question: parsed.question, answer, citations, usage,
             });
           } catch (e) {

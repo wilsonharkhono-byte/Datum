@@ -56,8 +56,14 @@ export function MessageList({
   pending: boolean;
   pendingLabel?: string;
   onRetry?: (() => void) | null;
-  /** Needed to render an ActionChip's Konfirmasi tap with the right project scope. */
-  projectId: string;
+  /**
+   * Needed to render an ActionChip's Konfirmasi tap with the right project
+   * scope. `null` in portfolio mode (Phase 3 Task 5, /brief's cross-project
+   * dock) — actions are disabled server-side there (route always sends
+   * `action: null`), so `m.action` is never truthy and ActionChip is never
+   * actually rendered with a null projectId in practice.
+   */
+  projectId: string | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { ref.current?.scrollTo({ top: ref.current.scrollHeight }); }, [messages, pending]);
@@ -135,7 +141,7 @@ export function MessageList({
                 ))}
               </div>
             ) : null}
-            {!m.streaming && m.action ? (
+            {!m.streaming && m.action && projectId ? (
               <ActionChip action={m.action} projectId={projectId} />
             ) : null}
           </div>

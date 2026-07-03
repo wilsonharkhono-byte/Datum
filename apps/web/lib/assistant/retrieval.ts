@@ -11,6 +11,7 @@ import {
   type AreaStepEventRow,
 } from "@/lib/steps/queries";
 import { getProjectForecast, type ProjectForecast } from "@/lib/steps/forecast-queries";
+import { getProjectsSlipRisk, type ProjectSlipRow } from "@/lib/steps/slip-risk-queries";
 
 export type CardWithEvents = {
   card: Card;
@@ -656,4 +657,140 @@ async function buildAdvisorSections(
     }
   }
   return lines.join("\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Portfolio (cross-project) context — Phase 3 Task 5.
+//
+// When the assistant is invoked WITHOUT a project (from /brief — the
+// principal's portfolio question), there is no single project's cards/steps
+// to retrieve. Instead we build ONE compact PORTFOLIO KONTEKS section: one
+// row per active project (forecast + top signal via the slip-risk stack this
+// codebase already uses on /brief and /risiko, plus an open-decision count),
+// capped to MAX_PORTFOLIO_PROJECTS so the token budget stays bounded no
+// matter how many projects the firm has.
+//
+// RLS: `getProjectsSlipRisk` selects from `projects` (RLS: projects_read_visible
+// — caller only sees their own visible projects) and internally re-uses the
+// same per-project queries (getProjectStepSignals/getProjectForecast) that
+// buildPmContextSections above already runs on the caller-scoped client —
+// never admin. The open-decision count query below also runs on the same
+// caller-scoped `supabase` client.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Max project rows injected into the PORTFOLIO KONTEKS (token budget). */
+export const MAX_PORTFOLIO_PROJECTS = 15;
+
+const RISK_LEVEL_LABEL: Record<ProjectSlipRow["risk"]["level"], string> = {
+  behind: "TERLAMBAT",
+  at_risk: "BERISIKO",
+  on_track: "SESUAI JADWAL",
+};
+
+/** One project's worth of data for the PORTFOLIO KONTEKS row. */
+export type PortfolioProjectRow = {
+  project: ProjectSlipRow["project"];
+  risk: ProjectSlipRow["risk"];
+  forecast: ProjectForecast;
+  /** Count of open (needs_decision) card_events for this project. */
+  openDecisionCount: number;
+};
+
+/**
+ * PORTFOLIO KONTEKS: one line per active project — risk level, bottleneck
+ * (top signal), forecast slip, open-decision count. `rows` must already be
+ * sorted worst-first (the same order `getProjectsSlipRisk` returns) and
+ * pre-capped by the caller; `totalActiveCount` is the true count BEFORE
+ * capping, so the "+N lainnya" tail is accurate even though the extra rows
+ * were never fetched.
+ *
+ * Pure / side-effect-free — safe to unit-test without Supabase.
+ */
+export function formatPortfolioContext(rows: PortfolioProjectRow[], totalActiveCount: number): string {
+  if (rows.length === 0) return "";
+
+  const lines: string[] = ["PORTOFOLIO PROYEK (lintas-proyek):"];
+  for (const row of rows) {
+    const level = RISK_LEVEL_LABEL[row.risk.level] ?? row.risk.level;
+    const parts = [`[${level}]`, `${row.project.name} (${row.project.code})`];
+    lines.push(parts.join(" "));
+
+    const detail: string[] = [];
+    if (row.forecast.slipDays != null) {
+      detail.push(
+        row.forecast.slipDays > 0
+          ? `perkiraan mundur ${row.forecast.slipDays} hari`
+          : "sesuai target",
+      );
+    }
+    if (row.risk.bottleneck) {
+      detail.push(`${row.risk.bottleneck.areaName} · ${row.risk.bottleneck.stepName} — ${row.risk.bottleneck.message}`);
+    }
+    if (detail.length > 0) lines.push(`  · ${detail.join(" · ")}`);
+    lines.push(`  · ${row.openDecisionCount} keputusan terbuka`);
+  }
+
+  if (totalActiveCount > rows.length) lines.push(`+${totalActiveCount - rows.length} proyek lainnya`);
+  return lines.join("\n");
+}
+
+/**
+ * Open (needs_decision) decision-event counts, grouped by project, for
+ * EXACTLY the given (already-capped) project ids — one bounded round-trip,
+ * never N-per-project. Mirrors fetchOpenDecisionEvents's filter shape but
+ * only needs counts, not the full rows, so it selects a single narrow column.
+ */
+async function fetchOpenDecisionCounts(
+  supabase: SupabaseClient<Database>,
+  projectIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (projectIds.length === 0) return counts;
+
+  const { data, error } = await supabase
+    .from("card_events")
+    .select("project_id")
+    .in("project_id", projectIds)
+    .eq("event_kind", "decision")
+    .contains("payload", { status: "needs_decision" });
+  if (error) return counts;
+
+  for (const row of data ?? []) {
+    const pid = (row as { project_id: string }).project_id;
+    counts.set(pid, (counts.get(pid) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Async orchestrator for the portfolio branch: ranks every RLS-visible
+ * active project by slip risk (getProjectsSlipRisk — same stack /brief and
+ * /risiko already use), caps to MAX_PORTFOLIO_PROJECTS BEFORE fetching the
+ * per-project open-decision counts (bounded fan-out: cap first, then one
+ * more query for exactly the capped set — never N-per-project beyond what
+ * getProjectsSlipRisk itself already does internally).
+ *
+ * Runs entirely on the caller-scoped `supabase` client — never admin — so
+ * the portfolio section only ever surfaces projects the asking staff member
+ * can see (same RLS guarantee as every other retrieval query in this file).
+ */
+export async function buildPortfolioContextBlock(
+  supabase: SupabaseClient<Database>,
+  today: string,
+  now: string,
+): Promise<string> {
+  const allRows = await getProjectsSlipRisk(supabase, today, now).catch(() => [] as ProjectSlipRow[]);
+  if (allRows.length === 0) return "Tidak ada proyek aktif yang terlihat untuk akun ini.";
+
+  const capped = allRows.slice(0, MAX_PORTFOLIO_PROJECTS);
+  const decisionCounts = await fetchOpenDecisionCounts(supabase, capped.map((r) => r.project.id));
+
+  const rows: PortfolioProjectRow[] = capped.map((r) => ({
+    project: r.project,
+    risk: r.risk,
+    forecast: r.forecast,
+    openDecisionCount: decisionCounts.get(r.project.id) ?? 0,
+  }));
+
+  return formatPortfolioContext(rows, allRows.length);
 }

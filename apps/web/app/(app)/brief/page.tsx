@@ -7,6 +7,7 @@ import { BriefSection } from "@/components/brief/BriefSection";
 import { AdvisorFeed } from "@/components/brief/AdvisorFeed";
 import { PulseSection } from "@/components/brief/PulseSection";
 import { ForecastSection } from "@/components/brief/ForecastSection";
+import { PortfolioAssistantButton } from "@/components/brief/PortfolioAssistantButton";
 
 export default async function BriefPage({
   searchParams,
@@ -46,12 +47,15 @@ export default async function BriefPage({
   return (
     <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
       <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
-      <header className="mt-2 mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">Morning brief</p>
-        <h1 className="text-3xl font-semibold text-[#141210]">Apa yang butuh perhatian hari ini</h1>
-        <p className="mt-1 text-sm text-[#524E49]">
-          Ringkasan lintas-proyek: keputusan yang dibutuhkan, pekerjaan terblokir, defect, permintaan klien, quote kedaluwarsa, dan gate berisiko.
-        </p>
+      <header className="mt-2 mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">Morning brief</p>
+          <h1 className="text-3xl font-semibold text-[#141210]">Apa yang butuh perhatian hari ini</h1>
+          <p className="mt-1 text-sm text-[#524E49]">
+            Ringkasan lintas-proyek: keputusan yang dibutuhkan, pekerjaan terblokir, defect, permintaan klien, quote kedaluwarsa, dan gate berisiko.
+          </p>
+        </div>
+        <PortfolioAssistantButton />
       </header>
 
       <div className="mb-4">
