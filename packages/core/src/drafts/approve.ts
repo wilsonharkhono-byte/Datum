@@ -88,14 +88,20 @@ export async function approveCardEventDraft(
     .single();
   if (evErr) return { ok: false, error: evErr.message };
 
-  // Mark the draft approved + record promotion
-  await supabase.from("data_drafts").update({
+  // Mark the draft approved + record promotion. The event insert above already
+  // succeeded — if this update silently failed, the draft would stay approvable
+  // and a re-approve would insert a DUPLICATE card_event.
+  const { error: promoteErr } = await supabase.from("data_drafts").update({
     status:               "approved",
     approved_by_staff_id: approverId,
     approved_at:          new Date().toISOString(),
     promoted_record_type: "card_events",
     promoted_record_id:   ev.id,
   }).eq("id", draftId);
+  if (promoteErr) {
+    console.error(`[drafts] approve: card_event ${ev.id} tercatat tapi draft ${draftId} gagal ditandai approved: ${promoteErr.message}`);
+    return { ok: false, error: `Event sudah tercatat tapi draft gagal ditandai approved — jangan approve ulang. ${promoteErr.message}` };
+  }
 
   // Fetch card slug + project code so the web wrapper can build notification
   // args and revalidation paths without an extra round-trip.

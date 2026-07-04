@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
-import type { StepStatus, StepType, TradeStepDep } from "@/lib/steps/types";
+import type { StepStatus, StepType } from "@/lib/steps/types";
+import { getTradeStepDeps } from "@/lib/steps/reference";
 import { forecastArea, type AreaForecast } from "@/lib/steps/forecast";
 
 export type AreaForecastRow = AreaForecast & { areaId: string; areaName: string };
@@ -26,10 +27,7 @@ export async function getProjectForecast(
     .eq("project_id", projectId);
   if (stepsErr) throw stepsErr;
 
-  const { data: depsRaw, error: depsErr } = await supabase
-    .from("trade_step_deps").select("step_code, predecessor_code");
-  if (depsErr) throw depsErr;
-  const deps = (depsRaw ?? []) as TradeStepDep[];
+  const deps = await getTradeStepDeps(supabase);
 
   const { data: gates, error: gatesErr } = await supabase
     .from("area_gate_status").select("area_id, target_end_date").eq("project_id", projectId);

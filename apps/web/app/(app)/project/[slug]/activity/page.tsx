@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProjectBySlug } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getProjectStepActivity, groupByDay } from "@/lib/activity/step-activity";
 
@@ -12,8 +13,7 @@ const CHIP: Record<string, { label: string; cls: string }> = {
 export default async function ProjectActivityPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = await createSupabaseServerClient();
-  const { data: project } = await supabase
-    .from("projects").select("id, project_code, project_name").eq("project_code", slug.toUpperCase()).maybeSingle();
+  const project = await getProjectBySlug(supabase, slug);
   if (!project) {
     return <div className="p-6 text-[var(--flag-critical)]">Proyek tidak ditemukan: {slug}</div>;
   }

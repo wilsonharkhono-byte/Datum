@@ -10,6 +10,7 @@ import {
   UpdateProjectInput,
   type UpdateProjectResult,
   updateProject as coreUpdateProject,
+  getProjectCodeById,
 } from "@datum/core";
 
 export type { CreateProjectResult } from "@datum/core";
@@ -82,20 +83,16 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
   const supabase = await createSupabaseServerClient();
 
   // Fetch the project_code for revalidation *before* the update
-  const { data: existing } = await supabase
-    .from("projects")
-    .select("project_code")
-    .eq("id", input.projectId)
-    .maybeSingle();
+  const existingCode = await getProjectCodeById(supabase, input.projectId);
 
   const result = await coreUpdateProject(supabase, input);
 
   if (result.ok) {
     revalidatePath("/");
-    if (existing?.project_code) {
-      revalidatePath(`/project/${existing.project_code}`);
-      revalidatePath(`/project/${existing.project_code}/settings`);
-      revalidatePath(`/project/${existing.project_code}/schedule`);
+    if (existingCode) {
+      revalidatePath(`/project/${existingCode}`);
+      revalidatePath(`/project/${existingCode}/settings`);
+      revalidatePath(`/project/${existingCode}/schedule`);
     }
   }
 

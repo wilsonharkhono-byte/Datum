@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { getProjectBySlug } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AssistantProvider } from "@/components/chat/AssistantProvider";
 import { ChatDock } from "@/components/chat/ChatDock";
@@ -12,11 +13,12 @@ export default async function ProjectLayout({
 }) {
   const { slug } = await params;
   const supabase = await createSupabaseServerClient();
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, project_code")
-    .eq("project_code", slug.toUpperCase())
-    .maybeSingle();
+  // Fail-soft: the dock is auxiliary — a failed lookup must not 500 the
+  // whole project section, but it should be visible in logs.
+  const project = await getProjectBySlug(supabase, slug).catch((e) => {
+    console.error(`[layout] project lookup failed for ${slug}: ${(e as Error).message}`);
+    return null;
+  });
 
   return (
     <AssistantProvider>

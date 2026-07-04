@@ -3,6 +3,7 @@ import type { Database } from "@datum/db";
 import { getProjectStepSignals } from "@/lib/steps/queries";
 import { summarizeProjectRisk, type ProjectRisk } from "@/lib/steps/slip-risk";
 import { getProjectForecast, type ProjectForecast } from "@/lib/steps/forecast-queries";
+import { getActiveProjects } from "@/lib/steps/reminders";
 
 export type ProjectSlipRow = {
   project: { id: string; code: string; name: string };
@@ -19,14 +20,10 @@ export async function getProjectsSlipRisk(
   today: string,
   now: string,
 ): Promise<ProjectSlipRow[]> {
-  const { data: projects, error } = await supabase
-    .from("projects")
-    .select("id, project_code, project_name")
-    .neq("status", "closed");
-  if (error) throw error;
+  const projects = await getActiveProjects(supabase);
 
   const rows = await Promise.all(
-    (projects ?? []).map(async (p) => {
+    projects.map(async (p) => {
       const signals = await getProjectStepSignals(supabase, p.id, today, now);
       const forecast = await getProjectForecast(supabase, p.id, today);
       return {

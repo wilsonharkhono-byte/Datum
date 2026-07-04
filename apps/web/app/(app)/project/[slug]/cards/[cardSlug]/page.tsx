@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProjectBySlug } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCardWithTimelineByProjectCode, getCardAttachments, getCardMembers, getCardComments, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
 import { getCardAreas } from "@/lib/cards/area-link-queries";
@@ -23,13 +24,11 @@ export default async function CardDetailPage({
   const currentStaffId = user?.id ?? null;
 
   const [projectRes, detailRes] = await Promise.allSettled([
-    supabase
-      .from("projects").select("id, project_code, project_name")
-      .eq("project_code", slug.toUpperCase()).maybeSingle(),
+    getProjectBySlug(supabase, slug),
     getCardWithTimelineByProjectCode(supabase, slug.toUpperCase(), cardSlug),
   ]);
   if (projectRes.status === "rejected") throw projectRes.reason;
-  const project = projectRes.value.data;
+  const project = projectRes.value;
   if (!project) {
     return <div className="p-6 text-[var(--flag-critical)]">Proyek tidak ditemukan: {slug}</div>;
   }

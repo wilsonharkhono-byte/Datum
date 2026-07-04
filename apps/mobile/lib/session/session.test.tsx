@@ -45,4 +45,16 @@ describe("SessionProvider", () => {
     const { getByText } = render(<SessionProvider><Probe /></SessionProvider>);
     await waitFor(() => expect(getByText("unauthenticated:none")).toBeTruthy());
   });
+  it("does NOT sign out on a transient staff-read failure", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    mockGetCurrentStaff.mockRejectedValue(new Error("[db] auth.currentStaff: network error"));
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { getByText, unmount } = render(<SessionProvider><Probe /></SessionProvider>);
+    // Stays in loading (retry pending) instead of bouncing to login.
+    await waitFor(() => expect(mockGetCurrentStaff).toHaveBeenCalled());
+    expect(getByText("loading:none")).toBeTruthy();
+    expect(mockSignOut).not.toHaveBeenCalled();
+    unmount(); // clears the retry timer
+    warn.mockRestore();
+  });
 });

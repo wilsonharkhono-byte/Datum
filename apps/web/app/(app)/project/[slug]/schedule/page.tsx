@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProjectBySlug, must } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { fetchMatrix } from "@/lib/matrix/fetch-matrix";
 import { AreaGateMatrix } from "@/components/matrix/area-gate-matrix";
@@ -21,11 +22,7 @@ export default async function ProjectSchedulePage({
   const { slug } = await params;
   const supabase = await createSupabaseServerClient();
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, project_code, project_name")
-    .eq("project_code", slug.toUpperCase())
-    .maybeSingle();
+  const project = await getProjectBySlug(supabase, slug);
   if (!project) {
     return (
       <div className="p-6 text-[var(--flag-critical)]">
@@ -35,32 +32,35 @@ export default async function ProjectSchedulePage({
     );
   }
 
-  const matrix = await fetchMatrix(project.id);
-  const scheduleCells = await getProjectScheduleCells(project.id);
-  const areaTargets = await getAreaTargetDates(project.id);
-
   // WIB (Asia/Jakarta) today — same pattern as Board + MiniCard.
   const jakartaToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
   const nowIso = new Date().toISOString();
 
-  // Fetch project-wide signals (one round-trip for steps, one for deps, one for area names).
-  const projectSignals = await getProjectStepSignals(supabase, project.id, jakartaToday, nowIso);
-
-  // Count stale cells
-  const { count: staleCount } = await supabase
-    .from("area_gate_status")
-    .select("*", { count: "exact", head: true })
-    .eq("project_id", project.id)
-    .eq("stale", true);
-
-  // Latest recompute time across all cells
-  const { data: latest } = await supabase
-    .from("area_gate_status")
-    .select("last_recomputed_at")
-    .eq("project_id", project.id)
-    .order("last_recomputed_at", { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
+  // These six fetches are independent — run them in one round-trip batch
+  // instead of paying ~6 sequential RTTs on the heaviest page.
+  const [matrix, scheduleCells, areaTargets, projectSignals, staleRes, latestRes] =
+    await Promise.all([
+      fetchMatrix(project.id),
+      getProjectScheduleCells(project.id),
+      getAreaTargetDates(project.id),
+      getProjectStepSignals(supabase, project.id, jakartaToday, nowIso),
+      // Count stale cells
+      supabase
+        .from("area_gate_status")
+        .select("*", { count: "exact", head: true })
+        .eq("project_id", project.id)
+        .eq("stale", true),
+      // Latest recompute time across all cells
+      supabase
+        .from("area_gate_status")
+        .select("last_recomputed_at")
+        .eq("project_id", project.id)
+        .order("last_recomputed_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+  const { count: staleCount } = must(staleRes, "schedule.staleCount");
+  const { data: latest } = must(latestRes, "schedule.lastRecompute");
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4">

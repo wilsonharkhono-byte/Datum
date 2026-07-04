@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { searchAll, type SearchHit, type SearchResults } from "@datum/core";
+import { searchAll, keys, type SearchHit, type SearchResults } from "@datum/core";
 import { supabase } from "@/lib/supabase/client";
 import { Screen } from "@/components/ui/Screen";
 import { Text } from "@/components/ui/Text";
@@ -165,7 +165,7 @@ export default function SearchScreen() {
   const isQueryReady = debouncedQuery.trim().length >= MIN_QUERY_LENGTH;
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["search", debouncedQuery],
+    queryKey: keys.search(debouncedQuery),
     enabled: isQueryReady,
     queryFn: () => searchAll(supabase, debouncedQuery),
   });

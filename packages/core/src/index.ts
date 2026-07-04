@@ -1,4 +1,5 @@
 export type { DatumClient } from "./client";
+export { must } from "./db/must";
 
 export { keys, PERSISTED_KEY_ROOTS, assistantKeys } from "./query/keys";
 export { createKVPersister, type AsyncKV } from "./query/persister";
@@ -37,6 +38,7 @@ export {
 // ─── Project by slug (settings header) ───────────────────────────────────────
 export {
   getProjectBySlug,
+  getProjectCodeById,
   type ProjectSettingsRow,
 } from "./projects/by-slug";
 

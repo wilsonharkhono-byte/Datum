@@ -1,4 +1,5 @@
 // apps/web/lib/assistant/audit.ts
+import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@datum/db";
 
@@ -28,7 +29,10 @@ export async function recordExchange(
     usage: { input_tokens: number; output_tokens: number };
   },
 ): Promise<void> {
-  await supabase.from("assistant_messages").insert([
+  // The chat answer has already streamed — never fail the response over the
+  // audit trail. But history + AI-data-access audit silently not recording is
+  // exactly the log you need later, so failures must reach Sentry.
+  const { error: msgErr } = await supabase.from("assistant_messages").insert([
     {
       session_id: args.sessionId,
       staff_id: args.staffId,
@@ -45,8 +49,12 @@ export async function recordExchange(
       token_count: args.usage.output_tokens,
     },
   ]);
+  if (msgErr) {
+    console.error(`[assistant] history not recorded for session ${args.sessionId}: ${msgErr.message}`);
+    Sentry.captureException(msgErr, { extra: { sessionId: args.sessionId, table: "assistant_messages" } });
+  }
 
-  await supabase.from("assistant_query_audit").insert({
+  const { error: auditErr } = await supabase.from("assistant_query_audit").insert({
     staff_id: args.staffId,
     project_scope_jsonb: { project_id: args.projectId },
     question: args.question,
@@ -54,4 +62,8 @@ export async function recordExchange(
     records_accessed_jsonb: args.citations as unknown as Json,
     included_unapproved_drafts: false,
   });
+  if (auditErr) {
+    console.error(`[assistant] query audit not recorded for staff ${args.staffId}: ${auditErr.message}`);
+    Sentry.captureException(auditErr, { extra: { staffId: args.staffId, table: "assistant_query_audit" } });
+  }
 }

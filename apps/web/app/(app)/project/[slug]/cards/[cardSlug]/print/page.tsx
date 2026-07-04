@@ -1,3 +1,4 @@
+import { getProjectBySlug } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCardWithTimeline, getCardComments, getProjectTopics } from "@/lib/cards/queries";
 import { PrintLayout } from "@/components/print/PrintLayout";
@@ -12,21 +13,17 @@ export default async function CardPrintPage({
   const { slug, cardSlug } = await params;
   const supabase = await createSupabaseServerClient();
 
-  const { data: project } = await supabase
-    .from("projects").select("id, project_code, project_name")
-    .eq("project_code", slug.toUpperCase()).maybeSingle();
+  const project = await getProjectBySlug(supabase, slug);
   if (!project) {
     return <div className="p-6 text-red-700">Proyek tidak ditemukan: {slug}</div>;
   }
 
-  const { data: cardRow } = await supabase
-    .from("cards").select("id").eq("project_id", project.id).eq("slug", cardSlug).maybeSingle();
-
   let detail; let comments; let topics;
   try {
-    [detail, comments, topics] = await Promise.all([
-      getCardWithTimeline(supabase, project.id, cardSlug),
-      getCardComments(supabase, cardRow?.id ?? ""),
+    // detail.card.id feeds the comments fetch — no separate cards lookup needed.
+    detail = await getCardWithTimeline(supabase, project.id, cardSlug);
+    [comments, topics] = await Promise.all([
+      getCardComments(supabase, detail.card.id),
       getProjectTopics(supabase, project.id),
     ]);
   } catch {

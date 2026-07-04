@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
+import { must } from "../db/must";
 
 export type SearchHit = {
   id: string;
@@ -39,11 +40,15 @@ export async function searchAll(
   }
   const pattern = `%${trimmed.replace(/[%_]/g, (m) => `\\${m}`)}%`;
 
-  const { data: devRows } = await supabase
-    .from("developments")
-    .select("id, name, area_label")
-    .ilike("name", pattern)
-    .limit(PER_GROUP);
+  // A failed query group must NOT render as "Tidak ada hasil".
+  const { data: devRows } = must(
+    await supabase
+      .from("developments")
+      .select("id, name, area_label")
+      .ilike("name", pattern)
+      .limit(PER_GROUP),
+    "search.developments",
+  );
 
   const developments: SearchHit[] = (devRows ?? []).map((d) => ({
     id: `d_${d.id}`,
@@ -61,13 +66,16 @@ export async function searchAll(
   // select/snippet uses `location` instead of `site_address`. Searching by location text
   // matches nothing via site_address. Preserved verbatim for web/mobile parity — to be
   // fixed cross-app in a dedicated bug fix later.
-  const { data: projectRows } = await supabase
-    .from("projects")
-    .select("id, project_code, project_name, client_name, location")
-    .or(
-      `project_name.ilike.${pattern},client_name.ilike.${pattern},site_address.ilike.${pattern}`,
-    )
-    .limit(PER_GROUP);
+  const { data: projectRows } = must(
+    await supabase
+      .from("projects")
+      .select("id, project_code, project_name, client_name, location")
+      .or(
+        `project_name.ilike.${pattern},client_name.ilike.${pattern},site_address.ilike.${pattern}`,
+      )
+      .limit(PER_GROUP),
+    "search.projects",
+  );
 
   const projects: SearchHit[] = (projectRows ?? []).map((p) => ({
     id: `p_${p.id}`,
@@ -81,11 +89,14 @@ export async function searchAll(
   }));
 
   // Cards: title OR current_summary
-  const { data: cardRows } = await supabase
-    .from("cards")
-    .select(`id, slug, title, current_summary, created_at, projects:project_id (project_code)`)
-    .or(`title.ilike.${pattern},current_summary.ilike.${pattern}`)
-    .limit(PER_GROUP);
+  const { data: cardRows } = must(
+    await supabase
+      .from("cards")
+      .select(`id, slug, title, current_summary, created_at, projects:project_id (project_code)`)
+      .or(`title.ilike.${pattern},current_summary.ilike.${pattern}`)
+      .limit(PER_GROUP),
+    "search.cards",
+  );
 
   const cards: SearchHit[] = (cardRows ?? []).map((c) => {
     const proj = (c as { projects: { project_code: string } | null }).projects;
@@ -106,11 +117,14 @@ export async function searchAll(
   const eventFields = ["body", "description", "topic", "request_text", "what", "notes", "title", "caption"];
   const orTerm = trimmed.replace(/[,()]/g, "").replace(/[%_]/g, (m) => `\\${m}`);
   const orPattern = `*${orTerm}*`;
-  const { data: eventRows } = await supabase
-    .from("card_events")
-    .select(`id, event_kind, payload, occurred_at, cards:card_id (slug, title, projects:project_id (project_code))`)
-    .or(eventFields.map((f) => `payload->>${f}.ilike.${orPattern}`).join(","))
-    .limit(PER_GROUP * 2);
+  const { data: eventRows } = must(
+    await supabase
+      .from("card_events")
+      .select(`id, event_kind, payload, occurred_at, cards:card_id (slug, title, projects:project_id (project_code))`)
+      .or(eventFields.map((f) => `payload->>${f}.ilike.${orPattern}`).join(","))
+      .limit(PER_GROUP * 2),
+    "search.events",
+  );
   // Dedup by id, sort, cap
   const seen = new Set<string>();
   const eventHits: SearchHit[] = [];
@@ -136,12 +150,15 @@ export async function searchAll(
   }
 
   // Comments: body ilike, exclude soft-deleted
-  const { data: commentRows } = await supabase
-    .from("card_comments")
-    .select(`id, body, created_at, cards:card_id (slug, title, projects:project_id (project_code))`)
-    .ilike("body", pattern)
-    .is("deleted_at", null)
-    .limit(PER_GROUP);
+  const { data: commentRows } = must(
+    await supabase
+      .from("card_comments")
+      .select(`id, body, created_at, cards:card_id (slug, title, projects:project_id (project_code))`)
+      .ilike("body", pattern)
+      .is("deleted_at", null)
+      .limit(PER_GROUP),
+    "search.comments",
+  );
 
   const comments: SearchHit[] = (commentRows ?? []).map((co) => {
     const c = (co as unknown as { cards: CardJoin | null }).cards;
@@ -160,13 +177,16 @@ export async function searchAll(
 
   // Attachments: AI caption ilike. Joined event→card→project; RLS-scoped so
   // cost-sensitive captions never reach non-cost roles.
-  const { data: attachmentRows } = await supabase
-    .from("card_attachments")
-    .select(
-      `id, ai_caption, mime_type, card_events:card_event_id ( cards:card_id ( slug, title, projects:project_id ( project_code ) ) )`,
-    )
-    .ilike("ai_caption", pattern)
-    .limit(PER_GROUP);
+  const { data: attachmentRows } = must(
+    await supabase
+      .from("card_attachments")
+      .select(
+        `id, ai_caption, mime_type, card_events:card_event_id ( cards:card_id ( slug, title, projects:project_id ( project_code ) ) )`,
+      )
+      .ilike("ai_caption", pattern)
+      .limit(PER_GROUP),
+    "search.attachments",
+  );
 
   const attachments: SearchHit[] = [];
   for (const a of attachmentRows ?? []) {
