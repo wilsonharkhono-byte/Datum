@@ -192,7 +192,7 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   const { data: cardRow } = await supabase
     .from("cards").select("title, slug").eq("id", input.cardId).maybeSingle();
   if (cardRow) {
-    await notifyWatchersOfEvent(supabase, {
+    const watcherIds = await notifyWatchersOfEvent(supabase, {
       eventId: result.eventId,
       eventKind: input.eventKind,
       payload: parsedPayload,
@@ -203,21 +203,13 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
       cardSlug: cardRow.slug,
       cardTitle: cardRow.title,
     });
-    // Best-effort Expo push for watcher event — derive recipients same way producer does.
-    void (async () => {
-      const { data: members } = await supabase
-        .from("card_members").select("staff_id")
-        .eq("card_id", input.cardId).is("removed_at", null);
-      const recipientIds = [...new Set(
-        (members ?? []).map((m) => m.staff_id)
-          .filter((id): id is string => typeof id === "string" && id !== user.id),
-      )];
-      await sendExpoPush(recipientIds, {
-        title: `${input.eventKind} baru di "${cardRow.title}"`,
-        body:  `${input.eventKind} baru di "${cardRow.title}"`,
-        data:  { link: `/project/${input.projectCode}/cards/${cardRow.slug}` },
-      });
-    })().catch(console.warn);
+    // Best-effort Expo push to the same recipients the producer notified —
+    // same list, same kind filter (routine work logs no longer push).
+    void sendExpoPush(watcherIds, {
+      title: `${input.eventKind} baru di "${cardRow.title}"`,
+      body:  `${input.eventKind} baru di "${cardRow.title}"`,
+      data:  { link: `/project/${input.projectCode}/cards/${cardRow.slug}` },
+    }).catch(console.warn);
     if (HIGH_RISK_KINDS.has(input.eventKind)) {
       const preview = pickPreview(parsedPayload);
       // notifyPrincipalsOfHighRiskEvent uses the service-role admin client —
@@ -649,7 +641,7 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
     const { data: cardRow } = await supabase
       .from("cards").select("title").eq("id", input.cardId).maybeSingle();
     if (cardRow) {
-      await notifyCardStatusChange(supabase, {
+      const memberIds = await notifyCardStatusChange(supabase, {
         cardId: input.cardId,
         cardTitle: cardRow.title,
         cardSlug: input.cardSlug,
@@ -658,21 +650,12 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
         newStatus: input.status,
         actorId: user.id,
       });
-      // Best-effort Expo push for status change — same recipient derivation as producer.
-      void (async () => {
-        const { data: members } = await supabase
-          .from("card_members").select("staff_id")
-          .eq("card_id", input.cardId).is("removed_at", null);
-        const recipientIds = [...new Set(
-          (members ?? []).map((m) => m.staff_id)
-            .filter((id): id is string => typeof id === "string" && id !== user.id),
-        )];
-        await sendExpoPush(recipientIds, {
-          title: "Status kartu diperbarui",
-          body:  `Status "${cardRow.title}" diubah ke ${input.status}`,
-          data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
-        });
-      })().catch(console.warn);
+      // Best-effort Expo push to the same recipients the producer notified.
+      void sendExpoPush(memberIds, {
+        title: "Status kartu diperbarui",
+        body:  `Status "${cardRow.title}" diubah ke ${input.status}`,
+        data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
+      }).catch(console.warn);
     }
   }
 
@@ -794,7 +777,7 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
   const { data: cardRow } = await supabase
     .from("cards").select("title").eq("id", input.cardId).maybeSingle();
   if (cardRow) {
-    await notifyDraftPending(supabase, {
+    const principalIds = await notifyDraftPending(supabase, {
       draftId: data.id,
       actorId: user.id,
       projectId: input.projectId,
@@ -802,18 +785,12 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
       cardTitle: cardRow.title,
       cardId: input.cardId,
     });
-    // Best-effort Expo push for draft pending — same principal query as producer.
-    void (async () => {
-      const { data: principals } = await supabase
-        .from("staff").select("id").eq("active", true).eq("role", "principal");
-      const recipientIds = (principals ?? [])
-        .map((s) => s.id).filter((id) => id !== user.id);
-      await sendExpoPush(recipientIds, {
-        title: "Draft menunggu approval",
-        body:  `Draft ${input.eventKind} baru menunggu approval untuk "${cardRow.title}"`,
-        data:  { link: "/review" },
-      });
-    })().catch(console.warn);
+    // Best-effort Expo push to the same principals the producer notified.
+    void sendExpoPush(principalIds, {
+      title: "Draft menunggu approval",
+      body:  `Draft ${input.eventKind} baru menunggu approval untuk "${cardRow.title}"`,
+      data:  { link: "/review" },
+    }).catch(console.warn);
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
