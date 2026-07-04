@@ -24,16 +24,32 @@ export const keys = {
   areas: (projectId: string) => ["areas", projectId] as const,
   /** Transient AI area-extraction proposal — NOT persisted (session-only). */
   areaProposal: (projectId: string) => ["areaProposal", projectId] as const,
+  // ─── Card detail sub-resources (mobile card screen) ──────────────────────
+  /** Comments for one card. */
+  cardComments: (cardId: string) => ["card-comments", cardId] as const,
+  /** Active members of one card. */
+  cardMembers: (cardId: string) => ["card-members", cardId] as const,
+  /** Attachments for one card. */
+  cardAttachments: (cardId: string) => ["card-attachments", cardId] as const,
+  /** Topics (board columns) for a project. */
+  topics: (projectId: string) => ["topics", projectId] as const,
+  /** Developments list (landing grouping). */
+  developments: () => ["developments"] as const,
+  /** Global search results for one query string — transient, NOT persisted. */
+  search: (q: string) => ["search", q] as const,
   // ─── Members / settings (NOT in PERSISTED_KEY_ROOTS — admin data, fetch-on-open) ─
   /** project_staff rows for a project (principal/admin only). */
   projectMembers: (projectId: string) => ["project-members", projectId] as const,
+  /** Staff of a project as picker candidates (different row shape than
+      projectMembers — do not merge the two caches). */
+  projectStaff: (projectId: string) => ["project-staff", projectId] as const,
   /** All active staff (for the "add member" picker). */
   availableStaff: () => ["available-staff"] as const,
   /** Project settings row (by slug) for the settings shell + info form. */
   projectSettings: (slug: string) => ["project-settings", slug] as const,
 };
 
-export const PERSISTED_KEY_ROOTS = ["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints", "rooms", "areas"] as const;
+export const PERSISTED_KEY_ROOTS = ["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints", "rooms", "areas", "card-comments", "card-members", "card-attachments", "topics", "developments"] as const;
 
 // ─── Assistant query keys ─────────────────────────────────────────────────────
 

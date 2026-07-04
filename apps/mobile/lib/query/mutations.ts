@@ -163,7 +163,7 @@ export function useAddComment(cardId: string) {
       if (!res.ok) throw new Error(res.error);
       return res;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["card-comments", cardId] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.cardComments(cardId) }),
   });
 }
 
@@ -175,7 +175,7 @@ export function useEditComment(cardId: string) {
       if (!res.ok) throw new Error(res.error);
       return res;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["card-comments", cardId] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.cardComments(cardId) }),
   });
 }
 
@@ -187,7 +187,7 @@ export function useDeleteComment(cardId: string) {
       if (!res.ok) throw new Error(res.error);
       return res;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["card-comments", cardId] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.cardComments(cardId) }),
   });
 }
 
@@ -297,7 +297,7 @@ export function useAddMember(cardId: string) {
       if (!res.ok) throw new Error(res.error);
       return res;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["card-members", cardId] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.cardMembers(cardId) }),
   });
 }
 
@@ -309,7 +309,7 @@ export function useRemoveMember(cardId: string) {
       if (!res.ok) throw new Error(res.error);
       return res;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["card-members", cardId] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.cardMembers(cardId) }),
   });
 }
 
@@ -439,6 +439,7 @@ export function useAddProjectMember(projectId: string) {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.projectMembers(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.projectStaff(projectId) }); // card MemberPicker candidates
     },
   });
 }
@@ -457,6 +458,7 @@ export function useRemoveProjectMember(projectId: string) {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.projectMembers(projectId) });
+      void qc.invalidateQueries({ queryKey: keys.projectStaff(projectId) }); // card MemberPicker candidates
     },
   });
 }

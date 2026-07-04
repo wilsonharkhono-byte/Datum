@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { View, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { getProjectStaff } from "@datum/core";
+import { getProjectStaff, keys } from "@datum/core";
 import { supabase } from "@/lib/supabase/client";
 import { Text } from "@/components/ui/Text";
 import { useAddMember, useRemoveMember } from "@/lib/query/mutations";
@@ -35,7 +35,7 @@ export function MemberPicker({
   const addMember = useAddMember(cardId);
 
   const staffQuery = useQuery({
-    queryKey: ["project-staff", projectId],
+    queryKey: keys.projectStaff(projectId),
     queryFn: () => getProjectStaff(supabase, projectId),
     enabled: open,
   });
