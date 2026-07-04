@@ -10,6 +10,7 @@ import { Timeline } from "@/components/board/Timeline";
 import { CommentsSection } from "@/components/board/CommentsSection";
 import { CardMembers } from "@/components/board/CardMembers";
 import { StaleDataNotice } from "@/components/shared/StaleDataNotice";
+import { PendingSyncNotice } from "@/components/shared/PendingSyncNotice";
 
 type StaffLite = Pick<Staff, "id" | "full_name" | "role">;
 
@@ -82,6 +83,7 @@ export function CardDetailClient({
     <div className="grid gap-0 md:grid-cols-[1fr_280px]">
       <div className="md:col-span-2">
         <StaleDataNotice realtimeDown={realtimeDown} refetchFailed={isError} />
+        <PendingSyncNotice />
       </div>
       {/* Main column — the focused content */}
       <div className="border-b border-[var(--border)] px-4 py-4 md:border-b-0 md:border-r md:px-6 md:py-5">
