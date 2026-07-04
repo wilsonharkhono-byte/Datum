@@ -81,10 +81,10 @@ export function CommentItem({
           <span className="flex gap-2">
             <button type="button" onClick={() => setEditing(true)}
               aria-label="Edit komentar"
-              className="px-2 py-1 text-xs text-[var(--sand-dark)] hover:underline">edit</button>
+              className="min-h-11 px-2 py-1 text-xs text-[var(--sand-dark)] hover:underline md:min-h-0">edit</button>
             <button type="button" onClick={() => setConfirmingDelete(true)} disabled={pending}
               aria-label="Hapus komentar"
-              className="px-2 py-1 text-xs text-[var(--flag-critical)] hover:underline">hapus</button>
+              className="min-h-11 px-2 py-1 text-xs text-[var(--flag-critical)] hover:underline md:min-h-0">hapus</button>
           </span>
         ) : null}
       </div>
@@ -96,7 +96,7 @@ export function CommentItem({
             onClick={softDelete}
             disabled={pending}
             aria-label="Ya, hapus komentar ini"
-            className="rounded bg-[var(--flag-critical)] px-2 py-1 text-xs font-semibold text-white hover:bg-[var(--flag-critical)]/90 disabled:opacity-50"
+            className="min-h-11 rounded bg-[var(--flag-critical)] px-2 py-1 text-xs font-semibold text-white hover:bg-[var(--flag-critical)]/90 disabled:opacity-50 md:min-h-0"
           >
             {pending ? "Menghapus…" : "Ya, hapus"}
           </button>
@@ -105,7 +105,7 @@ export function CommentItem({
             onClick={() => setConfirmingDelete(false)}
             disabled={pending}
             aria-label="Batal hapus komentar"
-            className="rounded px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
+            className="min-h-11 rounded px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)] md:min-h-0"
           >
             Batal
           </button>

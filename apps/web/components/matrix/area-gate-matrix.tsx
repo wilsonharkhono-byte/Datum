@@ -1,4 +1,5 @@
 import type { MatrixData } from "@/lib/matrix/fetch-matrix";
+import Link from "next/link";
 import { Fragment } from "react";
 import { Cell, CellChip } from "./cell";
 import { StatusLegend } from "./status-legend";
@@ -27,6 +28,24 @@ export function AreaGateMatrix({ data }: { data: MatrixData }) {
           {data.areas.length} area · {data.gates.length} gate
         </div>
       </div>
+
+      {/* Zero areas: without this the header rendered over an empty void and a
+          new project looked broken instead of pointing at settings. */}
+      {data.areas.length === 0 ? (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-secondary)]">
+          <p className="font-medium text-[var(--foreground)]">Proyek ini belum punya area.</p>
+          <p className="mt-2">
+            Matrix readiness dihitung per area (ruangan). Tambahkan area dulu di
+            pengaturan proyek, lalu klik &quot;Hitung ulang readiness&quot;.
+          </p>
+          <Link
+            href={`/project/${data.project_code}/settings?tab=areas`}
+            className="mt-3 inline-flex min-h-11 items-center rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)] hover:text-[var(--foreground)]"
+          >
+            Buka Pengaturan → Areas
+          </Link>
+        </div>
+      ) : null}
 
       {/* Mobile: stacked area cards (below md) */}
       <div className="md:hidden">

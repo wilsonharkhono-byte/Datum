@@ -88,7 +88,7 @@ export function CardMembers({
             disabled={pending}
             title={`${m.staff?.full_name ?? "(unknown)"} — klik untuk hapus`}
             aria-label={`Hapus anggota ${m.staff?.full_name ?? "(unknown)"}`}
-            className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-white px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--flag-critical)] hover:text-[var(--flag-critical)]"
+            className="flex min-h-11 items-center gap-1 rounded-full border border-[var(--border)] bg-white px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--flag-critical)] hover:text-[var(--flag-critical)] md:min-h-0"
           >
             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--sand)]/30 text-[8px] font-bold text-[var(--text-secondary)]">
               {initials(m.staff?.full_name)}
@@ -102,7 +102,7 @@ export function CardMembers({
           onClick={() => setPicking((p) => !p)}
           disabled={pending || addable.length === 0}
           aria-label={picking ? "Tutup pemilih anggota" : "Tambah anggota"}
-          className="rounded-full border border-dashed border-[var(--border)] px-2 py-0.5 text-xs font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] disabled:opacity-50"
+          className="min-h-11 rounded-full border border-dashed border-[var(--border)] px-2 py-0.5 text-xs font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] disabled:opacity-50 md:min-h-0"
         >
           {picking ? "× tutup" : "+ tambah"}
         </button>
@@ -119,7 +119,7 @@ export function CardMembers({
               onClick={() => add(s.id)}
               disabled={pending}
               aria-label={`Tambah ${s.full_name ?? "(unknown)"} sebagai anggota`}
-              className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-[var(--foreground)] hover:border-[var(--sand-dark)]"
+              className="min-h-11 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-[var(--foreground)] hover:border-[var(--sand-dark)] md:min-h-0"
             >
               {s.full_name ?? "(unknown)"}
             </button>

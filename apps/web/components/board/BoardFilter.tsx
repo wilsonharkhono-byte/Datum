@@ -71,7 +71,7 @@ export function BoardFilter({
         onClick={() => setShowSearch((v) => !v)}
         aria-expanded={showSearch}
         aria-label="Cari kartu"
-        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border text-[var(--text-secondary)] hover:text-[var(--foreground)] md:hidden ${
+        className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded border text-[var(--text-secondary)] hover:text-[var(--foreground)] md:hidden ${
           showSearch || query
             ? "border-[var(--sand-dark)] text-[var(--foreground)]"
             : "border-[var(--border)]"
@@ -83,7 +83,7 @@ export function BoardFilter({
         type="button"
         onClick={() => setShowFilters((v) => !v)}
         aria-expanded={showFilters}
-        className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded border px-2.5 text-[10px] font-semibold uppercase tracking-wide hover:text-[var(--foreground)] md:hidden ${
+        className={`inline-flex h-11 shrink-0 items-center gap-1.5 rounded border px-2.5 text-[10px] font-semibold uppercase tracking-wide hover:text-[var(--foreground)] md:hidden ${
           activeFilters
             ? "border-[var(--sand-dark)] text-[var(--foreground)]"
             : "border-[var(--border)] text-[var(--text-secondary)]"
@@ -130,7 +130,7 @@ export function BoardFilter({
               type="button"
               onClick={() => setShowFilters(false)}
               aria-label="Tutup filter"
-              className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--foreground)] md:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--foreground)] md:hidden"
             >
               <XIcon size={14} />
             </button>
