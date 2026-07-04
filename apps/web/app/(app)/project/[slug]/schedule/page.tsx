@@ -117,7 +117,7 @@ export default async function ProjectSchedulePage({
                     target ? "border-[var(--sand-dark)]" : "border-[var(--border)]"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-xs font-semibold text-[var(--foreground)]">
                         {area.area_name}
