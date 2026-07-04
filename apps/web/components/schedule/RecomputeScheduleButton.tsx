@@ -35,13 +35,13 @@ export function RecomputeScheduleButton({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {message ? <span className="text-[11px] text-green-700">{message}</span> : null}
-      {error ? <span className="text-[11px] text-red-700">{error}</span> : null}
+      {message ? <span className="text-[11px] text-[var(--flag-ok)]">{message}</span> : null}
+      {error ? <span className="text-[11px] text-[var(--flag-critical)]">{error}</span> : null}
       <button
         type="button"
         onClick={recompute}
         disabled={pending}
-        className="inline-flex min-h-11 items-center justify-center rounded border border-[#141210] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#141210] hover:bg-[var(--sand-tint)] disabled:opacity-50 md:min-h-0"
+        className="inline-flex min-h-11 items-center justify-center rounded border border-[var(--foreground)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--foreground)] hover:bg-[var(--sand-tint)] disabled:opacity-50 md:min-h-0"
         title="Hitung ulang jadwal dari kickoff_date + cascade ke planned_start/end tiap step"
       >
         {pending ? "Menghitung…" : "Hitung ulang jadwal"}

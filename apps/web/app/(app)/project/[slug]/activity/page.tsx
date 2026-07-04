@@ -4,9 +4,9 @@ import { getProjectStepActivity, groupByDay } from "@/lib/activity/step-activity
 
 const CHIP: Record<string, { label: string; cls: string }> = {
   not_started: { label: "Belum mulai", cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" },
-  in_progress: { label: "Berjalan", cls: "bg-blue-100 text-blue-800" },
-  blocked: { label: "Terblokir", cls: "bg-red-100 text-red-800" },
-  done: { label: "Selesai", cls: "bg-green-100 text-green-800" },
+  in_progress: { label: "Berjalan", cls: "bg-[var(--flag-info-bg)] text-[var(--flag-info)]" },
+  blocked: { label: "Terblokir", cls: "bg-[var(--flag-critical-bg)] text-[var(--flag-critical)]" },
+  done: { label: "Selesai", cls: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]" },
 };
 
 export default async function ProjectActivityPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -23,18 +23,18 @@ export default async function ProjectActivityPage({ params }: { params: Promise<
   return (
     <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
       <Link href={`/project/${project.project_code}`} className="text-xs text-[var(--text-muted)] hover:underline">← {project.project_code} Board</Link>
-      <h1 className="mt-2 text-2xl font-semibold text-[#141210]">Aktivitas Langkah</h1>
-      <p className="mt-1 text-sm text-[#524E49]">50 update langkah terbaru di proyek ini.</p>
+      <h1 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">Aktivitas Langkah</h1>
+      <p className="mt-1 text-sm text-[var(--text-secondary)]">50 update langkah terbaru di proyek ini.</p>
 
       {groups.length === 0 ? (
-        <div className="mt-6 rounded border border-dashed border-[#B5AFA8] p-6 text-center text-sm italic text-[#524E49]">
+        <div className="mt-6 rounded border border-dashed border-[var(--border)] p-6 text-center text-sm italic text-[var(--text-secondary)]">
           Belum ada aktivitas langkah.
         </div>
       ) : null}
 
       {groups.map((g) => (
         <section key={g.day} className="mt-6">
-          <h2 className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#7A6B56]">{g.day} ({g.items.length})</h2>
+          <h2 className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--sand-dark)]">{g.day} ({g.items.length})</h2>
           <ol className="space-y-2">
             {g.items.map((it) => {
               const chip = CHIP[it.status] ?? { label: it.status, cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" };

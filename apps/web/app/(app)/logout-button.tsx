@@ -24,7 +24,7 @@ export function LogoutButton() {
           router.push("/login");
         })
       }
-      className="h-8 rounded-[8px] border border-[#B5AFA8] px-3 text-xs font-semibold text-[#524E49] transition hover:bg-[#F2EFE9] disabled:opacity-50 sm:h-10 sm:px-4 sm:text-sm"
+      className="h-8 rounded-[8px] border border-[var(--border)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-alt)] disabled:opacity-50 sm:h-10 sm:px-4 sm:text-sm"
     >
       Keluar
     </button>

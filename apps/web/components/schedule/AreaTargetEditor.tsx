@@ -103,7 +103,7 @@ export function AreaTargetEditor({
             type="button"
             onClick={() => save(null)}
             disabled={pending}
-            className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] font-semibold text-[var(--text-muted)] hover:text-red-700 disabled:opacity-50 md:min-h-0"
+            className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] font-semibold text-[var(--text-muted)] hover:text-[var(--flag-critical)] disabled:opacity-50 md:min-h-0"
             aria-label="Hapus target, kembali ke jadwal default"
           >
             Hapus
@@ -122,7 +122,7 @@ export function AreaTargetEditor({
           Batal
         </button>
       </div>
-      {error ? <span className="text-[10px] text-red-700">{error}</span> : null}
+      {error ? <span className="text-[10px] text-[var(--flag-critical)]">{error}</span> : null}
     </div>
   );
 }

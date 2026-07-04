@@ -14,9 +14,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 const EVENT_CHIP: Record<string, { label: string; cls: string }> = {
   not_started: { label: "Belum mulai", cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" },
-  in_progress:  { label: "Berjalan",   cls: "bg-blue-100 text-blue-800" },
-  blocked:      { label: "Terblokir",  cls: "bg-red-100 text-red-800" },
-  done:         { label: "Selesai",    cls: "bg-green-100 text-green-800" },
+  in_progress:  { label: "Berjalan",   cls: "bg-[var(--flag-info-bg)] text-[var(--flag-info)]" },
+  blocked:      { label: "Terblokir",  cls: "bg-[var(--flag-critical-bg)] text-[var(--flag-critical)]" },
+  done:         { label: "Selesai",    cls: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]" },
 };
 
 const HISTORY_PREVIEW = 5;
@@ -144,7 +144,7 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
               <input type="checkbox" checked={c.result === "pass"} disabled={pending}
                 onChange={(e) => run(() => submitCheckpointResult({ checkpointId: c.id, result: e.target.checked ? "pass" : "pending" }))} />
               <span>{c.item_text}</span>
-              {c.severity === "kritis" ? <span className="ml-auto rounded-sm bg-red-100 px-1 text-[9px] font-bold uppercase text-red-700">kritis</span> : null}
+              {c.severity === "kritis" ? <span className="ml-auto rounded-sm bg-[var(--flag-critical-bg)] px-1 text-[9px] font-bold uppercase text-[var(--flag-critical)]">kritis</span> : null}
             </label>
           ))}
         </div>
@@ -152,12 +152,12 @@ export function StepDetail({ step, events = [] }: { step: AreaStepRow; events?: 
 
       <div className="mt-3 border-t border-[var(--border)] pt-2">
         <button type="button" disabled={pending} onClick={remove}
-          className="min-h-11 text-[11px] font-semibold text-[var(--text-muted)] hover:text-red-700 disabled:opacity-50 md:min-h-0">
+          className="min-h-11 text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--flag-critical)] disabled:opacity-50 md:min-h-0">
           Hapus langkah
         </button>
       </div>
 
-      {error ? <p className="mt-2 text-[11px] text-red-700">{error}</p> : null}
+      {error ? <p className="mt-2 text-[11px] text-[var(--flag-critical)]">{error}</p> : null}
 
       <StepHistory events={events} />
     </div>

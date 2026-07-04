@@ -31,12 +31,12 @@ export default async function CardDetailPage({
   if (projectRes.status === "rejected") throw projectRes.reason;
   const project = projectRes.value.data;
   if (!project) {
-    return <div className="p-6 text-red-700">Proyek tidak ditemukan: {slug}</div>;
+    return <div className="p-6 text-[var(--flag-critical)]">Proyek tidak ditemukan: {slug}</div>;
   }
 
   if (detailRes.status === "rejected") {
     return (
-      <div className="p-6 text-red-700">
+      <div className="p-6 text-[var(--flag-critical)]">
         Kartu tidak ditemukan: <code>{cardSlug}</code>
         <div className="mt-3"><Link href={`/project/${slug}`} className="underline">← kembali ke board</Link></div>
       </div>

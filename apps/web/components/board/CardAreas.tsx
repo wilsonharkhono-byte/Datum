@@ -94,7 +94,7 @@ export function CardAreas({
                   disabled={pending}
                   aria-label={`Lepas tautan area ${a.area_code}`}
                   title="Lepas tautan area"
-                  className="flex h-3.5 w-3.5 items-center justify-center rounded hover:text-red-700 disabled:opacity-50"
+                  className="-my-2 flex h-11 w-11 items-center justify-center rounded hover:text-[var(--flag-critical)] disabled:opacity-50 md:my-0 md:h-3.5 md:w-3.5"
                 >
                   <XIcon size={10} />
                 </button>
@@ -134,7 +134,7 @@ export function CardAreas({
       </div>
 
       {error ? (
-        <p className="text-[11px] text-red-700">{error}</p>
+        <p className="text-[11px] text-[var(--flag-critical)]">{error}</p>
       ) : null}
     </div>
   );

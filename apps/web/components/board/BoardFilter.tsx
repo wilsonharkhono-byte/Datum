@@ -71,7 +71,7 @@ export function BoardFilter({
         onClick={() => setShowSearch((v) => !v)}
         aria-expanded={showSearch}
         aria-label="Cari kartu"
-        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border text-[var(--text-secondary)] hover:text-[var(--foreground)] md:hidden ${
+        className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded border text-[var(--text-secondary)] hover:text-[var(--foreground)] md:hidden ${
           showSearch || query
             ? "border-[var(--sand-dark)] text-[var(--foreground)]"
             : "border-[var(--border)]"
@@ -83,7 +83,7 @@ export function BoardFilter({
         type="button"
         onClick={() => setShowFilters((v) => !v)}
         aria-expanded={showFilters}
-        className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded border px-2.5 text-[10px] font-semibold uppercase tracking-wide hover:text-[var(--foreground)] md:hidden ${
+        className={`inline-flex h-11 shrink-0 items-center gap-1.5 rounded border px-2.5 text-[10px] font-semibold uppercase tracking-wide hover:text-[var(--foreground)] md:hidden ${
           activeFilters
             ? "border-[var(--sand-dark)] text-[var(--foreground)]"
             : "border-[var(--border)] text-[var(--text-secondary)]"
@@ -98,7 +98,7 @@ export function BoardFilter({
         ) : null}
       </button>
 
-      <span className="ml-auto text-[10px] text-[#7A6B56] md:hidden">
+      <span className="ml-auto text-[10px] text-[var(--sand-dark)] md:hidden">
         {matched === total ? `${total}` : `${matched}/${total}`}
       </span>
 
@@ -124,13 +124,13 @@ export function BoardFilter({
       {/* Filter groups: own collapsible row on mobile; inline at md+. */}
       <div className={`w-full flex-wrap items-center gap-2 md:contents ${showFilters ? "flex" : "hidden"}`}>
         <div className="flex w-full items-center justify-between md:contents">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7A6B56] md:ml-2">status</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--sand-dark)] md:ml-2">status</span>
           {showFilters ? (
             <button
               type="button"
               onClick={() => setShowFilters(false)}
               aria-label="Tutup filter"
-              className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--foreground)] md:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--foreground)] md:hidden"
             >
               <XIcon size={14} />
             </button>
@@ -152,7 +152,7 @@ export function BoardFilter({
             );
           })}
         </div>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7A6B56] md:ml-2">perlu</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--sand-dark)] md:ml-2">perlu</span>
         <div className="flex flex-wrap gap-1.5">
           {(Object.keys(LABEL_FILTER_LABELS) as LabelFilterKind[]).map((k) => {
             const on = labelFilter.has(k);
@@ -171,7 +171,7 @@ export function BoardFilter({
         </div>
       </div>
 
-      <span className="ml-auto hidden text-[10px] text-[#7A6B56] md:inline">
+      <span className="ml-auto hidden text-[10px] text-[var(--sand-dark)] md:inline">
         {matched === total ? `${total} kartu` : `${matched} dari ${total} kartu cocok`}
       </span>
     </div>

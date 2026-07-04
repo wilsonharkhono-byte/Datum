@@ -284,7 +284,7 @@ export function AddEventForm({
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Tambah aktivitas baru"
-        className="mt-4 w-full rounded border border-dashed border-[#B5AFA8] px-3 py-2 text-left text-xs font-medium text-[#7A6B56] hover:border-[#7A6B56] hover:bg-[#FDFAF6]"
+        className="mt-4 w-full rounded border border-dashed border-[var(--border)] px-3 py-2 text-left text-xs font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--surface)]"
       >
         + tambah aktivitas
       </button>
@@ -300,10 +300,10 @@ export function AddEventForm({
     <form
       key={formKey}
       onSubmit={submit}
-      className="mt-4 rounded border border-[#B5AFA8] bg-[#FDFAF6] p-3"
+      className="mt-4 rounded border border-[var(--border)] bg-[var(--surface)] p-3"
     >
       <div className="mb-3 flex items-center gap-2">
-        <label htmlFor={kindSelectId} className="text-[10px] uppercase tracking-wide text-[#7A6B56]">
+        <label htmlFor={kindSelectId} className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">
           Jenis:
         </label>
         <select
@@ -331,12 +331,12 @@ export function AddEventForm({
             "w-full rounded border border-[var(--border)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none";
           return (
             <div key={f.name}>
-              <label htmlFor={fieldId} className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
+              <label htmlFor={fieldId} className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
                 {f.label}{f.required ? " *" : ""}
               </label>
               {renderInput(f, fieldId, baseInput, pending)}
               {errMsg ? (
-                <div className="mt-0.5 text-[10px] text-red-700">{errMsg}</div>
+                <div className="mt-0.5 text-[10px] text-[var(--flag-critical)]">{errMsg}</div>
               ) : null}
             </div>
           );
@@ -344,7 +344,7 @@ export function AddEventForm({
       </div>
 
       <div className="mt-3 border-t border-[var(--border)] pt-3">
-        <label htmlFor={attachInputId} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">
+        <label htmlFor={attachInputId} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
           Lampiran (opsional) — foto / PDF, maks 20MB per file
         </label>
         <input
@@ -358,18 +358,18 @@ export function AddEventForm({
             setFiles(list);
             setUploadError(null);
           }}
-          className="block w-full text-xs text-[#524E49] file:mr-3 file:rounded file:border file:border-[#B5AFA8] file:bg-white file:px-3 file:py-1 file:text-[10px] file:font-semibold file:uppercase file:tracking-wide file:text-[#524E49] hover:file:bg-[#FDFAF6]"
+          className="block w-full text-xs text-[var(--text-secondary)] file:mr-3 file:rounded file:border file:border-[var(--border)] file:bg-white file:px-3 file:py-1 file:text-[10px] file:font-semibold file:uppercase file:tracking-wide file:text-[var(--text-secondary)] hover:file:bg-[var(--surface)]"
         />
         {files.length > 0 ? (
-          <div className="mt-1 text-[10px] text-[#847E78]">
+          <div className="mt-1 text-[10px] text-[var(--text-muted)]">
             {files.length} file dipilih: {files.map((f) => f.name).join(", ")}
           </div>
         ) : null}
-        {uploadError ? <div className="mt-1 text-[10px] text-red-700">{uploadError}</div> : null}
+        {uploadError ? <div className="mt-1 text-[10px] text-[var(--flag-critical)]">{uploadError}</div> : null}
       </div>
 
       <div className="mt-3 flex items-center gap-2">
-        <label htmlFor={dateInputId} className="text-[10px] uppercase tracking-wide text-[#7A6B56]">
+        <label htmlFor={dateInputId} className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">
           Tanggal:
         </label>
         <input
@@ -380,11 +380,11 @@ export function AddEventForm({
           disabled={pending}
           className="rounded border border-[var(--border)] px-2 py-0.5 text-xs"
         />
-        <span className="text-[10px] text-[#847E78]">kosongkan untuk hari ini</span>
+        <span className="text-[10px] text-[var(--text-muted)]">kosongkan untuk hari ini</span>
       </div>
 
       {areaHint ? (
-        <label className="mt-3 flex items-center gap-1.5 text-[11px] text-[#524E49]">
+        <label className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
           <input
             type="checkbox"
             checked={linkAreaChecked}
@@ -395,14 +395,14 @@ export function AddEventForm({
         </label>
       ) : null}
 
-      {error ? <div className="mt-2 text-[11px] text-red-700">{error}</div> : null}
+      {error ? <div className="mt-2 text-[11px] text-[var(--flag-critical)]">{error}</div> : null}
 
       <div className="mt-3 flex gap-2">
         <button
           type="submit"
           disabled={pending}
           aria-label="Simpan aktivitas baru"
-          className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
+          className="rounded bg-[var(--foreground)] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--surface)] disabled:bg-[var(--text-muted)]"
         >
           {pending && uploadState === "uploading" ? "Mengupload…" : pending ? "Menyimpan…" : "Simpan"}
         </button>
@@ -421,7 +421,7 @@ export function AddEventForm({
           }}
           disabled={pending}
           aria-label="Batal tambah aktivitas"
-          className="rounded px-3 py-1.5 text-[11px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
+          className="rounded px-3 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
         >
           Batal
         </button>

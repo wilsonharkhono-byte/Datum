@@ -3,6 +3,7 @@ export type { DatumClient } from "./client";
 export { keys, PERSISTED_KEY_ROOTS, assistantKeys } from "./query/keys";
 export { createKVPersister, type AsyncKV } from "./query/persister";
 export { makeQueryClient, CACHE_BUSTER, CACHE_MAX_AGE } from "./query/client";
+export { subscribeResilient, type ChannelHealth } from "./realtime/resilient";
 export { subscribeToProjectChanges, type CardsChange } from "./realtime/project";
 export { subscribeToOwnNotifications, type UnreadDelta } from "./realtime/notifications";
 export { subscribeToAreaGateChanges, type AreaGatesChange } from "./realtime/area-gates";

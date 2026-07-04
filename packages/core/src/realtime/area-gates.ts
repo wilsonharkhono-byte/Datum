@@ -1,4 +1,5 @@
 import type { DatumClient } from "../client";
+import { subscribeResilient, type ChannelHealth } from "./resilient";
 
 export type AreaGatesChange = { kind: "area_gate_status" | "area" | "card_area" };
 
@@ -14,38 +15,45 @@ export type AreaGatesChange = { kind: "area_gate_status" | "area" | "card_area" 
  *
  * onChange fires after a 250ms debounce. Returns an unsubscribe function.
  * The Supabase client is injected so this is usable from web and React Native.
+ * onHealth (optional) reports channel drops/recovery — on "recovered" the
+ * caller should refetch, since events during the gap were missed.
  */
 export function subscribeToAreaGateChanges(
   supabase: DatumClient,
   projectId: string,
   onChange: (c: AreaGatesChange) => void,
+  onHealth?: (h: ChannelHealth) => void,
 ): () => void {
   let pending: ReturnType<typeof setTimeout> | null = null;
   function emit(kind: AreaGatesChange["kind"]) {
     if (pending) clearTimeout(pending);
     pending = setTimeout(() => onChange({ kind }), 250);
   }
-  const channel = supabase
-    .channel(`area-gates:${projectId}`)
-    .on(
-      "postgres_changes" as never,
-      { event: "*", schema: "public", table: "area_gate_status", filter: `project_id=eq.${projectId}` },
-      () => emit("area_gate_status"),
-    )
-    .on(
-      "postgres_changes" as never,
-      { event: "*", schema: "public", table: "areas", filter: `project_id=eq.${projectId}` },
-      () => emit("area"),
-    )
-    .on(
-      "postgres_changes" as never,
-      // card_areas has no project_id — subscribed unfiltered; RLS scopes data
-      { event: "*", schema: "public", table: "card_areas" },
-      () => emit("card_area"),
-    )
-    .subscribe();
+  const stop = subscribeResilient(
+    supabase,
+    () =>
+      supabase
+        .channel(`area-gates:${projectId}`)
+        .on(
+          "postgres_changes" as never,
+          { event: "*", schema: "public", table: "area_gate_status", filter: `project_id=eq.${projectId}` },
+          () => emit("area_gate_status"),
+        )
+        .on(
+          "postgres_changes" as never,
+          { event: "*", schema: "public", table: "areas", filter: `project_id=eq.${projectId}` },
+          () => emit("area"),
+        )
+        .on(
+          "postgres_changes" as never,
+          // card_areas has no project_id — subscribed unfiltered; RLS scopes data
+          { event: "*", schema: "public", table: "card_areas" },
+          () => emit("card_area"),
+        ),
+    onHealth,
+  );
   return () => {
     if (pending) clearTimeout(pending);
-    void supabase.removeChannel(channel);
+    stop();
   };
 }

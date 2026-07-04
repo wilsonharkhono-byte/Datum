@@ -9,18 +9,24 @@ import { AddColumnForm } from "./AddColumnForm";
 import { BoardFilter, type StatusFilter, type LabelFilter } from "./BoardFilter";
 import { BoardTabs } from "./BoardTabs";
 import { subscribeToProjectChanges } from "@/lib/cards/realtime";
+import { StaleDataNotice } from "@/components/shared/StaleDataNotice";
 
 export function Board({ initialBoard }: { initialBoard: BoardData }) {
   const code = initialBoard.project.project_code;
   const queryClient = useQueryClient();
-  const { data: board } = useBoard(code, initialBoard);
+  const { data: board, isError } = useBoard(code, initialBoard);
   // Add/move now flow through TanStack mutations (useAddCard/useMoveCard), which
   // optimistically write the ghost/moved card into this same query cache. The
   // board renders directly from the live cache — no separate useOptimistic layer.
   const liveBoard = board ?? initialBoard;
+  const [realtimeDown, setRealtimeDown] = useState(false);
   useEffect(() => {
-    return subscribeToProjectChanges(initialBoard.project.id, () => {
+    const invalidate = () =>
       queryClient.invalidateQueries({ queryKey: keys.board(code) });
+    return subscribeToProjectChanges(initialBoard.project.id, invalidate, (h) => {
+      setRealtimeDown(h === "down");
+      // Changes during the outage were missed — refetch to catch up.
+      if (h === "recovered") invalidate();
     });
   }, [initialBoard.project.id, code, queryClient]);
   const [query, setQuery] = useState("");
@@ -111,6 +117,7 @@ export function Board({ initialBoard }: { initialBoard: BoardData }) {
 
   return (
     <div className="flex h-full flex-col">
+      <StaleDataNotice realtimeDown={realtimeDown} refetchFailed={isError} />
       <BoardFilter
         query={query}
         onQueryChange={setQuery}

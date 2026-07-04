@@ -22,7 +22,7 @@ export function ProjectCard({
 }: { project: ProjectListItem; developments: DevelopmentOption[] }) {
   const tint = developmentTint(project.development_name ?? "");
   return (
-    <div className="overflow-hidden rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6]">
+    <div className="overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--surface)]">
       <Link href={`/project/${project.project_code}`} className="block transition-opacity hover:opacity-90">
         <div className="relative h-24 w-full" style={{ backgroundColor: tint.bg }}>
           {project.cover_url ? (
@@ -34,17 +34,17 @@ export function ProjectCard({
           )}
         </div>
         <div className="p-3">
-          <div className="text-[13px] font-bold uppercase leading-tight tracking-[0.04em] text-[#141210]">
+          <div className="text-[13px] font-bold uppercase leading-tight tracking-[0.04em] text-[var(--foreground)]">
             {project.project_code}
           </div>
-          <div className="mt-0.5 text-sm text-[#524E49]">{project.project_name}</div>
-          <div className="mt-1 text-xs text-[#847E78]">Client: {project.client_name ?? "-"}</div>
-          <span className="mt-2 inline-block rounded-[5px] bg-[#B29F86]/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#7A6B56]">
+          <div className="mt-0.5 text-sm text-[var(--text-secondary)]">{project.project_name}</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">Client: {project.client_name ?? "-"}</div>
+          <span className="mt-2 inline-block rounded-[5px] bg-[var(--sand)]/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--sand-dark)]">
             {statusLabel[project.status] ?? project.status}
           </span>
         </div>
       </Link>
-      <div className="border-t border-[#EAE4DA] px-3 py-2">
+      <div className="border-t border-[var(--oat-line)] px-3 py-2">
         <ProjectEditDialog project={project} developments={developments} />
       </div>
     </div>

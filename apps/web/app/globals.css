@@ -4,6 +4,9 @@
   /* Surfaces */
   --background: #d2d0c4;        /* oat — page bg */
   --oat-deep: #c6c1b6;          /* darker oat — section dividers */
+  --oat-raised: #dad6c9;        /* lighter oat — sticky bars over the page bg */
+  --oat-card: #efeadf;          /* grouped-landing card bg */
+  --oat-line: #eae4da;          /* subtle divider on oat cards */
   --surface: #fdfaf6;           /* warm near-white — cards */
   --surface-alt: #f2efe9;       /* warmer off-white — inactive */
 
@@ -17,6 +20,7 @@
   /* Brand accent (sand) */
   --sand: #b29f86;
   --sand-dark: #7a6b56;
+  --sand-darker: #3a3527;      /* hover shade for sand-dark text / foreground buttons */
   --sand-tint: rgba(178, 159, 134, 0.12);
 
   /* Borders */
@@ -42,10 +46,14 @@
   --color-surface: var(--surface);
   --color-surface-alt: var(--surface-alt);
   --color-oat-deep: var(--oat-deep);
+  --color-oat-raised: var(--oat-raised);
+  --color-oat-card: var(--oat-card);
+  --color-oat-line: var(--oat-line);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-sand: var(--sand);
   --color-sand-dark: var(--sand-dark);
+  --color-sand-darker: var(--sand-darker);
   --color-border-brand: var(--border);
   --color-flag-ok: var(--flag-ok);
   --color-flag-info: var(--flag-info);

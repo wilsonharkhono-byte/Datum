@@ -10,11 +10,11 @@ import type { getRoomStepView } from "@/lib/steps/queries";
 type View = Awaited<ReturnType<typeof getRoomStepView>>;
 const CHIP: Record<string, { label: string; cls: string }> = {
   not_started: { label: "Belum mulai", cls: "bg-[var(--sand-tint)] text-[var(--text-muted)]" },
-  in_progress: { label: "Berjalan", cls: "bg-blue-100 text-blue-800" },
-  blocked: { label: "Terblokir", cls: "bg-red-100 text-red-800" },
-  stalled: { label: "Mandek", cls: "bg-red-100 text-red-800" },
-  accepted: { label: "Selesai", cls: "bg-green-100 text-green-800" },
-  done_with_defects: { label: "Selesai (ada defect)", cls: "bg-amber-100 text-amber-800" },
+  in_progress: { label: "Berjalan", cls: "bg-[var(--flag-info-bg)] text-[var(--flag-info)]" },
+  blocked: { label: "Terblokir", cls: "bg-[var(--flag-critical-bg)] text-[var(--flag-critical)]" },
+  stalled: { label: "Mandek", cls: "bg-[var(--flag-critical-bg)] text-[var(--flag-critical)]" },
+  accepted: { label: "Selesai", cls: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]" },
+  done_with_defects: { label: "Selesai (ada defect)", cls: "bg-[var(--flag-high-bg)] text-[var(--flag-high)]" },
 };
 
 export function RoomStepsPanel({ areaId, view }: { areaId: string; view: View }) {

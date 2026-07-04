@@ -75,10 +75,10 @@ export function CardMembers({
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">Anggota:</span>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">Anggota:</span>
       <div className="flex flex-wrap gap-1">
         {members.length === 0 ? (
-          <span className="text-[10px] italic text-[#847E78]">belum ada</span>
+          <span className="text-[10px] italic text-[var(--text-muted)]">belum ada</span>
         ) : null}
         {members.map((m) => (
           <button
@@ -88,9 +88,9 @@ export function CardMembers({
             disabled={pending}
             title={`${m.staff?.full_name ?? "(unknown)"} — klik untuk hapus`}
             aria-label={`Hapus anggota ${m.staff?.full_name ?? "(unknown)"}`}
-            className="flex items-center gap-1 rounded-full border border-[#B5AFA8] bg-white px-2 py-0.5 text-xs font-medium text-[#524E49] hover:border-red-400 hover:text-red-700"
+            className="flex min-h-11 items-center gap-1 rounded-full border border-[var(--border)] bg-white px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--flag-critical)] hover:text-[var(--flag-critical)] md:min-h-0"
           >
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#B29F86]/30 text-[8px] font-bold text-[#524E49]">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--sand)]/30 text-[8px] font-bold text-[var(--text-secondary)]">
               {initials(m.staff?.full_name)}
             </span>
             <span>{m.staff?.full_name ?? "(unknown)"}</span>
@@ -102,7 +102,7 @@ export function CardMembers({
           onClick={() => setPicking((p) => !p)}
           disabled={pending || addable.length === 0}
           aria-label={picking ? "Tutup pemilih anggota" : "Tambah anggota"}
-          className="rounded-full border border-dashed border-[#B5AFA8] px-2 py-0.5 text-xs font-medium text-[#7A6B56] hover:border-[#7A6B56] disabled:opacity-50"
+          className="min-h-11 rounded-full border border-dashed border-[var(--border)] px-2 py-0.5 text-xs font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] disabled:opacity-50 md:min-h-0"
         >
           {picking ? "× tutup" : "+ tambah"}
         </button>
@@ -110,7 +110,7 @@ export function CardMembers({
       {picking ? (
         <div className="ml-2 flex flex-wrap gap-1">
           {addable.length === 0 ? (
-            <span className="text-[10px] italic text-[#847E78]">semua staf sudah jadi anggota</span>
+            <span className="text-[10px] italic text-[var(--text-muted)]">semua staf sudah jadi anggota</span>
           ) : null}
           {addable.map((s) => (
             <button
@@ -119,14 +119,14 @@ export function CardMembers({
               onClick={() => add(s.id)}
               disabled={pending}
               aria-label={`Tambah ${s.full_name ?? "(unknown)"} sebagai anggota`}
-              className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-[#141210] hover:border-[var(--sand-dark)]"
+              className="min-h-11 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-[var(--foreground)] hover:border-[var(--sand-dark)] md:min-h-0"
             >
               {s.full_name ?? "(unknown)"}
             </button>
           ))}
         </div>
       ) : null}
-      {error ? <span className="text-[10px] text-red-700">{error}</span> : null}
+      {error ? <span className="text-[10px] text-[var(--flag-critical)]">{error}</span> : null}
     </div>
   );
 }
