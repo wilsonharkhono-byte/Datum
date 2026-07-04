@@ -10,6 +10,7 @@ import { BoardFilter, type StatusFilter, type LabelFilter } from "./BoardFilter"
 import { BoardTabs } from "./BoardTabs";
 import { subscribeToProjectChanges } from "@/lib/cards/realtime";
 import { StaleDataNotice } from "@/components/shared/StaleDataNotice";
+import { PendingSyncNotice } from "@/components/shared/PendingSyncNotice";
 
 export function Board({ initialBoard }: { initialBoard: BoardData }) {
   const code = initialBoard.project.project_code;
@@ -118,6 +119,7 @@ export function Board({ initialBoard }: { initialBoard: BoardData }) {
   return (
     <div className="flex h-full flex-col">
       <StaleDataNotice realtimeDown={realtimeDown} refetchFailed={isError} />
+      <PendingSyncNotice />
       <BoardFilter
         query={query}
         onQueryChange={setQuery}

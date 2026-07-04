@@ -46,7 +46,9 @@ export function CommentInput({
     });
   }
 
-  const pending = addComment.isPending;
+  // Paused (offline) mutations must not lock the form — the queued comment is
+  // already painted optimistically and PendingSyncNotice shows the count.
+  const pending = addComment.isPending && !addComment.isPaused;
 
   return (
     <form onSubmit={submit} className="mt-3">

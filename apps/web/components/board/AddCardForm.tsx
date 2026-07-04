@@ -15,6 +15,9 @@ export function AddCardForm({
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const addCard = useAddCard(projectCode);
+  // A paused mutation (offline, waiting for reconnect) must not lock the form —
+  // the user can queue further cards; PendingSyncNotice shows the queue count.
+  const busy = addCard.isPending && !addCard.isPaused;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,7 +63,7 @@ export function AddCardForm({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Judul kartu — contoh: Master bathroom"
-        disabled={addCard.isPending}
+        disabled={busy}
         maxLength={120}
         className="w-full rounded border border-[var(--border)] px-2 py-1 text-xs focus:border-[var(--sand-dark)] focus:outline-none"
       />
@@ -68,10 +71,10 @@ export function AddCardForm({
       <div className="mt-1.5 flex gap-1">
         <button
           type="submit"
-          disabled={addCard.isPending || !title.trim()}
+          disabled={busy || !title.trim()}
           className="rounded bg-[var(--foreground)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--surface)] disabled:bg-[var(--text-muted)]"
         >
-          {addCard.isPending ? "Menyimpan…" : "Simpan"}
+          {busy ? "Menyimpan…" : "Simpan"}
         </button>
         <button
           type="button"
@@ -80,7 +83,7 @@ export function AddCardForm({
             setTitle("");
             setError(null);
           }}
-          disabled={addCard.isPending}
+          disabled={busy}
           className="rounded px-3 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
         >
           Batal

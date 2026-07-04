@@ -69,7 +69,7 @@ export function MoveCardControl({
         id="move-card-column"
         value={targetId}
         onChange={(e) => setTargetId(e.target.value)}
-        disabled={move.isPending}
+        disabled={move.isPending && !move.isPaused}
         className="select-brand-sm min-w-0 max-w-full"
       >
         {topics.map((t) => (
@@ -79,7 +79,7 @@ export function MoveCardControl({
       <button
         type="button"
         onClick={submit}
-        disabled={move.isPending || targetId === currentTopicId}
+        disabled={(move.isPending && !move.isPaused) || targetId === currentTopicId}
         aria-label="Pindah kartu ke kolom yang dipilih"
         className="rounded bg-[var(--foreground)] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--surface)] disabled:bg-[var(--text-muted)]"
       >
@@ -88,7 +88,7 @@ export function MoveCardControl({
       <button
         type="button"
         onClick={() => { setOpen(false); setTargetId(currentTopicId); setError(null); }}
-        disabled={move.isPending}
+        disabled={move.isPending && !move.isPaused}
         aria-label="Batal pindahkan kartu"
         className="rounded px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
       >
