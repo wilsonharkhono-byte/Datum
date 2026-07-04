@@ -22,28 +22,34 @@ export async function writePlannedDates(
   supabase: SupabaseClient<Database>,
   areaId: string,
 ): Promise<void> {
-  const { data: gates } = await supabase
+  // Every read here MUST be checked: back-scheduling with a silently-empty
+  // dependency graph or template set would PERSIST wrong planned windows.
+  const { data: gates, error: gatesErr } = await supabase
     .from("area_gate_status")
     .select("gate_code, target_start_date, target_end_date")
     .eq("area_id", areaId);
-  const { data: deps } = await supabase
+  if (gatesErr) throw gatesErr;
+  const { data: deps, error: depsErr } = await supabase
     .from("trade_step_deps").select("step_code, predecessor_code");
+  if (depsErr) throw depsErr;
 
   for (const g of gates ?? []) {
     if (!g.target_start_date || !g.target_end_date) continue;
-    const { data: tmpl } = await supabase
+    const { data: tmpl, error: tmplErr } = await supabase
       .from("trade_steps")
       .select("code, gate_code, name, step_type, trade_role, typical_duration_days, lead_time_days, sort_order, applicability")
       .eq("gate_code", g.gate_code).eq("active", true).is("project_id", null);
+    if (tmplErr) throw tmplErr;
     const plan = backScheduleSteps(
       (tmpl ?? []) as unknown as TradeStepTemplate[],
       (deps ?? []) as TradeStepDep[],
       { start: g.target_start_date, end: g.target_end_date },
     );
     for (const [code, win] of plan) {
-      await supabase.from("area_steps")
+      const { error: writeErr } = await supabase.from("area_steps")
         .update({ planned_start: win.planned_start, planned_end: win.planned_end })
         .eq("area_id", areaId).eq("step_code", code);
+      if (writeErr) throw writeErr;
     }
   }
 }

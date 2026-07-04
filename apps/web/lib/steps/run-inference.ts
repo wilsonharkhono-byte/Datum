@@ -53,11 +53,12 @@ export async function processPendingStepInference(
         continue;
       }
 
-      const { data: card } = await supabase
+      const { data: card, error: cardErr } = await supabase
         .from("cards")
         .select("title")
         .eq("id", ev.card_id)
         .single();
+      if (cardErr) throw cardErr; // don't infer with a silently-empty title
       const { verdict } = await inferCardEventSteps({
         cardTitle: card?.title ?? "",
         eventText: summarizeWorkEvent(ev.payload),
@@ -79,7 +80,7 @@ export async function processPendingStepInference(
     } catch (e) {
       console.warn(`[infer-card-steps] event ${ev.id} failed: ${errMsg(e)}`);
       Sentry.captureException(e, { extra: { cardEventId: ev.id } });
-      await supabase
+      const { error: markErr } = await supabase
         .from("card_events")
         .update({
           ai_step_status: "failed",
@@ -87,6 +88,11 @@ export async function processPendingStepInference(
           ai_step_processed_at: now(),
         })
         .eq("id", ev.id);
+      if (markErr) {
+        // Event stays claimed/processing with no recorded error — surface it.
+        console.error(`[infer-card-steps] could not mark event ${ev.id} failed: ${markErr.message}`);
+        Sentry.captureException(markErr, { extra: { cardEventId: ev.id } });
+      }
       failed++;
     }
   }

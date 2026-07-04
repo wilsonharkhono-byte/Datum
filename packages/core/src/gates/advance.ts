@@ -157,10 +157,15 @@ export async function markGatePassed(
       passed_by_staff_id: staffId,
       passed_at: passedAt,
     }));
-    // onConflict on the natural key avoids dupes if confirmed twice; ignore err.
-    await sb
+    // onConflict on the natural key avoids dupes if confirmed twice. The gate
+    // pass itself already succeeded so don't fail it — but a lost checkpoint
+    // audit trail must at least be visible in logs.
+    const { error: cpErr } = await sb
       .from("area_gate_checkpoints")
       .upsert(rows, { onConflict: "project_id,area_id,gate_code,template_id" });
+    if (cpErr) {
+      console.error(`[gates] markGatePassed: checkpoint rows not recorded for area ${input.areaId} gate ${input.gateCode}: ${cpErr.message}`);
+    }
   }
 
   // NOTE: Web wrapper (apps/web/lib/gates/advance.ts) calls revalidatePath after
