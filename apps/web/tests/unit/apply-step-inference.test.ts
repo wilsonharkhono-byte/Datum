@@ -30,6 +30,7 @@ it("inserts one AI event per selected match with source/confidence/card_event_id
   await applyStepInference(fakeSupabase(captured) as any, {
     cardEventId: "ce-1",
     projectId: "p-1",
+    occurredAt: "2026-06-30T10:00:00.000Z",
     selected,
   });
   expect(captured).toHaveLength(1);
@@ -38,9 +39,10 @@ it("inserts one AI event per selected match with source/confidence/card_event_id
     project_id: "p-1",
     status: "done",
     note: null,
-    percent_complete: 100,
+    percent_complete: null,
     source: "ai",
     confidence: 0.9,
     card_event_id: "ce-1",
+    occurred_at: "2026-06-30T10:00:00.000Z",
   });
 });

@@ -35,9 +35,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-test-typecheck
     if: github.event_name == 'pull_request'
-    env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    # Runs Playwright against an EPHEMERAL local Supabase spun up in the runner —
+    # never production. The prod-guard in playwright.config.ts hard-fails if
+    # NEXT_PUBLIC_SUPABASE_URL ever resolves to the prod project ref; e2e specs
+    # write and delete data, and pointing them at prod already polluted it once.
     steps:
       - uses: actions/checkout@v4
 
@@ -50,6 +51,41 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Local Supabase stack (Postgres 17 per config.toml). `supabase start`
+      # applies every migration in packages/db/supabase/migrations on a fresh
+      # volume, so CI also validates that migrations apply cleanly.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.102.0
+
+      - name: Start local Supabase (applies migrations)
+        working-directory: packages/db
+        run: supabase start
+
+      # Map the CLI's env names to what the app + seed scripts expect. These are
+      # the well-known local-dev keys the CLI generates on every machine — not
+      # secrets. Exporting to $GITHUB_ENV makes them available to later steps
+      # (seed scripts) and to the dev server Playwright's webServer boots.
+      - name: Export local Supabase env
+        working-directory: packages/db
+        run: |
+          eval "$(supabase status -o env)"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
+      # Seed the pilot fixture the specs assume: wilson@datum.local + projects
+      # BDG-H1 / PKW-PC1012 + areas (seed), then the board cards incl. the
+      # "Master bathroom" card the add-event/comment specs open (seed:cards).
+      - name: Seed pilot data
+        run: |
+          pnpm --filter @datum/db seed
+          pnpm --filter @datum/db seed:cards
+
       - run: pnpm --filter web exec playwright install --with-deps chromium
 
+      # ANTHROPIC_API_KEY intentionally unset: the one LLM spec (chat-query)
+      # self-skips without it; the rest don't exercise the model.
       - run: pnpm --filter web test:e2e

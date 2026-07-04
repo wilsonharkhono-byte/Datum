@@ -276,6 +276,49 @@ describe("InboxTab", () => {
     expect(mockPush).toHaveBeenCalledWith("/(tabs)/(matrix)/review");
   });
 
+  it("tapping a readiness reminder row navigates to the project schedule route", async () => {
+    const notif = makeNotification({
+      id:   "notif-schedule-1",
+      kind: "readiness_reminder",
+      link: "/project/ARIN-1/schedule",
+    });
+    mockGetNotifications.mockResolvedValue([notif]);
+
+    wrap(<InboxTab />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("notification-row-notif-schedule-1")).toBeTruthy(),
+    );
+
+    fireEvent.press(screen.getByTestId("notification-row-notif-schedule-1"));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      "/(tabs)/(matrix)/project/ARIN-1/schedule",
+    );
+    // Kind chip has a label (not the raw kind string)
+    expect(screen.getByText("Pengingat")).toBeTruthy();
+  });
+
+  it("tapping an unconfirmed-block row navigates to the project rooms route", async () => {
+    const notif = makeNotification({
+      id:   "notif-rooms-1",
+      link: "/project/ARIN-1/rooms",
+    });
+    mockGetNotifications.mockResolvedValue([notif]);
+
+    wrap(<InboxTab />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("notification-row-notif-rooms-1")).toBeTruthy(),
+    );
+
+    fireEvent.press(screen.getByTestId("notification-row-notif-rooms-1"));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      "/(tabs)/(matrix)/project/ARIN-1/rooms",
+    );
+  });
+
   it("tapping an unknown link falls back to matrix index route", async () => {
     const notif = makeNotification({
       id:   "notif-unknown-1",

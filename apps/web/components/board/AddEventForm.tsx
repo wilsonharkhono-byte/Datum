@@ -1,9 +1,12 @@
 "use client";
-import { useState, useTransition, useId, type ReactNode } from "react";
+import { useState, useTransition, useId, useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import * as Sentry from "@sentry/nextjs";
 import { createCardEvent, attachToEvent } from "@/lib/cards/mutations";
+import { linkCardToArea } from "@/lib/cards/area-link-mutations";
 import { uploadCardAttachment } from "@/lib/cards/upload";
 import { keys } from "@/lib/query/keys";
+import { suggestAreaForCard, type HintArea } from "@/lib/areas/match-hint";
 import type { EventKind } from "@datum/types";
 
 const KIND_LABELS: Record<EventKind, string> = {
@@ -152,6 +155,10 @@ export function AddEventForm({
   cardSlug,
   cardCode,
   cardQuerySlug,
+  cardTitle,
+  topicName,
+  hasLinkedArea,
+  projectAreas,
 }: {
   cardId: string;
   projectId: string;
@@ -161,6 +168,14 @@ export function AddEventForm({
   cardCode: string;
   /** Canonical card slug — identity for the useCard query key. */
   cardQuerySlug: string;
+  /** Card title — used for the deterministic area-hint matcher. */
+  cardTitle: string;
+  /** Topic name (or null) — used for the deterministic area-hint matcher. */
+  topicName: string | null;
+  /** Whether the card already has at least one linked area — suppresses the hint chip. */
+  hasLinkedArea: boolean;
+  /** All areas in the project — candidates for the area-hint matcher. */
+  projectAreas: HintArea[];
 }) {
   const queryClient = useQueryClient();
   const formId = useId();
@@ -175,6 +190,14 @@ export function AddEventForm({
   const [uploadState, setUploadState] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Deterministic, zero-latency area hint — only offered when the card has no
+  // linked area yet. Pre-checked; unchecking means "don't link".
+  const areaHint = useMemo(() => {
+    if (hasLinkedArea) return null;
+    return suggestAreaForCard({ cardTitle, topicName, areas: projectAreas });
+  }, [hasLinkedArea, cardTitle, topicName, projectAreas]);
+  const [linkAreaChecked, setLinkAreaChecked] = useState(true);
+
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -188,6 +211,24 @@ export function AddEventForm({
     fd.set("eventKind", kind);
     if (occurredAt) fd.set("occurredAt", occurredAt);
     startTransition(async () => {
+      // Link the suggested area BEFORE creating the event so downstream
+      // inference (which reads the card's linked areas) sees it.
+      if (areaHint && linkAreaChecked) {
+        const linkFd = new FormData();
+        linkFd.set("cardId", cardId);
+        linkFd.set("areaId", areaHint.area.id);
+        linkFd.set("projectCode", projectCode);
+        linkFd.set("cardSlug", cardSlug);
+        const linkRes = await linkCardToArea(linkFd);
+        // Best-effort — never block event creation on a link failure, but
+        // report it so a silently-failing capture-time hint doesn't go unnoticed.
+        if (!linkRes.ok) {
+          Sentry.captureMessage("AddEventForm: capture-time area link failed", {
+            level: "warning",
+            extra: { cardId, areaId: areaHint.area.id, error: linkRes.error },
+          });
+        }
+      }
       const res = await createCardEvent(fd);
       if (!res.ok) {
         setError(res.error);
@@ -232,6 +273,7 @@ export function AddEventForm({
       setOccurredAt("");
       setFiles([]);
       setUploadState("idle");
+      setLinkAreaChecked(true);
       setFormKey((k) => k + 1);
     });
   }
@@ -341,6 +383,18 @@ export function AddEventForm({
         <span className="text-[10px] text-[var(--text-muted)]">kosongkan untuk hari ini</span>
       </div>
 
+      {areaHint ? (
+        <label className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={linkAreaChecked}
+            onChange={(e) => setLinkAreaChecked(e.target.checked)}
+            disabled={pending}
+          />
+          Tautkan ke {areaHint.area.area_name}
+        </label>
+      ) : null}
+
       {error ? <div className="mt-2 text-[11px] text-[var(--flag-critical)]">{error}</div> : null}
 
       <div className="mt-3 flex gap-2">
@@ -362,6 +416,7 @@ export function AddEventForm({
             setFiles([]);
             setUploadState("idle");
             setUploadError(null);
+            setLinkAreaChecked(true);
             setFormKey((k) => k + 1);
           }}
           disabled={pending}

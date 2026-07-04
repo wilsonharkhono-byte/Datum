@@ -50,3 +50,9 @@ export async function recomputeProjectGates(
   }
   return result;
 }
+
+// NOTE: recomputeProjectGatesSystem (admin-client + skipAuthCheck variant for
+// use inside after() background callbacks with no end-user session) lives in
+// lib/gates/recompute-system.ts, NOT here — this file is "use server" and
+// every export becomes a client-callable action; that variant must never be
+// client-reachable. See recompute-system.ts's header comment.
