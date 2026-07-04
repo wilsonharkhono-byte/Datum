@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
+import { must } from "../db/must";
 import {
   findCascadeRisks,
   findExpiringQuotes,
@@ -54,13 +55,13 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
   const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
   const [
-    { data: draftRows, count: draftCount },
-    { data: blockedRaw, count: blockedCount },
-    { data: defectEvs, count: defectCount },
-    { data: crEvs, count: crCount },
-    { data: decEvs, count: decCount },
-    { data: vendorEvs },
-    { data: gateRows },
+    draftsRes,
+    blockedRes,
+    defectsRes,
+    crRes,
+    decRes,
+    vendorRes,
+    gatesRes,
   ] = await Promise.all([
     // 1. Pending drafts (card_event drafts)
     supabase
@@ -143,6 +144,15 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
       .or("target_start_date.not.is.null,stale.eq.true"),
   ]);
 
+  // A failed query must NOT render as "0 drafts / no blockers / all clear".
+  const { data: draftRows, count: draftCount } = must(draftsRes, "brief.drafts");
+  const { data: blockedRaw, count: blockedCount } = must(blockedRes, "brief.blockers");
+  const { data: defectEvs, count: defectCount } = must(defectsRes, "brief.defects");
+  const { data: crEvs, count: crCount } = must(crRes, "brief.clientRequests");
+  const { data: decEvs, count: decCount } = must(decRes, "brief.decisions");
+  const { data: vendorEvs } = must(vendorRes, "brief.vendorQuotes");
+  const { data: gateRows } = must(gatesRes, "brief.gateCells");
+
   const pendingDrafts = {
     count: draftCount ?? 0,
     items: (draftRows ?? []).map((d) => {
@@ -174,12 +184,15 @@ export async function getBriefData(supabase: SupabaseClient<Database>): Promise<
   // tie-break.
   const oldestBlockedAt = blockedEvs.at(-1)?.occurred_at;
   if (blockedCardIds.length > 0 && oldestBlockedAt !== undefined) {
-    const { data: workEvs } = await supabase
-      .from("card_events")
-      .select("id, card_id, occurred_at, created_at, payload")
-      .eq("event_kind", "work")
-      .in("card_id", blockedCardIds)
-      .gte("occurred_at", oldestBlockedAt);
+    const { data: workEvs } = must(
+      await supabase
+        .from("card_events")
+        .select("id, card_id, occurred_at, created_at, payload")
+        .eq("event_kind", "work")
+        .in("card_id", blockedCardIds)
+        .gte("occurred_at", oldestBlockedAt),
+      "brief.supersession",
+    );
     for (const w of workEvs ?? []) {
       const status = (w.payload as { status?: string } | null)?.status;
       if (status === "blocked") continue;
