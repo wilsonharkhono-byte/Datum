@@ -16,16 +16,19 @@ export type CurrentStaff = {
   email: string | null;
 };
 
-/** Trimmed current-staff shape (the `require-role` flavor). Null when not
-    signed in or no staff row exists yet (orphan auth user). */
+/** Trimmed current-staff shape (the `require-role` flavor). Null ONLY when not
+    signed in or no staff row exists yet (orphan auth user). A failed staff
+    read THROWS — callers treat null as "orphan, sign out", so conflating a
+    transient error with no-row force-logged-out mobile users in the field. */
 export async function getCurrentStaff(supabase: DatumClient): Promise<CurrentStaff | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("staff")
     .select("id, full_name, role, email")
     .eq("id", user.id)
     .maybeSingle();
+  if (error) throw new Error(`[db] auth.currentStaff: ${error.message}`);
   if (!data) return null;
   return {
     id: data.id,
@@ -35,11 +38,14 @@ export async function getCurrentStaff(supabase: DatumClient): Promise<CurrentSta
   };
 }
 
-/** Full staff row (the `get-current-user` flavor). */
+/** Full staff row (the `get-current-user` flavor). Same contract: null =
+    logged out / no row; a failed read throws. */
 export async function getCurrentStaffRow(supabase: DatumClient): Promise<Staff | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from("staff").select("*").eq("id", user.id).single();
+  const { data, error } = await supabase.from("staff").select("*").eq("id", user.id).single();
+  // PGRST116 = no row (orphan auth user) — that one is a legitimate null.
+  if (error && error.code !== "PGRST116") throw new Error(`[db] auth.currentStaffRow: ${error.message}`);
   return data ?? null;
 }
 
