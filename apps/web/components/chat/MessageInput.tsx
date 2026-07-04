@@ -69,7 +69,7 @@ export function MessageInput({
             type="button"
             onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
             aria-label="Hapus lampiran yang dipilih"
-            className="shrink-0 text-red-700 hover:underline"
+            className="shrink-0 text-[var(--flag-critical)] hover:underline"
           >hapus</button>
         </div>
       ) : null}

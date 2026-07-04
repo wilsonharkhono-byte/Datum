@@ -11,17 +11,17 @@ import type { StepSignalSeverity } from "@/lib/steps/signals";
 // ─── Severity styling tokens (SANO palette — no raw hex) ─────────────────────
 
 const SEVERITY_DOT: Record<StepSignalSeverity, string> = {
-  critical: "bg-red-600",
-  high: "bg-amber-500",
-  warning: "bg-yellow-400",
-  info: "bg-blue-400",
+  critical: "bg-[var(--flag-critical)]",
+  high: "bg-[var(--flag-high)]",
+  warning: "bg-[var(--flag-warning)]",
+  info: "bg-[var(--flag-info)]",
 };
 
 const SEVERITY_CHIP: Record<StepSignalSeverity, string> = {
-  critical: "bg-red-100 text-red-800",
-  high: "bg-amber-100 text-amber-800",
-  warning: "bg-yellow-100 text-yellow-800",
-  info: "bg-blue-100 text-blue-800",
+  critical: "bg-[var(--flag-critical-bg)] text-[var(--flag-critical)]",
+  high: "bg-[var(--flag-high-bg)] text-[var(--flag-high)]",
+  warning: "bg-[var(--flag-warning-bg)] text-[var(--flag-warning)]",
+  info: "bg-[var(--flag-info-bg)] text-[var(--flag-info)]",
 };
 
 const SEVERITY_LABEL: Record<StepSignalSeverity, string> = {

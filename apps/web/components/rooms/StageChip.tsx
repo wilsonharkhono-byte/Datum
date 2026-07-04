@@ -10,11 +10,11 @@ const STAGE_STYLE: Record<
   "blocked" | "in_progress" | "ready_for_handoff" | "passed" | "none",
   ChipStyle
 > = {
-  blocked: { cls: "bg-[rgba(198,40,40,0.08)] text-[#C62828]", sym: "■" },
-  in_progress: { cls: "bg-[rgba(230,81,0,0.10)] text-[#E65100]", sym: "▶" },
-  ready_for_handoff: { cls: "bg-[rgba(21,101,192,0.08)] text-[#1565C0]", sym: "►" },
-  passed: { cls: "bg-[rgba(61,139,64,0.08)] text-[#3D8B40]", sym: "✓" },
-  none: { cls: "bg-[#F2EFE9] text-[#847E78]", sym: "·" },
+  blocked: { cls: "bg-[var(--flag-critical-bg)] text-[var(--flag-critical)]", sym: "■" },
+  in_progress: { cls: "bg-[var(--flag-warning-bg)] text-[var(--flag-warning)]", sym: "▶" },
+  ready_for_handoff: { cls: "bg-[var(--flag-info-bg)] text-[var(--flag-info)]", sym: "►" },
+  passed: { cls: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]", sym: "✓" },
+  none: { cls: "bg-[var(--surface-alt)] text-[var(--text-muted)]", sym: "·" },
 };
 
 export function StageChip({ stage }: { stage: RoomStage }) {

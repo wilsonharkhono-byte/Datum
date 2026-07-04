@@ -98,7 +98,7 @@ export function AddStepForm({ areaId, addableCatalog }: { areaId: string; addabl
         className="mt-2 min-h-11 text-[11px] text-[var(--text-muted)] hover:text-[var(--foreground)] disabled:opacity-50 md:min-h-0">
         Batal
       </button>
-      {error ? <p className="mt-2 text-[11px] text-red-700">{error}</p> : null}
+      {error ? <p className="mt-2 text-[11px] text-[var(--flag-critical)]">{error}</p> : null}
     </div>
   );
 }

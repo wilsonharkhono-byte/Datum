@@ -90,14 +90,14 @@ describe("subscribeToProjectChanges — channel resilience", () => {
     subscribeToProjectChanges("p1", () => {});
     expect(supabaseMock.channel).toHaveBeenCalledTimes(1);
 
-    channels[0].statusCb!("CHANNEL_ERROR");
+    channels[0]!.statusCb!("CHANNEL_ERROR");
     // Retry is scheduled with backoff, not immediate.
     expect(supabaseMock.channel).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(1100);
 
     expect(supabaseMock.removeChannel).toHaveBeenCalledWith(channels[0]);
     expect(supabaseMock.channel).toHaveBeenCalledTimes(2);
-    expect(channels[1].statusCb).not.toBeNull();
+    expect(channels[1]!.statusCb).not.toBeNull();
   });
 
   it("reports down then recovered via onHealth, and resets backoff", () => {
@@ -105,12 +105,12 @@ describe("subscribeToProjectChanges — channel resilience", () => {
     const onHealth = vi.fn();
     subscribeToProjectChanges("p1", () => {}, onHealth);
 
-    channels[0].statusCb!("TIMED_OUT");
+    channels[0]!.statusCb!("TIMED_OUT");
     expect(onHealth).toHaveBeenCalledWith("down");
     expect(onHealth).not.toHaveBeenCalledWith("recovered");
 
     vi.advanceTimersByTime(1100);
-    channels[1].statusCb!("SUBSCRIBED");
+    channels[1]!.statusCb!("SUBSCRIBED");
     expect(onHealth).toHaveBeenCalledWith("recovered");
     expect(onHealth).toHaveBeenCalledTimes(2);
   });
@@ -120,15 +120,15 @@ describe("subscribeToProjectChanges — channel resilience", () => {
     const onHealth = vi.fn();
     subscribeToProjectChanges("p1", () => {}, onHealth);
 
-    channels[0].statusCb!("CHANNEL_ERROR");
-    channels[0].statusCb!("CLOSED");
+    channels[0]!.statusCb!("CHANNEL_ERROR");
+    channels[0]!.statusCb!("CLOSED");
     expect(onHealth).toHaveBeenCalledTimes(1);
   });
 
   it("stops retrying after unsubscribe", () => {
     vi.useFakeTimers();
     const unsubscribe = subscribeToProjectChanges("p1", () => {});
-    channels[0].statusCb!("CHANNEL_ERROR");
+    channels[0]!.statusCb!("CHANNEL_ERROR");
     unsubscribe();
     vi.advanceTimersByTime(60_000);
     // Only the initial channel was ever built; no rebuild after stop.
@@ -140,7 +140,7 @@ describe("subscribeToProjectChanges — channel resilience", () => {
     const onHealth = vi.fn();
     const unsubscribe = subscribeToProjectChanges("p1", () => {}, onHealth);
     unsubscribe();
-    channels[0].statusCb!("CLOSED");
+    channels[0]!.statusCb!("CLOSED");
     vi.advanceTimersByTime(60_000);
     expect(onHealth).not.toHaveBeenCalled();
     expect(supabaseMock.channel).toHaveBeenCalledTimes(1);

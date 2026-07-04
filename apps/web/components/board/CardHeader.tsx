@@ -78,7 +78,7 @@ export function CardHeader({
             type="button"
             onClick={() => setEditing(true)}
             aria-label="Edit kartu"
-            className="shrink-0 rounded border border-[#B5AFA8] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:bg-[#FDFAF6]"
+            className="shrink-0 rounded border border-[var(--border)] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:bg-[var(--surface)]"
           >
             edit
           </button>
@@ -134,7 +134,7 @@ export function CardHeader({
         />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <label htmlFor="card-status" className="text-[10px] uppercase tracking-wide text-[#7A6B56]">Status:</label>
+        <label htmlFor="card-status" className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Status:</label>
         <select
           id="card-status"
           value={status}
@@ -156,13 +156,13 @@ export function CardHeader({
         placeholder="Ringkasan singkat — mis. 'Marmer Statuario disetujui klien'"
         className="mt-2 w-full rounded border border-[var(--border)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none"
       />
-      {error ? <div className="mt-1 text-[11px] text-red-700">{error}</div> : null}
+      {error ? <div className="mt-1 text-[11px] text-[var(--flag-critical)]">{error}</div> : null}
       <div className="mt-2 flex gap-2">
         <button
           type="submit"
           disabled={pending || !title.trim()}
           aria-label="Simpan perubahan kartu"
-          className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
+          className="rounded bg-[var(--foreground)] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--surface)] disabled:bg-[var(--text-muted)]"
         >
           {pending ? "Menyimpan…" : "Simpan"}
         </button>
@@ -171,7 +171,7 @@ export function CardHeader({
           onClick={cancel}
           disabled={pending}
           aria-label="Batal edit kartu"
-          className="rounded px-3 py-1.5 text-[11px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
+          className="rounded px-3 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
         >
           Batal
         </button>

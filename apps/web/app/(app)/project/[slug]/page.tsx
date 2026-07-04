@@ -21,7 +21,7 @@ export default async function ProjectBoardPage({
     board = await getBoardForProject(supabase, slug);
   } catch {
     return (
-      <div className="p-6 text-red-700">
+      <div className="p-6 text-[var(--flag-critical)]">
         Proyek tidak ditemukan: <code>{slug}</code>
         <div className="mt-3"><Link href="/" className="underline">← kembali</Link></div>
       </div>
@@ -68,19 +68,19 @@ export default async function ProjectBoardPage({
               </Link>
               <Link
                 href={`/project/${board.project.project_code}/rooms`}
-                className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+                className="text-xs font-semibold uppercase tracking-wide text-[var(--sand-dark)] hover:text-[var(--sand-darker)]"
               >
                 Ruangan →
               </Link>
               <Link
                 href={`/project/${board.project.project_code}/activity`}
-                className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+                className="text-xs font-semibold uppercase tracking-wide text-[var(--sand-dark)] hover:text-[var(--sand-darker)]"
               >
                 Aktivitas →
               </Link>
               <Link
                 href={`/project/${board.project.project_code}/schedule`}
-                className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+                className="text-xs font-semibold uppercase tracking-wide text-[var(--sand-dark)] hover:text-[var(--sand-darker)]"
               >
                 Jadwal & Readiness →
               </Link>

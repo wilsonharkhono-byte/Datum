@@ -60,7 +60,7 @@ export function NotificationBadgeClient({
     <Link
       href="/notifications"
       aria-label={ariaLabel}
-      className="relative inline-flex items-center gap-1.5 rounded border border-[#B5AFA8] bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]"
+      className="relative inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]"
     >
       <BellIcon size={13} />
       {count > 0 ? (

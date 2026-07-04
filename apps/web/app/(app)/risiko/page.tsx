@@ -3,9 +3,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getProjectsSlipRisk } from "@/lib/steps/slip-risk-queries";
 
 const LEVEL: Record<string, { label: string; cls: string }> = {
-  behind: { label: "Terlambat", cls: "bg-red-100 text-red-800" },
-  at_risk: { label: "Berisiko", cls: "bg-amber-100 text-amber-800" },
-  on_track: { label: "Aman", cls: "bg-green-100 text-green-800" },
+  behind: { label: "Terlambat", cls: "bg-[var(--flag-critical-bg)] text-[var(--flag-critical)]" },
+  at_risk: { label: "Berisiko", cls: "bg-[var(--flag-high-bg)] text-[var(--flag-high)]" },
+  on_track: { label: "Aman", cls: "bg-[var(--flag-ok-bg)] text-[var(--flag-ok)]" },
 };
 
 export default async function SlipRiskPage() {
@@ -16,11 +16,11 @@ export default async function SlipRiskPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
-      <h1 className="text-2xl font-semibold text-[#141210]">Risiko Keterlambatan</h1>
-      <p className="mt-1 text-sm text-[#524E49]">Proyek aktif diurutkan dari yang paling berisiko terlambat, beserta penyebab utamanya.</p>
+      <h1 className="text-2xl font-semibold text-[var(--foreground)]">Risiko Keterlambatan</h1>
+      <p className="mt-1 text-sm text-[var(--text-secondary)]">Proyek aktif diurutkan dari yang paling berisiko terlambat, beserta penyebab utamanya.</p>
 
       {rows.length === 0 ? (
-        <div className="mt-6 rounded border border-dashed border-[#B5AFA8] p-6 text-center text-sm italic text-[#524E49]">
+        <div className="mt-6 rounded border border-dashed border-[var(--border)] p-6 text-center text-sm italic text-[var(--text-secondary)]">
           Tidak ada proyek aktif.
         </div>
       ) : null}
@@ -36,7 +36,7 @@ export default async function SlipRiskPage() {
                   {r.project.code} · {r.project.name}
                 </Link>
                 <span className="flex-1" />
-                {r.risk.behindCount > 0 ? <span className="text-[10px] text-red-700">{r.risk.behindCount} terlambat</span> : null}
+                {r.risk.behindCount > 0 ? <span className="text-[10px] text-[var(--flag-critical)]">{r.risk.behindCount} terlambat</span> : null}
                 {r.risk.atRiskCount > 0 ? <span className="text-[10px] text-[var(--sand-dark)]">{r.risk.atRiskCount} berisiko</span> : null}
               </div>
               {r.risk.bottleneck ? (
@@ -45,7 +45,7 @@ export default async function SlipRiskPage() {
                 </p>
               ) : null}
               {r.forecast.slipDays != null ? (
-                <p className={`mt-0.5 text-[11px] ${r.forecast.slipDays > 0 ? "text-red-700" : "text-[var(--text-muted)]"}`}>
+                <p className={`mt-0.5 text-[11px] ${r.forecast.slipDays > 0 ? "text-[var(--flag-critical)]" : "text-[var(--text-muted)]"}`}>
                   Perkiraan handover {r.forecast.projectedHandover ?? "—"}
                   {r.forecast.slipDays > 0
                     ? ` · +${r.forecast.slipDays} hari dari target${r.forecast.worstArea ? ` (${r.forecast.worstArea.areaName})` : ""}`

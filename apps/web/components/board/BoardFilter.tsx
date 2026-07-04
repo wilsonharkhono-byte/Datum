@@ -98,7 +98,7 @@ export function BoardFilter({
         ) : null}
       </button>
 
-      <span className="ml-auto text-[10px] text-[#7A6B56] md:hidden">
+      <span className="ml-auto text-[10px] text-[var(--sand-dark)] md:hidden">
         {matched === total ? `${total}` : `${matched}/${total}`}
       </span>
 
@@ -124,7 +124,7 @@ export function BoardFilter({
       {/* Filter groups: own collapsible row on mobile; inline at md+. */}
       <div className={`w-full flex-wrap items-center gap-2 md:contents ${showFilters ? "flex" : "hidden"}`}>
         <div className="flex w-full items-center justify-between md:contents">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7A6B56] md:ml-2">status</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--sand-dark)] md:ml-2">status</span>
           {showFilters ? (
             <button
               type="button"
@@ -152,7 +152,7 @@ export function BoardFilter({
             );
           })}
         </div>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7A6B56] md:ml-2">perlu</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--sand-dark)] md:ml-2">perlu</span>
         <div className="flex flex-wrap gap-1.5">
           {(Object.keys(LABEL_FILTER_LABELS) as LabelFilterKind[]).map((k) => {
             const on = labelFilter.has(k);
@@ -171,7 +171,7 @@ export function BoardFilter({
         </div>
       </div>
 
-      <span className="ml-auto hidden text-[10px] text-[#7A6B56] md:inline">
+      <span className="ml-auto hidden text-[10px] text-[var(--sand-dark)] md:inline">
         {matched === total ? `${total} kartu` : `${matched} dari ${total} kartu cocok`}
       </span>
     </div>

@@ -46,7 +46,7 @@ export function AddCardForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-1 w-full rounded border border-dashed border-[#B5AFA8] px-2 py-1.5 text-left text-[11px] font-medium text-[#7A6B56] hover:border-[#7A6B56] hover:bg-white"
+        className="mt-1 w-full rounded border border-dashed border-[var(--border)] px-2 py-1.5 text-left text-[11px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-white"
       >
         + tambah kartu
       </button>
@@ -54,7 +54,7 @@ export function AddCardForm({
   }
 
   return (
-    <form onSubmit={submit} className="mt-1 rounded border border-[#B5AFA8] bg-white p-2">
+    <form onSubmit={submit} className="mt-1 rounded border border-[var(--border)] bg-white p-2">
       <input
         autoFocus
         value={title}
@@ -64,12 +64,12 @@ export function AddCardForm({
         maxLength={120}
         className="w-full rounded border border-[var(--border)] px-2 py-1 text-xs focus:border-[var(--sand-dark)] focus:outline-none"
       />
-      {error ? <div className="mt-1 text-[10px] text-red-700">{error}</div> : null}
+      {error ? <div className="mt-1 text-[10px] text-[var(--flag-critical)]">{error}</div> : null}
       <div className="mt-1.5 flex gap-1">
         <button
           type="submit"
           disabled={addCard.isPending || !title.trim()}
-          className="rounded bg-[#141210] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
+          className="rounded bg-[var(--foreground)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--surface)] disabled:bg-[var(--text-muted)]"
         >
           {addCard.isPending ? "Menyimpan…" : "Simpan"}
         </button>
@@ -81,7 +81,7 @@ export function AddCardForm({
             setError(null);
           }}
           disabled={addCard.isPending}
-          className="rounded px-3 py-1 text-[10px] font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
+          className="rounded px-3 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
         >
           Batal
         </button>

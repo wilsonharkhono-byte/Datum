@@ -27,7 +27,7 @@ export default async function ProjectSchedulePage({
     .maybeSingle();
   if (!project) {
     return (
-      <div className="p-6 text-red-700">
+      <div className="p-6 text-[var(--flag-critical)]">
         Proyek tidak ditemukan: <code>{slug}</code>
         <div className="mt-3"><Link href="/" className="underline">← kembali</Link></div>
       </div>
@@ -78,13 +78,13 @@ export default async function ProjectSchedulePage({
       ) : null}
 
       <header className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--sand-dark)]">
           Jadwal & Readiness
         </p>
-        <h1 className="text-2xl font-semibold text-[#141210]">
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">
           {project.project_code} · {project.project_name}
         </h1>
-        <p className="mt-1 text-sm text-[#524E49]">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Status per area × gate, dihitung dari card_events oleh rule engine v{RULE_VERSION}.
           {latest?.last_recomputed_at ? (
             <> Terakhir dihitung: <span className="font-medium">{new Date(latest.last_recomputed_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</span>.</>
@@ -159,13 +159,14 @@ export default async function ProjectSchedulePage({
           areas={matrix?.areas ?? []}
           gates={(matrix?.gates ?? []).map((c) => ({ code: c, name: c }))}
           cells={scheduleCells}
+          todayIso={jakartaToday}
         />
       </section>
 
       {matrix ? (
         <AreaGateMatrix data={matrix} />
       ) : (
-        <div className="rounded border border-[#B5AFA8] bg-[#FDFAF6] p-6 text-sm text-[#524E49]">
+        <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-secondary)]">
           Matrix belum tersedia.
         </div>
       )}

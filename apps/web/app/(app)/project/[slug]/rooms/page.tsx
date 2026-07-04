@@ -18,7 +18,7 @@ export default async function ProjectRoomsPage({
   const data = await getProjectRooms(slug);
   if (!data) {
     return (
-      <div className="p-6 text-red-700">
+      <div className="p-6 text-[var(--flag-critical)]">
         Proyek tidak ditemukan: <code>{slug}</code>
         <div className="mt-3">
           <Link href="/" className="underline">

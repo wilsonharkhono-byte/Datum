@@ -31,7 +31,7 @@ export function MoveCardControl({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Pindahkan kartu (sekarang di: ${currentName})`}
-        className="rounded border border-[#B5AFA8] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:bg-[#FDFAF6]"
+        className="rounded border border-[var(--border)] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:bg-[var(--surface)]"
         title={`Sekarang di: ${currentName}`}
       >
         pindahkan
@@ -81,7 +81,7 @@ export function MoveCardControl({
         onClick={submit}
         disabled={move.isPending || targetId === currentTopicId}
         aria-label="Pindah kartu ke kolom yang dipilih"
-        className="rounded bg-[#141210] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
+        className="rounded bg-[var(--foreground)] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--surface)] disabled:bg-[var(--text-muted)]"
       >
         {move.isPending ? "…" : "pindah"}
       </button>
@@ -90,11 +90,11 @@ export function MoveCardControl({
         onClick={() => { setOpen(false); setTargetId(currentTopicId); setError(null); }}
         disabled={move.isPending}
         aria-label="Batal pindahkan kartu"
-        className="rounded px-2 py-1 text-xs font-medium text-[#524E49] hover:bg-[var(--surface-alt)]"
+        className="rounded px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
       >
         batal
       </button>
-      {error ? <span className="text-[10px] text-red-700">{error}</span> : null}
+      {error ? <span className="text-[10px] text-[var(--flag-critical)]">{error}</span> : null}
     </div>
   );
 }
