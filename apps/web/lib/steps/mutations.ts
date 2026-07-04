@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 import { backScheduleSteps } from "@/lib/steps/back-schedule";
 import { projectStepStatus } from "@/lib/steps/status";
-import type { TradeStepDep, TradeStepTemplate } from "@/lib/steps/types";
+import type { TradeStepTemplate } from "@/lib/steps/types";
+import { getTradeStepDeps } from "@/lib/steps/reference";
 import type { SelectedMatch } from "@/lib/steps/infer";
 
 /** Call the SQL instantiation function for an area (idempotent). */
@@ -29,9 +30,7 @@ export async function writePlannedDates(
     .select("gate_code, target_start_date, target_end_date")
     .eq("area_id", areaId);
   if (gatesErr) throw gatesErr;
-  const { data: deps, error: depsErr } = await supabase
-    .from("trade_step_deps").select("step_code, predecessor_code");
-  if (depsErr) throw depsErr;
+  const deps = await getTradeStepDeps(supabase);
 
   for (const g of gates ?? []) {
     if (!g.target_start_date || !g.target_end_date) continue;
@@ -42,7 +41,7 @@ export async function writePlannedDates(
     if (tmplErr) throw tmplErr;
     const plan = backScheduleSteps(
       (tmpl ?? []) as unknown as TradeStepTemplate[],
-      (deps ?? []) as TradeStepDep[],
+      deps,
       { start: g.target_start_date, end: g.target_end_date },
     );
     for (const [code, win] of plan) {
