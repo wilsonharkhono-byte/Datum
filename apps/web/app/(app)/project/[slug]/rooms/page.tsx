@@ -3,6 +3,7 @@ import { getProjectRooms } from "@/lib/rooms/queries";
 import { getRoomStepViews } from "@/lib/steps/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { RoomsView } from "@/components/rooms/RoomsView";
+import { AreaGatesRefresher } from "@/components/realtime/AreaGatesRefresher";
 
 export default async function ProjectRoomsPage({
   params,
@@ -35,5 +36,10 @@ export default async function ProjectRoomsPage({
     data.rooms.map((r) => ({ areaId: r.areaId, areaType: r.areaType })),
   );
 
-  return <RoomsView data={data} now={Date.now()} stepViews={stepViews} />;
+  return (
+    <>
+      <AreaGatesRefresher projectId={data.projectId} />
+      <RoomsView data={data} now={Date.now()} stepViews={stepViews} />
+    </>
+  );
 }

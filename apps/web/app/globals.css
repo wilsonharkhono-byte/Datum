@@ -17,6 +17,7 @@
   /* Brand accent (sand) */
   --sand: #b29f86;
   --sand-dark: #7a6b56;
+  --sand-darker: #3a3527;      /* hover shade for sand-dark text / foreground buttons */
   --sand-tint: rgba(178, 159, 134, 0.12);
 
   /* Borders */
@@ -46,6 +47,7 @@
   --color-text-muted: var(--text-muted);
   --color-sand: var(--sand);
   --color-sand-dark: var(--sand-dark);
+  --color-sand-darker: var(--sand-darker);
   --color-border-brand: var(--border);
   --color-flag-ok: var(--flag-ok);
   --color-flag-info: var(--flag-info);

@@ -20,25 +20,35 @@ export function NotificationBadgeClient({
   useEffect(() => {
     if (!staffId) return;
     let refreshing = false;
-    const unsubscribe = subscribeToOwnNotifications(staffId, async (delta) => {
-      if (delta.kind === "insert") {
-        setCount((c) => c + 1);
-      } else {
-        // On any update (mark-read), refetch the canonical count via the API.
-        // Use a tiny route that returns just { count }.
-        if (refreshing) return;
-        refreshing = true;
-        try {
-          const res = await fetch("/api/notifications/unread-count", { cache: "no-store" });
-          if (res.ok) {
-            const data = await res.json();
-            if (typeof data?.count === "number") setCount(data.count);
-          }
-        } finally {
-          refreshing = false;
+    // Refetch the canonical count via a tiny route that returns just { count }.
+    async function refreshCount() {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const res = await fetch("/api/notifications/unread-count", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (typeof data?.count === "number") setCount(data.count);
         }
+      } finally {
+        refreshing = false;
       }
-    });
+    }
+    const unsubscribe = subscribeToOwnNotifications(
+      staffId,
+      (delta) => {
+        if (delta.kind === "insert") {
+          setCount((c) => c + 1);
+        } else {
+          // Any update (mark-read) → resync with the server.
+          void refreshCount();
+        }
+      },
+      (h) => {
+        // Inserts during a channel outage were missed — resync on recovery.
+        if (h === "recovered") void refreshCount();
+      },
+    );
     return unsubscribe;
   }, [staffId]);
 

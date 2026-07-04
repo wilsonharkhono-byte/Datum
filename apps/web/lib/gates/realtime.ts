@@ -1,16 +1,16 @@
 "use client";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
-  subscribeToProjectChanges as core,
-  type CardsChange,
+  subscribeToAreaGateChanges as core,
+  type AreaGatesChange,
   type ChannelHealth,
 } from "@datum/core";
 
-export type { CardsChange, ChannelHealth };
+export type { AreaGatesChange, ChannelHealth };
 
-export function subscribeToProjectChanges(
+export function subscribeToAreaGateChanges(
   projectId: string,
-  onChange: (c: CardsChange) => void,
+  onChange: (c: AreaGatesChange) => void,
   onHealth?: (h: ChannelHealth) => void,
 ): () => void {
   return core(createSupabaseBrowserClient(), projectId, onChange, onHealth);

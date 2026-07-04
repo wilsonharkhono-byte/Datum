@@ -10,6 +10,7 @@ import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedul
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
 import { getProjectStepSignals } from "@/lib/steps/queries";
 import { SignalSummaryPanel } from "@/components/schedule/SignalSummaryPanel";
+import { AreaGatesRefresher } from "@/components/realtime/AreaGatesRefresher";
 
 export default async function ProjectSchedulePage({
   params,
@@ -62,6 +63,7 @@ export default async function ProjectSchedulePage({
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4">
+      <AreaGatesRefresher projectId={project.id} />
       <div className="mb-3 flex items-center justify-between">
         <Link href={`/project/${project.project_code}`} className="text-xs text-[var(--text-muted)] hover:underline">
           ← {project.project_code} Board
