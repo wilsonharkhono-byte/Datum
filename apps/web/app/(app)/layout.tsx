@@ -52,7 +52,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               {canManageAccess(staff) && (
                 <Link
                   href="/library/steps"
-                  className="hidden rounded border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)] sm:inline-flex"
+                  className="hidden rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)] sm:inline-flex"
                 >
                   Pustaka Langkah
                 </Link>

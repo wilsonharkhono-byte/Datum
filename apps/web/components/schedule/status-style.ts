@@ -7,7 +7,7 @@
  *  and only exist here — keep this module the single source. */
 export const STATUS_STYLE: Record<string, { bg: string; fg: string; border: string }> = {
   not_started:       { bg: "#e9e5dd", fg: "var(--text-secondary)", border: "#cfc8bc" },
-  in_progress:       { bg: "rgba(230, 81, 0, 0.18)",  fg: "#9a3c00", border: "var(--flag-warning)" },
+  in_progress:       { bg: "rgba(161, 98, 7, 0.18)",  fg: "#6b4a03", border: "var(--flag-warning)" },
   ready_for_handoff: { bg: "rgba(21, 101, 192, 0.18)", fg: "#0d3d77", border: "var(--flag-info)" },
   blocked:           { bg: "rgba(191, 54, 12, 0.18)",  fg: "#7a2208", border: "var(--flag-high)" },
   passed:            { bg: "rgba(61, 139, 64, 0.18)",  fg: "#235425", border: "var(--flag-ok)" },

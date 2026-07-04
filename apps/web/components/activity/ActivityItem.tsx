@@ -16,7 +16,7 @@ const KIND_COLOR: Record<string, string> = {
 export function ActivityItem({ item }: { item: Item }) {
   const cardHref = `/project/${item.projectCode}/cards/${item.cardSlug}`;
   return (
-    <li className="rounded border border-[var(--border)] bg-white p-3 text-xs">
+    <li className="rounded border border-[var(--border)] bg-[var(--surface-bright)] p-3 text-xs">
       <div className="mb-1 flex flex-col gap-0.5 text-[10px] sm:flex-row sm:items-center sm:justify-between sm:gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide ${KIND_COLOR[item.kind] ?? ""}`}>

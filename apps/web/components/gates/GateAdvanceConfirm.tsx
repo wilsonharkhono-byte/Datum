@@ -218,7 +218,7 @@ export function GateAdvanceConfirm({
                         aria-hidden
                         className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${
                           on
-                            ? "border-[var(--flag-ok)] bg-[var(--flag-ok)] text-white"
+                            ? "border-[var(--flag-ok)] bg-[var(--flag-ok)] text-[var(--text-inverse)]"
                             : "border-[var(--sand-dark)] bg-[var(--surface)]"
                         }`}
                       >
@@ -266,7 +266,7 @@ export function GateAdvanceConfirm({
             type="button"
             onClick={confirm}
             disabled={pending}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded bg-foreground px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_2px_6px_-1px_rgba(122,107,86,0.4)] hover:bg-[var(--sand-dark)] disabled:opacity-60"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded bg-foreground px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-inverse)] shadow-[0_2px_6px_-1px_rgba(122,107,86,0.4)] hover:bg-[var(--sand-dark)] disabled:opacity-60"
           >
             <CheckIcon size={13} />
             {pending ? "Menyimpan…" : "Tandai selesai"}

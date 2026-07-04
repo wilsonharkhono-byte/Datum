@@ -71,7 +71,7 @@ export default async function SearchPage({
             </h2>
             <ol className="space-y-2">
               {items.map((h) => (
-                <li key={h.id} className="rounded border border-[var(--border)] bg-white p-3 text-sm">
+                <li key={h.id} className="rounded border border-[var(--border)] bg-[var(--surface-bright)] p-3 text-sm">
                   <div className="mb-1 flex items-center justify-between text-[10px]">
                     <span className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide ${KIND_COLOR[h.kind]}`}>
                       {KIND_LABEL[h.kind]}

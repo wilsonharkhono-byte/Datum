@@ -47,7 +47,7 @@ export function AddColumnForm({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="h-full w-full rounded border border-dashed border-[var(--border)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-white"
+          className="h-full w-full rounded border border-dashed border-[var(--border)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--surface-bright)]"
         >
           + tambah kolom
         </button>
@@ -57,7 +57,7 @@ export function AddColumnForm({
 
   return (
     <div className="flex flex-shrink-0 flex-col rounded bg-[var(--oat-deep)]/40 p-2 md:w-56">
-      <form onSubmit={submit} className="rounded border border-[var(--border)] bg-white p-2">
+      <form onSubmit={submit} className="rounded border border-[var(--border)] bg-[var(--surface-bright)] p-2">
         <input
           autoFocus
           value={name}

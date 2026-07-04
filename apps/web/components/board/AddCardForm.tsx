@@ -46,7 +46,7 @@ export function AddCardForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-1 w-full rounded border border-dashed border-[var(--border)] px-2 py-1.5 text-left text-[11px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-white"
+        className="mt-1 w-full rounded border border-dashed border-[var(--border)] px-2 py-1.5 text-left text-[11px] font-medium text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--surface-bright)]"
       >
         + tambah kartu
       </button>
@@ -54,7 +54,7 @@ export function AddCardForm({
   }
 
   return (
-    <form onSubmit={submit} className="mt-1 rounded border border-[var(--border)] bg-white p-2">
+    <form onSubmit={submit} className="mt-1 rounded border border-[var(--border)] bg-[var(--surface-bright)] p-2">
       <input
         autoFocus
         value={title}

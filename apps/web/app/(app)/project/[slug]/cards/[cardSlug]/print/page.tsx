@@ -1,3 +1,6 @@
+// Print pages intentionally use grayscale Tailwind stone-* classes and plain
+// white, NOT the brand CSS-variable tokens: this output is designed for B/W
+// printing/PDF export. Exempt from the "always use CSS variables" rule.
 import { getProjectBySlug } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCardWithTimeline, getCardComments, getProjectTopics } from "@/lib/cards/queries";

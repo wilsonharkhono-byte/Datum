@@ -68,7 +68,7 @@ export function CommentItem({
   }
 
   return (
-    <li className="rounded border border-[var(--border)] bg-white px-3 py-2 text-sm">
+    <li className="rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-2 text-sm">
       <div className="mb-1 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
         <span>
           {new Date(comment.created_at).toLocaleString("id-ID", {
@@ -96,7 +96,7 @@ export function CommentItem({
             onClick={softDelete}
             disabled={pending}
             aria-label="Ya, hapus komentar ini"
-            className="min-h-11 rounded bg-[var(--flag-critical)] px-2 py-1 text-xs font-semibold text-white hover:bg-[var(--flag-critical)]/90 disabled:opacity-50 md:min-h-0"
+            className="min-h-11 rounded bg-[var(--flag-critical)] px-2 py-1 text-xs font-semibold text-[var(--text-inverse)] hover:bg-[var(--flag-critical)]/90 disabled:opacity-50 md:min-h-0"
           >
             {pending ? "Menghapus…" : "Ya, hapus"}
           </button>

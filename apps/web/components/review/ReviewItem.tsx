@@ -139,7 +139,7 @@ export function ReviewItem({ draft }: { draft: Draft }) {
               type="button"
               onClick={approve}
               aria-label="Setujui dan tambahkan ke kartu"
-              className="inline-flex items-center gap-1.5 rounded bg-[var(--flag-ok)] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_2px_6px_-1px_rgba(61,139,64,0.4)] hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded bg-[var(--flag-ok)] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-inverse)] shadow-[0_2px_6px_-1px_rgba(61,139,64,0.4)] hover:opacity-90"
             >
               <CheckIcon size={13} /> Setujui & tambah ke kartu
             </button>
@@ -156,7 +156,7 @@ export function ReviewItem({ draft }: { draft: Draft }) {
                   type="button"
                   onClick={reject}
                   aria-label="Konfirmasi tolak"
-                  className="rounded bg-[var(--flag-critical)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white"
+                  className="rounded bg-[var(--flag-critical)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--text-inverse)]"
                 >
                   Tolak
                 </button>
