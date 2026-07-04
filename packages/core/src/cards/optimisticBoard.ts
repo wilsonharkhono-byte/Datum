@@ -44,6 +44,21 @@ export function applyAddCard(board: Board, topicId: string, title: string, id?: 
   return matched ? { ...board, columns } : board;
 }
 
+/** Pure: remove a card (typically a failed optimistic ghost) by id from
+    whatever column holds it. Unknown id returns the board unchanged. Exists
+    for surgical rollback: restoring a whole pre-mutation snapshot in onError
+    clobbers sibling in-flight optimistic updates; removing only this
+    mutation's ghost composes under concurrency. */
+export function removeCardById(board: Board, cardId: string): Board {
+  let matched = false;
+  const columns = board.columns.map((col) => {
+    if (!col.cards.some((c) => c.id === cardId)) return col;
+    matched = true;
+    return { ...col, cards: col.cards.filter((c) => c.id !== cardId) };
+  });
+  return matched ? { ...board, columns } : board;
+}
+
 /** Pure: move a card to `newTopicId`. Removes it from its current column and
     appends it to the target. Unknown card id returns the board unchanged.
     Never mutates `board`. */

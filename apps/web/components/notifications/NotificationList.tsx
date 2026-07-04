@@ -53,7 +53,7 @@ export function NotificationList({ items }: { items: Notification[] }) {
               onClick={markAll}
               disabled={busy}
               aria-label="Tandai semua notifikasi sebagai dibaca"
-              className="inline-flex min-h-11 items-center justify-center rounded border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)] disabled:opacity-50 md:min-h-0"
+              className="inline-flex min-h-11 items-center justify-center rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)] disabled:opacity-50 md:min-h-0"
             >
               tandai semua dibaca
             </button>

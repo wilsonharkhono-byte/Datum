@@ -9,6 +9,7 @@
   --oat-line: #eae4da;          /* subtle divider on oat cards */
   --surface: #fdfaf6;           /* warm near-white — cards */
   --surface-alt: #f2efe9;       /* warmer off-white — inactive */
+  --surface-bright: #ffffff;    /* pure white — chips that pop above --surface */
 
   /* Text */
   --foreground: #141210;        /* warm near-black */
@@ -30,12 +31,12 @@
   /* Status — the flag system */
   --flag-ok: #3d8b40;
   --flag-info: #1565c0;
-  --flag-warning: #e65100;
+  --flag-warning: #a16207;     /* gold — deliberately yellow-leaning so it reads apart from --flag-high */
   --flag-high: #bf360c;
   --flag-critical: #c62828;
   --flag-ok-bg: rgba(61, 139, 64, 0.08);
   --flag-info-bg: rgba(21, 101, 192, 0.08);
-  --flag-warning-bg: rgba(230, 81, 0, 0.10);
+  --flag-warning-bg: rgba(161, 98, 7, 0.10);
   --flag-high-bg: rgba(191, 54, 12, 0.10);
   --flag-critical-bg: rgba(198, 40, 40, 0.08);
 }
@@ -45,6 +46,7 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-alt: var(--surface-alt);
+  --color-surface-bright: var(--surface-bright);
   --color-oat-deep: var(--oat-deep);
   --color-oat-raised: var(--oat-raised);
   --color-oat-card: var(--oat-card);

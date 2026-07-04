@@ -56,7 +56,7 @@ export function MessageInput({
         <button
           type="submit"
           disabled={disabled || (value.trim().length === 0 && !file)}
-          className="inline-flex min-h-11 items-center justify-center rounded bg-foreground px-4 py-1.5 text-xs font-semibold text-white disabled:bg-[var(--text-muted)] md:min-h-0"
+          className="inline-flex min-h-11 items-center justify-center rounded bg-foreground px-4 py-1.5 text-xs font-semibold text-[var(--text-inverse)] disabled:bg-[var(--text-muted)] md:min-h-0"
         >
           Kirim
         </button>

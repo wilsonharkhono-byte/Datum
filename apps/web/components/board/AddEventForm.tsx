@@ -358,7 +358,7 @@ export function AddEventForm({
             setFiles(list);
             setUploadError(null);
           }}
-          className="block w-full text-xs text-[var(--text-secondary)] file:mr-3 file:rounded file:border file:border-[var(--border)] file:bg-white file:px-3 file:py-1 file:text-[10px] file:font-semibold file:uppercase file:tracking-wide file:text-[var(--text-secondary)] hover:file:bg-[var(--surface)]"
+          className="block w-full text-xs text-[var(--text-secondary)] file:mr-3 file:rounded file:border file:border-[var(--border)] file:bg-[var(--surface-bright)] file:px-3 file:py-1 file:text-[10px] file:font-semibold file:uppercase file:tracking-wide file:text-[var(--text-secondary)] hover:file:bg-[var(--surface)]"
         />
         {files.length > 0 ? (
           <div className="mt-1 text-[10px] text-[var(--text-muted)]">

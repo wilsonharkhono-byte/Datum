@@ -283,7 +283,7 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
             type="button"
             onClick={handleSave}
             aria-label={confirmArmed ? "Konfirmasi simpan proposal ke kartu" : "Simpan proposal ke kartu"}
-            className={`inline-flex items-center gap-1.5 rounded px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_2px_6px_-1px_rgba(122,107,86,0.4)] ${
+            className={`inline-flex items-center gap-1.5 rounded px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-inverse)] shadow-[0_2px_6px_-1px_rgba(122,107,86,0.4)] ${
               confirmArmed
                 ? "bg-[var(--flag-warning)] hover:opacity-90"
                 : "bg-foreground hover:bg-[var(--sand-dark)]"

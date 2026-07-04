@@ -58,13 +58,13 @@ export default async function HomePage() {
           <Link href="/projects/new" aria-label="Buat proyek baru" className="rounded bg-[var(--foreground)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-inverse)] hover:bg-[var(--sand-dark)]">
             + Buat proyek
           </Link>
-          <Link href="/activity" aria-label="Aktivitas terbaru" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
+          <Link href="/activity" aria-label="Aktivitas terbaru" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
             <ClipboardIcon size={13} /> Aktivitas terbaru
           </Link>
-          <Link href="/brief" aria-label="Morning brief" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
+          <Link href="/brief" aria-label="Morning brief" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
             <BookIcon size={13} /> Morning brief
           </Link>
-          <Link href="/search" aria-label="Cari" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
+          <Link href="/search" aria-label="Cari" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
             <SearchIcon size={13} /> Cari
           </Link>
         </div>
