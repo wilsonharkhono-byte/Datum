@@ -10,6 +10,8 @@
  *
  * Deep-link parsing: web link paths are mapped to mobile routes:
  *   /project/{code}/cards/{slug}  →  /(tabs)/(matrix)/project/{code}/card/{slug}
+ *   /project/{code}/schedule      →  /(tabs)/(matrix)/project/{code}/schedule
+ *   /project/{code}/rooms         →  /(tabs)/(matrix)/project/{code}/rooms
  *   /review                       →  /(tabs)/(matrix)/review
  *   (anything else)               →  /(tabs)/(matrix)  (index fallback)
  */
@@ -33,13 +35,14 @@ import type { Notification, ActivityItem } from "@datum/core";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const KIND_LABEL: Record<string, string> = {
-  mention:          "Mention",
-  watcher_event:    "Aktivitas",
-  card_status:      "Status kartu",
-  draft_pending:    "Draft menunggu",
-  draft_approved:   "Draft disetujui",
-  draft_rejected:   "Draft ditolak",
-  review_assigned:  "Review ditugaskan",
+  mention:            "Mention",
+  watcher_event:      "Aktivitas",
+  card_status:        "Status kartu",
+  draft_pending:      "Draft menunggu",
+  draft_approved:     "Draft disetujui",
+  draft_rejected:     "Draft ditolak",
+  review_assigned:    "Review ditugaskan",
+  readiness_reminder: "Pengingat",
 };
 
 // ─── Deep-link parser ─────────────────────────────────────────────────────────
@@ -49,6 +52,8 @@ const KIND_LABEL: Record<string, string> = {
  *
  * Web formats:
  *   /project/{code}/cards/{slug}  →  /(tabs)/(matrix)/project/{code}/card/{slug}
+ *   /project/{code}/schedule      →  /(tabs)/(matrix)/project/{code}/schedule
+ *   /project/{code}/rooms         →  /(tabs)/(matrix)/project/{code}/rooms
  *   /review                       →  /(tabs)/(matrix)/review
  *   (other)                       →  /(tabs)/(matrix)
  */
@@ -57,6 +62,12 @@ function parseLink(link: string): string {
   const cardMatch = /^\/project\/([^/]+)\/cards\/([^/]+)/.exec(link);
   if (cardMatch) {
     return `/(tabs)/(matrix)/project/${cardMatch[1]}/card/${cardMatch[2]}`;
+  }
+  // /project/{code}/schedule (readiness reminders) and
+  // /project/{code}/rooms (unconfirmed AI-block notifications)
+  const projectViewMatch = /^\/project\/([^/]+)\/(schedule|rooms)(?:[/?#]|$)/.exec(link);
+  if (projectViewMatch) {
+    return `/(tabs)/(matrix)/project/${projectViewMatch[1]}/${projectViewMatch[2]}`;
   }
   // /review
   if (/^\/review/.test(link)) {

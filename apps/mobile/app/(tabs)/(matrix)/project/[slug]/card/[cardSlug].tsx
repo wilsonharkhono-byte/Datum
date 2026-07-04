@@ -6,12 +6,15 @@
  *  - useCardComments(cardId)       → comments
  *  - useCardMembers(cardId)        → members (with staff)
  *  - useCardAttachments(cardId)    → attachments keyed by event id
+ *  - useCardAreas(cardId)          → linked areas
+ *  - useAreas(projectId)           → project areas (picker candidates)
  *
  * Write actions (this task):
  *  - MobileAddEventForm            → useAddEvent (collapsed "+ Catat aktivitas")
  *  - CommentInput / DeletableCommentItem → useAddComment / useDeleteComment / useEditComment
  *  - MemberPicker / RemovableMemberRow  → useAddMember / useRemoveMember
  *  - ResolveButton                 → useResolveEvent (shown on open-loop events)
+ *  - CardAreas                     → useLinkCardArea / useUnlinkCardArea
  *
  * Attachment upload is scoped to "view + caption" (existing read screen).
  * Native file picker is a TODO noted in MobileAddEventForm.
@@ -37,11 +40,13 @@ import { MobileAddEventForm } from "@/components/card/AddEventForm";
 import { CommentInput, DeletableCommentItem } from "@/components/card/CommentInput";
 import { MemberPicker, RemovableMemberRow } from "@/components/card/MemberPicker";
 import { ResolveButton } from "@/components/card/ResolveButton";
+import { CardAreas } from "@/components/card/CardAreas";
 import {
   useCard,
   useCardComments,
   useCardMembers,
   useCardAttachments,
+  useCardAreas,
 } from "@/lib/query/hooks";
 import { useProjectRealtime } from "@/lib/realtime/useRealtimeInvalidation";
 import { useSession } from "@/lib/session/session";
@@ -105,6 +110,7 @@ export default function CardDetailScreen() {
   const commentsQuery = useCardComments(cardId);
   const membersQuery = useCardMembers(cardId);
   const attachmentsQuery = useCardAttachments(cardId);
+  const areasQuery = useCardAreas(cardId);
 
   // Realtime — invalidate card + board on project changes
   useProjectRealtime(card?.project_id, code);
@@ -179,6 +185,24 @@ export default function CardDetailScreen() {
           <Text variant="secondary" className="mb-3 leading-snug">
             {card.current_summary}
           </Text>
+        ) : null}
+
+        {/* ── Area terkait ── */}
+        <SectionHeader title="Area terkait" />
+
+        {areasQuery.isPending ? (
+          <Skeleton className="h-10 w-full" />
+        ) : areasQuery.isError ? (
+          <Text variant="muted" className="italic">
+            Gagal memuat area.
+          </Text>
+        ) : cardId ? (
+          <CardAreas
+            cardId={cardId}
+            projectId={card.project_id}
+            code={code}
+            currentAreas={areasQuery.data ?? []}
+          />
         ) : null}
 
         {/* ── Aktivitas (timeline) ── */}

@@ -117,6 +117,10 @@ export default async function CardDetailPage({
                 cardSlug={cardSlug}
                 cardCode={project.project_code}
                 cardQuerySlug={cardSlug}
+                cardTitle={detail.card.title}
+                topicName={topicName === "—" ? null : topicName}
+                hasLinkedArea={cardAreas.length > 0}
+                projectAreas={projectAreas}
               />
             }
             moveControl={

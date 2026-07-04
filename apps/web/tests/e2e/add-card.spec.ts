@@ -13,8 +13,10 @@ test("creates a new card via + tambah kartu in a column", async ({ page }) => {
   // Use a unique title (timestamp suffix) so this test is idempotent
   const title = `E2E test card ${Date.now()}`;
 
-  // Find any "+ tambah kartu" button and click it (use .first() since every column has one)
-  await page.getByText("+ tambah kartu").first().click();
+  // Find any "+ tambah kartu" button and click it (use .first() since every column has one).
+  // Target the button by role: empty columns also render the literal text "+ tambah kartu"
+  // inside a help paragraph, and getByText would match that inert <p> first.
+  await page.getByRole("button", { name: "+ tambah kartu" }).first().click();
 
   // The form input has placeholder "Judul kartu — contoh..."
   const titleInput = page.getByPlaceholder(/Judul kartu/);
