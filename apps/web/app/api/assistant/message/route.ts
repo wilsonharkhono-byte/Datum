@@ -10,6 +10,7 @@ import {
   type AssistantStream,
 } from "@/lib/assistant/anthropic";
 import { ensureSession, recordExchange } from "@/lib/assistant/audit";
+import { getCurrentStaff } from "@datum/core";
 import { ChatRequest } from "@/lib/assistant/types";
 
 /**
@@ -34,9 +35,8 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   // staff.id is a PK that references auth.users(id) directly
-  const { data: staff, error: staffErr } = await supabase
-    .from("staff").select("id").eq("id", user.id).maybeSingle();
-  if (staffErr || !staff) {
+  const staff = await getCurrentStaff(supabase);
+  if (!staff) {
     return NextResponse.json(
       { error: "no_staff_record", message: "Akun Anda belum terdaftar sebagai staf di DATUM." },
       { status: 403 },

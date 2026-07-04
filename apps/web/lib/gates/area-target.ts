@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentStaff } from "@/lib/auth/get-current-user";
-import { setAreaTargetDate as coreSetAreaTargetDate } from "@datum/core";
+import { setAreaTargetDate as coreSetAreaTargetDate, getProjectCodeById } from "@datum/core";
 
 // A "use server" file may only export async functions. Types only here; the
 // TargetInput schema value is imported from "@datum/core" directly where needed.
@@ -30,16 +30,10 @@ export async function setAreaTargetDate(input: {
 
   if (result.ok) {
     // Re-baselining shifts derived gate windows → refresh schedule + board.
-    // We need the project_code for the path. Re-query it (RLS already checked
-    // inside core, so this is safe and cheap).
-    const { data: project } = await supabase
-      .from("projects")
-      .select("project_code")
-      .eq("id", input.projectId)
-      .maybeSingle();
-    if (project) {
-      revalidatePath(`/project/${project.project_code}/schedule`);
-      revalidatePath(`/project/${project.project_code}`);
+    const code = await getProjectCodeById(supabase, input.projectId);
+    if (code) {
+      revalidatePath(`/project/${code}/schedule`);
+      revalidatePath(`/project/${code}`);
     }
   }
 

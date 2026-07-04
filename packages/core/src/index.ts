@@ -37,6 +37,7 @@ export {
 // ─── Project by slug (settings header) ───────────────────────────────────────
 export {
   getProjectBySlug,
+  getProjectCodeById,
   type ProjectSettingsRow,
 } from "./projects/by-slug";
 

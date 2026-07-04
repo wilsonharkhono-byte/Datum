@@ -1,32 +1,21 @@
 import Link from "next/link";
+import { listPendingCardEventDrafts, type PendingDraft } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ReviewItem } from "@/components/review/ReviewItem";
 
 export default async function ReviewPage() {
   const supabase = await createSupabaseServerClient();
 
-  const { data: drafts, error } = await supabase
-    .from("data_drafts")
-    .select(`
-      id, project_id, draft_type, proposed_payload, risk_level, status,
-      source_type, original_input_text, created_at, created_by_staff_id,
-      projects:project_id (project_code, project_name),
-      created_by:created_by_staff_id (full_name)
-    `)
-    .eq("status", "draft")
-    .eq("draft_type", "card_event")
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error) {
+  let items: PendingDraft[];
+  try {
+    items = await listPendingCardEventDrafts(supabase);
+  } catch (e) {
     return (
       <div className="mx-auto w-full max-w-4xl p-4 text-[var(--flag-critical)] sm:p-6">
-        Gagal memuat: {error.message}
+        Gagal memuat: {(e as Error).message}
       </div>
     );
   }
-
-  const items = drafts ?? [];
 
   return (
     <div className="bg-[var(--background)] py-4 md:py-6">

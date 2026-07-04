@@ -35,3 +35,24 @@ export async function getProjectBySlug(
   if (error) throw error;
   return (data as ProjectSettingsRow | null) ?? null;
 }
+
+/**
+ * Reverse lookup: project_code by id, for revalidatePath after a successful
+ * write. Fail-soft by design — the write already succeeded, so a failed
+ * lookup must not fail the action; it logs and the caller skips revalidation.
+ */
+export async function getProjectCodeById(
+  supabase: DatumClient,
+  projectId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("project_code")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (error) {
+    console.error(`[projects] code lookup failed for ${projectId} — revalidation will be skipped: ${error.message}`);
+    return null;
+  }
+  return data?.project_code ?? null;
+}
