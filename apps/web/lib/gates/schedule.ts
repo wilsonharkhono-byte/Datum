@@ -9,7 +9,7 @@ import {
   getCardNextDeadline as coreGetCardNextDeadline,
   recomputeProjectSchedule as coreRecomputeProjectSchedule,
 } from "@datum/core";
-import { writePlannedDates } from "@/lib/steps/mutations";
+import { cascadePlannedDates } from "@/lib/steps/mutations";
 
 // Re-export types from core so existing web importers are unbroken.
 export type { ScheduledCell } from "@datum/core";
@@ -74,17 +74,7 @@ export async function recomputeProjectSchedule(formData: FormData): Promise<Sche
   const result = await coreRecomputeProjectSchedule(supabase, input.projectId);
   if (result.ok) {
     // Cascade the freshly-computed gate windows onto area_steps.planned_*.
-    // Best-effort per area — one area's step-template gap must not abort the
-    // whole project's backfill.
-    const { data: areas } = await supabase
-      .from("areas").select("id").eq("project_id", input.projectId);
-    for (const area of areas ?? []) {
-      try {
-        await writePlannedDates(supabase, area.id);
-      } catch (e) {
-        console.warn(`[schedule] writePlannedDates failed for area ${area.id}:`, (e as Error).message);
-      }
-    }
+    await cascadePlannedDates(supabase, input.projectId);
     revalidatePath(`/project/${input.projectCode}/schedule`);
   }
   return result;

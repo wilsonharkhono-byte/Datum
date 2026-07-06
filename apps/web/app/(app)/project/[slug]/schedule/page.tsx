@@ -10,8 +10,11 @@ import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
-import { getProjectStepSignals } from "@/lib/steps/queries";
+import { getProjectStepSignals, groupSignalsByStep } from "@/lib/steps/queries";
 import { SignalSummaryPanel } from "@/components/schedule/SignalSummaryPanel";
+import { CollapsibleSection } from "@/components/schedule/CollapsibleSection";
+import { HealthStrip } from "@/components/schedule/HealthStrip";
+import { summarizeSchedule } from "@/components/schedule/health-summary";
 import { AreaGatesRefresher } from "@/components/realtime/AreaGatesRefresher";
 
 export default async function ProjectSchedulePage({
@@ -62,6 +65,27 @@ export default async function ProjectSchedulePage({
   const { count: staleCount } = must(staleRes, "schedule.staleCount");
   const { data: latest } = must(latestRes, "schedule.lastRecompute");
 
+  // Collapse the flat signal list to one row per (area × step) so the panel
+  // reads as a to-do list rather than 5 near-duplicate rows per step.
+  const groupedSignals = groupSignalsByStep(projectSignals);
+  const health = summarizeSchedule(projectSignals, scheduleCells, jakartaToday);
+
+  // Gantt date span for the collapsed section subtitle.
+  const scheduledDates = scheduleCells
+    .flatMap((c) => [c.target_start_date, c.target_end_date])
+    .filter((d): d is string => d !== null)
+    .sort();
+  const dateFmt = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const ganttSpan =
+    scheduledDates.length > 0
+      ? `${dateFmt(scheduledDates[0]!)} – ${dateFmt(scheduledDates[scheduledDates.length - 1]!)}`
+      : undefined;
+
+  const areasWithTarget = matrix
+    ? matrix.areas.filter((a) => areaTargets.get(a.id)).length
+    : 0;
+
   return (
     <div className="mx-auto w-full max-w-6xl p-4">
       <AreaGatesRefresher projectId={project.id} projectEvents />
@@ -90,23 +114,45 @@ export default async function ProjectSchedulePage({
         </h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Status per area × gate, dihitung dari card_events oleh rule engine v{RULE_VERSION}.
-          {latest?.last_recomputed_at ? (
-            <> Terakhir dihitung: <span className="font-medium">{new Date(latest.last_recomputed_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</span>.</>
-          ) : (
+          {latest?.last_recomputed_at ? null : (
             <> Belum pernah dihitung — klik &quot;hitung ulang readiness&quot; di kanan atas.</>
           )}
         </p>
       </header>
 
-      <section className="mb-4">
-        <RulesViewer />
-      </section>
+      <HealthStrip health={health} lastRecomputedAt={latest?.last_recomputed_at ?? null} />
+
+      <SignalSummaryPanel signals={groupedSignals} />
+
+      <CollapsibleSection title="Gantt rencana" subtitle={ganttSpan} defaultOpen={false}>
+        <Gantt
+          areas={matrix?.areas ?? []}
+          gates={(matrix?.gates ?? []).map((c) => ({ code: c, name: c }))}
+          cells={scheduleCells}
+          todayIso={jakartaToday}
+        />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Matrix area × gate"
+        badge={matrix ? `${matrix.areas.length} area` : undefined}
+        defaultOpen={false}
+      >
+        {matrix ? (
+          <AreaGateMatrix data={matrix} />
+        ) : (
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-secondary)]">
+            Matrix belum tersedia.
+          </div>
+        )}
+      </CollapsibleSection>
 
       {matrix && matrix.areas.length > 0 ? (
-        <section className="mb-6">
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
-            Target handover per area
-          </h2>
+        <CollapsibleSection
+          title="Target handover per area"
+          badge={`${areasWithTarget} target`}
+          defaultOpen={false}
+        >
           <p className="mb-3 text-xs text-[var(--text-secondary)]">
             Set tanggal target nyata per area. Jika diisi, window gate area itu
             dihitung mundur dari target (gate H berakhir di tanggal target),
@@ -150,30 +196,12 @@ export default async function ProjectSchedulePage({
               );
             })}
           </div>
-        </section>
+        </CollapsibleSection>
       ) : null}
 
-      <SignalSummaryPanel signals={projectSignals} />
-
-      <section className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
-          Gantt rencana
-        </h2>
-        <Gantt
-          areas={matrix?.areas ?? []}
-          gates={(matrix?.gates ?? []).map((c) => ({ code: c, name: c }))}
-          cells={scheduleCells}
-          todayIso={jakartaToday}
-        />
+      <section className="mb-4">
+        <RulesViewer />
       </section>
-
-      {matrix ? (
-        <AreaGateMatrix data={matrix} />
-      ) : (
-        <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-secondary)]">
-          Matrix belum tersedia.
-        </div>
-      )}
     </div>
   );
 }

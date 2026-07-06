@@ -15,9 +15,12 @@ export default async function SlipRiskPage() {
   const rows = await getProjectsSlipRisk(supabase, today, now);
 
   return (
-    <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
-      <h1 className="text-2xl font-semibold text-[var(--foreground)]">Risiko Keterlambatan</h1>
-      <p className="mt-1 text-sm text-[var(--text-secondary)]">Proyek aktif diurutkan dari yang paling berisiko terlambat, beserta penyebab utamanya.</p>
+    <div className="mx-auto w-full max-w-4xl p-4">
+      <header className="mb-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--sand-dark)]">Analisa proyek</p>
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Risiko Keterlambatan</h1>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Proyek aktif diurutkan dari yang paling berisiko terlambat, beserta penyebab utamanya.</p>
+      </header>
 
       {rows.length === 0 ? (
         <div className="mt-6 rounded border border-dashed border-[var(--border)] p-6 text-center text-sm italic text-[var(--text-secondary)]">

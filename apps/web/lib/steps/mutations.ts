@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
-import { backScheduleSteps } from "@/lib/steps/back-schedule";
+import { backScheduleSteps, daysBetween, addDays } from "@/lib/steps/back-schedule";
 import { projectStepStatus } from "@/lib/steps/status";
 import type { TradeStepTemplate } from "@/lib/steps/types";
 import { getTradeStepDeps } from "@/lib/steps/reference";
@@ -18,6 +18,12 @@ export async function instantiateAreaSteps(
 /**
  * Compute planned windows for an area's steps from each gate's target window
  * and persist them onto area_steps. Gates with no target window are skipped.
+ *
+ * Honors the area's handover target (areas.target_date): the same translation
+ * overlayAreaTargetDates applies read-time to the Gantt — shift every gate
+ * window so the last gate ends on the target — is applied here before
+ * back-scheduling, so reminders and planned dates agree with what the
+ * schedule page shows.
  */
 export async function writePlannedDates(
   supabase: SupabaseClient<Database>,
@@ -30,25 +36,74 @@ export async function writePlannedDates(
     .select("gate_code, target_start_date, target_end_date")
     .eq("area_id", areaId);
   if (gatesErr) throw gatesErr;
+  const { data: area, error: areaErr } = await supabase
+    .from("areas")
+    .select("project_id, target_date")
+    .eq("id", areaId)
+    .single();
+  if (areaErr) throw areaErr;
   const deps = await getTradeStepDeps(supabase);
+
+  // Overlay delta (days): mirror overlayAreaTargetDates — anchor on the
+  // highest gate code that has a stored end date, shift all windows so that
+  // gate ends on areas.target_date. 0 when no target (kickoff schedule as-is).
+  let delta = 0;
+  if (area.target_date) {
+    const anchor = (gates ?? [])
+      .filter((g) => g.target_end_date)
+      .sort((a, b) => a.gate_code.localeCompare(b.gate_code))
+      .pop();
+    if (anchor?.target_end_date) {
+      delta = daysBetween(anchor.target_end_date, area.target_date);
+    }
+  }
 
   for (const g of gates ?? []) {
     if (!g.target_start_date || !g.target_end_date) continue;
+    // Global templates + this project's custom steps (Approach-B rows) — both
+    // are instantiated on areas, so both need planned windows.
     const { data: tmpl, error: tmplErr } = await supabase
       .from("trade_steps")
       .select("code, gate_code, name, step_type, trade_role, typical_duration_days, lead_time_days, sort_order, applicability")
-      .eq("gate_code", g.gate_code).eq("active", true).is("project_id", null);
+      .eq("gate_code", g.gate_code).eq("active", true)
+      .or(`project_id.is.null,project_id.eq.${area.project_id}`);
     if (tmplErr) throw tmplErr;
     const plan = backScheduleSteps(
       (tmpl ?? []) as unknown as TradeStepTemplate[],
       deps,
-      { start: g.target_start_date, end: g.target_end_date },
+      {
+        start: delta === 0 ? g.target_start_date : addDays(g.target_start_date, delta),
+        end: delta === 0 ? g.target_end_date : addDays(g.target_end_date, delta),
+      },
     );
     for (const [code, win] of plan) {
       const { error: writeErr } = await supabase.from("area_steps")
         .update({ planned_start: win.planned_start, planned_end: win.planned_end })
         .eq("area_id", areaId).eq("step_code", code);
       if (writeErr) throw writeErr;
+    }
+  }
+}
+
+/**
+ * Re-derive planned step windows for EVERY area of a project. Best-effort per
+ * area — one area's template gap must not abort the rest. Call after anything
+ * that moves gate windows: kickoff_date change (the DB trigger recomputes
+ * area_gate_status synchronously inside the UPDATE, so windows are fresh by
+ * the time this runs) or an area handover target change.
+ */
+export async function cascadePlannedDates(
+  supabase: SupabaseClient<Database>,
+  projectId: string,
+): Promise<void> {
+  const { data: areas, error } = await supabase
+    .from("areas").select("id").eq("project_id", projectId);
+  if (error) throw error;
+  for (const area of areas ?? []) {
+    try {
+      await writePlannedDates(supabase, area.id);
+    } catch (e) {
+      console.warn(`[steps] writePlannedDates failed for area ${area.id}:`, (e as Error).message);
     }
   }
 }
