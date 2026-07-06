@@ -10,7 +10,7 @@ function sig(severity: ProjectStepSignalRow["signal"]["severity"]): ProjectStepS
     stepCode: "s1",
     stepName: "Step 1",
     tradeRole: null,
-    signal: { kind: "behind_plan", severity, message: "m", detail: null } as ProjectStepSignalRow["signal"],
+    signal: { stepCode: "s1", kind: "behind_plan", severity, message: "m", detail: undefined },
   };
 }
 

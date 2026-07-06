@@ -87,7 +87,7 @@ describe("updateProject", () => {
   it("does not include project_code in the patch when omitted", async () => {
     const { supabase, update } = makeMockSupabase();
     await updateProject(supabase, { projectId, projectName: "New name" });
-    const patch = update.mock.calls[0][0];
+    const patch = update.mock.calls[0]![0];
     expect(patch).not.toHaveProperty("project_code");
     expect(patch).toHaveProperty("project_name", "New name");
   });
