@@ -21,6 +21,7 @@ export function ProjectInfoForm({ project }: { project: Project }) {
   const formId = useId();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [code, setCode] = useState(project.project_code);
   const [name, setName] = useState(project.project_name);
   const [client, setClient] = useState(project.client_name ?? "");
   const [location, setLocation] = useState(project.location ?? "");
@@ -35,8 +36,11 @@ export function ProjectInfoForm({ project }: { project: Project }) {
     e.preventDefault();
     setError(null);
     setSaved(false);
+    const nextCode = code.trim().toUpperCase();
+    const codeChanged = nextCode !== project.project_code;
     const fd = new FormData();
     fd.set("projectId", project.id);
+    fd.set("projectCode", nextCode);
     fd.set("projectName", name.trim());
     fd.set("clientName", client.trim());
     fd.set("location", location.trim());
@@ -48,7 +52,13 @@ export function ProjectInfoForm({ project }: { project: Project }) {
       if (res.ok) {
         setSaved(true);
         queryClient.invalidateQueries({ queryKey: keys.projects() });
-        router.refresh();
+        if (codeChanged) {
+          // The code is the URL slug — the current URL now points at the old
+          // code, so navigate to the renamed project instead of refreshing.
+          router.replace(`/project/${nextCode}/settings?tab=proyek`);
+        } else {
+          router.refresh();
+        }
         setTimeout(() => setSaved(false), 3000);
       } else {
         setError(res.error);
@@ -64,6 +74,23 @@ export function ProjectInfoForm({ project }: { project: Project }) {
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 sm:col-span-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--sand-dark)]">Kode proyek</span>
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            disabled={pending}
+            minLength={2}
+            maxLength={40}
+            required
+            pattern="[A-Z0-9\-]+"
+            title="Hanya huruf besar, angka, dan tanda hubung"
+            className="rounded border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-sm uppercase tracking-wide focus:border-[var(--sand-dark)] focus:outline-none"
+          />
+          <span className="text-[10px] text-[var(--text-muted)]">
+            Kode ini dipakai sebagai alamat (URL) proyek. Mengubahnya akan mengubah link proyek.
+          </span>
+        </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--sand-dark)]">Nama proyek</span>
           <input
@@ -144,7 +171,7 @@ export function ProjectInfoForm({ project }: { project: Project }) {
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending || !name.trim()}
+          disabled={pending || !name.trim() || code.trim().length < 2}
           className="rounded bg-[var(--foreground)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-inverse)] hover:bg-[var(--sand-dark)] disabled:bg-[var(--text-muted)]"
         >
           {pending ? "Menyimpan…" : "Simpan perubahan"}

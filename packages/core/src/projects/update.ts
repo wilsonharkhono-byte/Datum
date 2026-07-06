@@ -23,6 +23,14 @@ export const PROJECT_STATUS = [
  */
 export const UpdateProjectInput = z.object({
   projectId:       z.string().uuid(),
+  // Same shape as CreateProjectInput.projectCode. The DB column is `unique`;
+  // a collision surfaces as a friendly error from the mutation below.
+  projectCode:     z
+    .string()
+    .min(2)
+    .max(40)
+    .regex(/^[A-Z0-9-]+$/, "Hanya huruf besar, angka, dan tanda hubung")
+    .optional(),
   projectName:     z.string().min(1).max(120).optional(),
   clientName:      z.string().max(120).nullable().optional(),
   location:        z.string().max(200).nullable().optional(),
@@ -57,6 +65,7 @@ export async function updateProject(
 ): Promise<UpdateProjectResult> {
   // Build the patch object with only the fields that were provided.
   const patch: Database["public"]["Tables"]["projects"]["Update"] = {};
+  if (input.projectCode !== undefined)    patch.project_code = input.projectCode;
   if (input.projectName !== undefined)    patch.project_name = input.projectName;
   if (input.clientName !== undefined)     patch.client_name = input.clientName;
   if (input.location !== undefined)       patch.location = input.location;
@@ -97,7 +106,14 @@ export async function updateProject(
     .from("projects")
     .update(patch)
     .eq("id", input.projectId);
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // Unique-violation on project_code — surface a friendly message
+    // instead of the raw Postgres error (mirrors createProject).
+    if (error.code === "23505" && input.projectCode !== undefined) {
+      return { ok: false, error: `Kode proyek "${input.projectCode}" sudah dipakai` };
+    }
+    return { ok: false, error: error.message };
+  }
 
   return { ok: true };
 }
