@@ -62,6 +62,7 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
   try {
     input = UpdateProjectInput.parse({
       projectId:       formData.get("projectId"),
+      projectCode:     formData.get("projectCode") ? String(formData.get("projectCode")).trim().toUpperCase() : undefined,
       projectName:     formData.get("projectName") || undefined,
       clientName:      formData.get("clientName") === null ? undefined : (formData.get("clientName") === "" ? null : formData.get("clientName")),
       location:        formData.get("location") === null ? undefined : (formData.get("location") === "" ? null : formData.get("location")),
@@ -89,10 +90,15 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
 
   if (result.ok) {
     revalidatePath("/");
-    if (existingCode) {
-      revalidatePath(`/project/${existingCode}`);
-      revalidatePath(`/project/${existingCode}/settings`);
-      revalidatePath(`/project/${existingCode}/schedule`);
+    // Revalidate both the old and (if renamed) the new code's paths so neither
+    // the stale nor the fresh URL serves a cached copy.
+    const codes = new Set<string>();
+    if (existingCode) codes.add(existingCode);
+    if (input.projectCode) codes.add(input.projectCode);
+    for (const code of codes) {
+      revalidatePath(`/project/${code}`);
+      revalidatePath(`/project/${code}/settings`);
+      revalidatePath(`/project/${code}/schedule`);
     }
   }
 
