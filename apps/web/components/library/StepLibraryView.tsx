@@ -54,10 +54,10 @@ function StepEditor({ step, onDone }: { step: StandardStep; onDone: () => void }
         <input value={name} disabled={pending} onChange={(e) => setName(e.target.value)} placeholder="Nama langkah"
           className="min-h-11 flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 md:min-h-0" />
         <select value={stepType} disabled={pending} onChange={(e) => setStepType(e.target.value)}
-          className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 md:min-h-0">
+          className="select-brand-sm min-h-11 md:min-h-0">
           {TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
-        <input value={trade} disabled={pending} onChange={(e) => setTrade(e.target.value)} placeholder="Trade (mis. tukang_marmer)"
+        <input value={trade} disabled={pending} onChange={(e) => setTrade(e.target.value)} placeholder="Tukang (mis. tukang_marmer)"
           className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 md:min-h-0" />
         <label className="flex items-center gap-1">Durasi
           <input value={dur} disabled={pending} inputMode="numeric" onChange={(e) => setDur(e.target.value.replace(/[^0-9]/g, ""))}
@@ -114,13 +114,13 @@ function GateSection({ g }: { g: StandardLibraryGate }) {
       {g.active.map((s, i) => (
         <div key={s.code}>
           <div className="flex items-center gap-2 border-t border-[var(--border)] px-4 py-2 text-[13px]">
-            <div className="flex flex-col">
-              <button type="button" disabled={pending || i === 0} onClick={() => move(i, -1)} className="min-h-11 text-[10px] leading-none text-[var(--text-muted)] disabled:opacity-30 md:min-h-0">▲</button>
-              <button type="button" disabled={pending || i === g.active.length - 1} onClick={() => move(i, 1)} className="min-h-11 text-[10px] leading-none text-[var(--text-muted)] disabled:opacity-30 md:min-h-0">▼</button>
+            <div className="flex flex-col gap-0.5">
+              <button type="button" aria-label="Naikkan" disabled={pending || i === 0} onClick={() => move(i, -1)} className="flex min-h-11 items-center justify-center rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 text-[10px] leading-none text-[var(--sand-dark)] disabled:opacity-30 md:min-h-6">▲</button>
+              <button type="button" aria-label="Turunkan" disabled={pending || i === g.active.length - 1} onClick={() => move(i, 1)} className="flex min-h-11 items-center justify-center rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 text-[10px] leading-none text-[var(--sand-dark)] disabled:opacity-30 md:min-h-6">▼</button>
             </div>
             <span className="rounded bg-[var(--sand-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">{TYPE_LABEL[s.step_type] ?? s.step_type}</span>
             <span className="flex-1 text-[var(--foreground)]">{s.name}</span>
-            <span className="text-[10px] text-[var(--text-muted)]">{s.typical_duration_days}h/lead {s.lead_time_days}h</span>
+            <span className="text-[10px] text-[var(--text-muted)]">Durasi {s.typical_duration_days}h · Lead {s.lead_time_days}h</span>
             <button type="button" onClick={() => setEditing(editing === s.code ? null : s.code)}
               className="min-h-11 rounded border border-[var(--border)] px-2 py-0.5 text-[11px] font-semibold text-[var(--sand-dark)] md:min-h-0">Ubah</button>
             <button type="button" disabled={pending} onClick={() => run(() => setStandardStepActive({ code: s.code, active: false }))}
@@ -150,8 +150,17 @@ function GateSection({ g }: { g: StandardLibraryGate }) {
 }
 
 export function StepLibraryView({ library }: { library: StandardLibraryGate[] }) {
+  // "Empty" = no gates at all, or every gate has zero steps (active + inactive).
+  // The per-gate AddStandardStepForm still renders below so the pustaka can be
+  // seeded — the notice just explains the blank slate.
+  const isEmpty = library.length === 0 || library.every((g) => g.active.length === 0 && g.inactive.length === 0);
   return (
     <div className="flex flex-col gap-3">
+      {isEmpty ? (
+        <div className="rounded border border-dashed border-[var(--border)] p-6 text-center text-sm italic text-[var(--text-secondary)]">
+          Belum ada langkah di pustaka. Tambahkan langkah standar di bawah.
+        </div>
+      ) : null}
       {library.map((g) => <GateSection key={g.gate} g={g} />)}
     </div>
   );

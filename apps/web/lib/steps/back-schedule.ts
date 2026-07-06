@@ -10,15 +10,26 @@ export function addDays(iso: string, n: number): string {
   return new Date(d.getTime() + n * DAY_MS).toISOString().slice(0, 10);
 }
 
-function maxIso(a: string, b: string): string {
-  return a >= b ? a : b;
+/** Whole-day difference (later − earlier) between two YYYY-MM-DD dates. */
+export function daysBetween(fromIso: string, toIso: string): number {
+  const a = new Date(fromIso + "T00:00:00Z").getTime();
+  const b = new Date(toIso + "T00:00:00Z").getTime();
+  return Math.round((b - a) / DAY_MS);
 }
 
 /**
  * Assign a planned window to every step.
  *
- * - site_work / inspection: forward pass. start = max(window.start, latest
- *   planned_end of its site/inspection predecessors); end = start + duration.
+ * - site_work / inspection: forward pass in day-offsets from window.start
+ *   (start = latest end of physical predecessors; end = start + duration),
+ *   then the whole chain is DILATED to fill the gate window: every offset is
+ *   scaled by windowDays / chainDays (only when the window is longer than the
+ *   chain). A gate window is a span of weeks, not a sprint — without dilation
+ *   every step bunches at the window start, each step's window is only its
+ *   typical duration, and every reminder for the gate fires at once. With it,
+ *   steps share the window proportionally and the last physical step ends on
+ *   window.end, which is also what anchors area handover targets (gate H ends
+ *   on the target).
  * - decision / procurement: back pass. end = (earliest dependent's planned_start
  *   - 1 day); start = end - (lead_time + duration). Dependents are resolved
  *   transitively so a decision gating a procurement gating site work lands first.
@@ -47,7 +58,10 @@ export function backScheduleSteps(
     return t === "site_work" || t === "inspection";
   };
 
-  // Forward pass for physical steps (topological by physical predecessors).
+  // Forward pass for physical steps (topological by physical predecessors),
+  // in whole-day offsets from window.start.
+  const startOff = new Map<string, number>();
+  const endOff = new Map<string, number>();
   const physical = steps.filter((s) => isPhysical(s.code));
   const done = new Set<string>();
   let guard = physical.length * physical.length + 1;
@@ -56,13 +70,25 @@ export function backScheduleSteps(
       if (done.has(s.code)) continue;
       const physicalPreds = predsOf.get(s.code)!.filter(isPhysical);
       if (!physicalPreds.every((p) => done.has(p))) continue;
-      const start = physicalPreds.reduce(
-        (acc, p) => maxIso(acc, planned.get(p)!.planned_end),
-        window.start,
-      );
-      planned.set(s.code, { planned_start: start, planned_end: addDays(start, s.typical_duration_days) });
+      const start = physicalPreds.reduce((acc, p) => Math.max(acc, endOff.get(p)!), 0);
+      startOff.set(s.code, start);
+      endOff.set(s.code, start + s.typical_duration_days);
       done.add(s.code);
     }
+  }
+
+  // Dilate the chain onto the window (never compress: factor >= 1, so a window
+  // shorter than the chain keeps honest overrun past window.end). Math.round on
+  // monotone offsets keeps successor starts aligned with predecessor ends.
+  const chainDays = Math.max(0, ...endOff.values());
+  const windowDays = daysBetween(window.start, window.end);
+  const factor = chainDays > 0 && windowDays > chainDays ? windowDays / chainDays : 1;
+  for (const s of physical) {
+    if (!startOff.has(s.code)) continue; // unresolved (cyclic deps) — skip
+    planned.set(s.code, {
+      planned_start: addDays(window.start, Math.round(startOff.get(s.code)! * factor)),
+      planned_end: addDays(window.start, Math.round(endOff.get(s.code)! * factor)),
+    });
   }
 
   // Back pass for decision/procurement steps. Resolve from the earliest planned

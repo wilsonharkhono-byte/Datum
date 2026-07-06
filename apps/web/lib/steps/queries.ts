@@ -292,6 +292,30 @@ export async function getProjectStepSignals(
   return allSignalRows;
 }
 
+/**
+ * One reminder row per step: the flat signal list can carry up to 5 signals
+ * for a single step (behind_plan + lead_time_risk + stale_decision …), which
+ * reads as near-duplicate rows. Collapse to the highest-severity signal per
+ * (areaId, stepCode) — input is already severity-sorted, so the first row wins
+ * — and count the collapsed rest so the UI can show "+N sinyal lain".
+ * Pure + unit-testable.
+ */
+export type GroupedStepSignal = ProjectStepSignalRow & { otherSignalCount: number };
+
+export function groupSignalsByStep(rows: ProjectStepSignalRow[]): GroupedStepSignal[] {
+  const byStep = new Map<string, GroupedStepSignal>();
+  for (const row of rows) {
+    const key = `${row.areaId}:${row.stepCode}`;
+    const existing = byStep.get(key);
+    if (existing) {
+      existing.otherSignalCount += 1;
+    } else {
+      byStep.set(key, { ...row, otherSignalCount: 0 });
+    }
+  }
+  return [...byStep.values()];
+}
+
 /** Steps for an area plus the per-area flags (siap dimulai / perlu keputusan / blocked). */
 export async function getAreaStepView(
   supabase: SupabaseClient<Database>,

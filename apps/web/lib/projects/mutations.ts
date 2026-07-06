@@ -12,6 +12,7 @@ import {
   updateProject as coreUpdateProject,
   getProjectCodeById,
 } from "@datum/core";
+import { cascadePlannedDates } from "@/lib/steps/mutations";
 
 export type { CreateProjectResult } from "@datum/core";
 export type { UpdateProjectResult } from "@datum/core";
@@ -85,9 +86,25 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
   // Fetch the project_code for revalidation *before* the update
   const existingCode = await getProjectCodeById(supabase, input.projectId);
 
+  // Pre-read kickoff so the (expensive) planned-dates cascade below only runs
+  // when the kickoff actually moved — the settings form always submits the
+  // field, changed or not.
+  let previousKickoff: string | null = null;
+  if (input.kickoffDate !== undefined) {
+    const { data: prev } = await supabase
+      .from("projects").select("kickoff_date").eq("id", input.projectId).maybeSingle();
+    previousKickoff = prev?.kickoff_date ?? null;
+  }
+
   const result = await coreUpdateProject(supabase, input);
 
   if (result.ok) {
+    if (input.kickoffDate !== undefined && input.kickoffDate !== previousKickoff) {
+      // The DB trigger already recomputed area_gate_status windows inside the
+      // UPDATE; cascade them onto area_steps.planned_* so step reminders track
+      // the new kickoff instead of the schedule the areas were created under.
+      await cascadePlannedDates(supabase, input.projectId);
+    }
     revalidatePath("/");
     if (existingCode) {
       revalidatePath(`/project/${existingCode}`);
