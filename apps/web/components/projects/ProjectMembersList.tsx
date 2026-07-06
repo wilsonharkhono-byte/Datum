@@ -100,7 +100,7 @@ export function ProjectMembersList({
         </tbody>
       </table>
       {error ? (
-        <div className="border-t border-[var(--border)] bg-[var(--flag-critical-bg)] px-3 py-2 text-xs text-[var(--flag-critical)]">
+        <div className="flag-pop border-t border-[var(--border)] bg-[var(--flag-critical-bg)] px-3 py-2 text-xs text-[var(--flag-critical)]">
           {error}
         </div>
       ) : null}

@@ -447,7 +447,10 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
             On mobile (when onClose is provided), shows a close button instead. */}
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[var(--text-inverse)]">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)]">
+            {/* The wordmark is redundant inside the dock (the dark bar IS the
+                assistant) — hide it below sm so the segmented control and
+                actions fit one row on phones. */}
+            <span className="hidden items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)] sm:inline-flex">
               <SparkIcon size={12} /> Asisten
             </span>
             <div className="seg" role="tablist" aria-label="Mode asisten">
@@ -567,7 +570,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           of the notch/status bar and the input clear of the home indicator. */}
       {mobileOpen ? (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] md:hidden"
+          className="sheet-in fixed inset-0 z-50 flex flex-col bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] md:hidden"
         >
           {renderDock(() => setMobileOpen(false))}
         </div>

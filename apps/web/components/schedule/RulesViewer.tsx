@@ -126,7 +126,11 @@ export function RulesViewer() {
         </span>
       </button>
 
-      {open && (
+      {/* Always mounted so the grid-rows reveal can animate open/closed; the
+          .reveal CSS flips collapsed content to visibility:hidden, keeping it
+          out of tab order and the accessibility tree. */}
+      <div className="reveal" data-open={open}>
+        <div>
         <div
           className="space-y-6 border-t px-4 py-4 text-sm"
           style={{ borderColor: "var(--border)", color: "var(--foreground)" }}
@@ -284,7 +288,8 @@ export function RulesViewer() {
             <code className="rounded bg-[var(--surface-alt)] px-1 not-italic">RULE_VERSION</code>.
           </p>
         </div>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

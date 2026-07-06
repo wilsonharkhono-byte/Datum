@@ -21,7 +21,7 @@ export default async function ProjectBoardPage({
     board = await getBoardForProject(supabase, slug);
   } catch {
     return (
-      <div className="p-6 text-red-700">
+      <div className="m-6 rounded border border-[var(--flag-critical)] bg-[var(--flag-critical-bg)] p-6 text-sm text-[var(--flag-critical)]">
         Proyek tidak ditemukan: <code>{slug}</code>
         <div className="mt-3"><Link href="/" className="underline">← kembali</Link></div>
       </div>

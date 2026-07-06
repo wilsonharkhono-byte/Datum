@@ -139,7 +139,70 @@ export function AreasManager({
           Belum ada area. Tambah area pertama di bawah untuk mengaktifkan matrix area × gate.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded border border-[var(--border)]">
+        <>
+        {/* Mobile (<md): stacked cards — the 7-column table (and its inline
+            edit row) only pans horizontally on a phone. Same md:hidden idiom
+            as area-gate-matrix and the Gantt fallback. */}
+        <div className="space-y-2 md:hidden">
+          {areas.map((a) =>
+            editingId === a.id ? (
+              <AreaCardEdit
+                key={a.id}
+                area={a}
+                pending={pending}
+                onCancel={cancelEdit}
+                onSave={(draft) => saveEdit(a, draft)}
+              />
+            ) : (
+              <div
+                key={a.id}
+                className="flex items-start justify-between gap-3 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5"
+              >
+                <div className="min-w-0">
+                  <div className="font-mono text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+                    {a.area_code}
+                  </div>
+                  <div className="mt-0.5 text-sm font-medium text-[var(--foreground)]">
+                    {a.area_name}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--text-secondary)]">
+                    <span>Lantai {a.floor ?? "—"}</span>
+                    <span>{fmtAreaType(a.area_type)}</span>
+                    <span className="tabular-nums">{fmtSqm(a.area_sqm)} m²</span>
+                    <span className="tabular-nums text-[var(--text-muted)]">
+                      Urutan {a.sort_order}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-stretch gap-1">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(a.id)}
+                    disabled={pending}
+                    aria-label={`Edit ${a.area_name}`}
+                    className="min-h-11 rounded border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
+                  >
+                    edit
+                  </button>
+                  {canDelete ? (
+                    <button
+                      type="button"
+                      onClick={() => remove(a)}
+                      disabled={pending}
+                      aria-label={`Hapus ${a.area_name} dari proyek`}
+                      className="min-h-11 rounded border border-[var(--border)] px-3 text-xs font-medium text-[var(--flag-critical)] hover:bg-[var(--flag-critical-bg)] disabled:opacity-50"
+                    >
+                      hapus
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+
+        {/* Desktop (md+): full table with inline edit row. */}
+        <div className="hidden overflow-x-auto rounded border border-[var(--border)] md:block">
           <table className="w-full min-w-[44rem] text-sm">
             <thead className="bg-[var(--foreground)] text-[var(--text-inverse)]">
               <tr>
@@ -211,12 +274,16 @@ export function AreasManager({
               )}
             </tbody>
           </table>
-          {error ? (
-            <div className="border-t border-[var(--border)] bg-[var(--flag-critical-bg)] px-3 py-2 text-xs text-[var(--flag-critical)]">
-              {error}
-            </div>
-          ) : null}
         </div>
+
+        {/* Shared error banner — the table is hidden on mobile, so this sits
+            outside both views. */}
+        {error ? (
+          <div className="flag-pop rounded border border-[var(--flag-critical)] bg-[var(--flag-critical-bg)] px-3 py-2 text-xs text-[var(--flag-critical)]">
+            {error}
+          </div>
+        ) : null}
+        </>
       )}
 
       <AddAreaForm
@@ -248,17 +315,7 @@ type AreaDraft = {
   sortOrder: string;
 };
 
-function AreaEditRow({
-  area,
-  pending,
-  onCancel,
-  onSave,
-}: {
-  area: Area;
-  pending: boolean;
-  onCancel: () => void;
-  onSave: (draft: AreaDraft) => void;
-}) {
+function useAreaDraft(area: Area) {
   const [draft, setDraft] = useState<AreaDraft>({
     areaCode:  area.area_code,
     areaName:  area.area_name,
@@ -271,6 +328,147 @@ function AreaEditRow({
   function update<K extends keyof AreaDraft>(k: K, v: AreaDraft[K]) {
     setDraft((d) => ({ ...d, [k]: v }));
   }
+
+  return { draft, update };
+}
+
+// Mobile (<md) edit form — full-width stacked fields inside the card, instead
+// of the desktop table's 7-cell inline row (whose inputs are unreachable
+// without horizontal panning on a phone).
+function AreaCardEdit({
+  area,
+  pending,
+  onCancel,
+  onSave,
+}: {
+  area: Area;
+  pending: boolean;
+  onCancel: () => void;
+  onSave: (draft: AreaDraft) => void;
+}) {
+  const formId = useId();
+  const { draft, update } = useAreaDraft(area);
+  const label =
+    "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]";
+  const input =
+    "w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-2 text-sm text-[var(--foreground)]";
+
+  return (
+    <div className="flag-pop grid gap-3 rounded border border-[var(--sand-dark)] bg-[var(--surface-alt)] p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor={`${formId}-code`} className={label}>Kode area</label>
+          <input
+            id={`${formId}-code`}
+            value={draft.areaCode}
+            onChange={(e) => update("areaCode", e.target.value)}
+            disabled={pending}
+            className={`${input} font-mono text-[12px]`}
+          />
+        </div>
+        <div>
+          <label htmlFor={`${formId}-floor`} className={label}>Lantai</label>
+          <input
+            id={`${formId}-floor`}
+            value={draft.floor}
+            onChange={(e) => update("floor", e.target.value)}
+            disabled={pending}
+            placeholder="Lt. 1"
+            className={input}
+          />
+        </div>
+      </div>
+      <div>
+        <label htmlFor={`${formId}-name`} className={label}>Nama area</label>
+        <input
+          id={`${formId}-name`}
+          value={draft.areaName}
+          onChange={(e) => update("areaName", e.target.value)}
+          disabled={pending}
+          className={input}
+        />
+      </div>
+      <div>
+        <label htmlFor={`${formId}-type`} className={label}>Jenis</label>
+        <select
+          id={`${formId}-type`}
+          value={draft.areaType}
+          onChange={(e) => update("areaType", e.target.value as AreaTypeValue)}
+          disabled={pending}
+          className="select-brand w-full"
+        >
+          {AREA_TYPE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor={`${formId}-sqm`} className={label}>Luas m²</label>
+          <input
+            id={`${formId}-sqm`}
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            value={draft.areaSqm}
+            onChange={(e) => update("areaSqm", e.target.value)}
+            disabled={pending}
+            placeholder="—"
+            className={`${input} text-right tabular-nums`}
+          />
+        </div>
+        <div>
+          <label htmlFor={`${formId}-sort`} className={label}>Urutan</label>
+          <input
+            id={`${formId}-sort`}
+            type="number"
+            inputMode="numeric"
+            step="1"
+            min="0"
+            value={draft.sortOrder}
+            onChange={(e) => update("sortOrder", e.target.value)}
+            disabled={pending}
+            className={`${input} text-right tabular-nums`}
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onSave(draft)}
+          disabled={pending || !draft.areaCode.trim() || !draft.areaName.trim()}
+          className="min-h-11 rounded bg-[var(--foreground)] px-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-inverse)] hover:bg-[var(--sand-dark)] disabled:bg-[var(--text-muted)]"
+        >
+          {pending ? "…" : "Simpan"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={pending}
+          className="min-h-11 rounded border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface)] disabled:opacity-50"
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AreaEditRow({
+  area,
+  pending,
+  onCancel,
+  onSave,
+}: {
+  area: Area;
+  pending: boolean;
+  onCancel: () => void;
+  onSave: (draft: AreaDraft) => void;
+}) {
+  const { draft, update } = useAreaDraft(area);
 
   return (
     <tr className="bg-[var(--surface-alt)]">
@@ -521,12 +719,12 @@ function AddAreaForm({
         </button>
       </div>
       {error ? (
-        <div className="rounded border border-[var(--flag-critical)] bg-[var(--flag-critical-bg)] px-3 py-2 text-xs text-[var(--flag-critical)] sm:col-span-2 lg:col-span-6">
+        <div className="flag-pop rounded border border-[var(--flag-critical)] bg-[var(--flag-critical-bg)] px-3 py-2 text-xs text-[var(--flag-critical)] sm:col-span-2 lg:col-span-6">
           {error}
         </div>
       ) : null}
       {success ? (
-        <div className="rounded border border-[var(--flag-ok)] bg-[var(--flag-ok-bg)] px-3 py-2 text-xs text-[var(--flag-ok)] sm:col-span-2 lg:col-span-6">
+        <div className="flag-pop rounded border border-[var(--flag-ok)] bg-[var(--flag-ok-bg)] px-3 py-2 text-xs text-[var(--flag-ok)] sm:col-span-2 lg:col-span-6">
           {success}
         </div>
       ) : null}

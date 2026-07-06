@@ -26,7 +26,7 @@ export default async function ProjectSchedulePage({
     .maybeSingle();
   if (!project) {
     return (
-      <div className="p-6 text-red-700">
+      <div className="m-6 rounded border border-[var(--flag-critical)] bg-[var(--flag-critical-bg)] p-6 text-sm text-[var(--flag-critical)]">
         Proyek tidak ditemukan: <code>{slug}</code>
         <div className="mt-3"><Link href="/" className="underline">← kembali</Link></div>
       </div>
@@ -61,7 +61,10 @@ export default async function ProjectSchedulePage({
     .maybeSingle();
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-4">
+    // No local padding — the (app) layout already provides the page gutters
+    // (px-2 py-2 sm:px-8 sm:py-8); a local p-4 double-padded desktop and
+    // misaligned this page against the rest of the app.
+    <div className="mx-auto w-full max-w-6xl">
       <div className="mb-3 flex items-center justify-between">
         <Link href={`/project/${project.project_code}`} className="text-xs text-[var(--text-muted)] hover:underline">
           ← {project.project_code} Board

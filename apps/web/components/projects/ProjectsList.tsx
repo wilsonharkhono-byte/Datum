@@ -88,13 +88,18 @@ export function ProjectsList({
                 <span>{isCollapsed ? "▸" : "▾"} {g.name} · {g.projects.length}</span>
                 {g.area_label ? <span className="font-medium text-[#B5AFA8]">{g.area_label}</span> : null}
               </button>
-              {!isCollapsed ? (
-                <div className="grid gap-2.5 p-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
-                  {g.projects.map((p) => (
-                    <ProjectCard key={p.id} project={p} developments={developments} />
-                  ))}
+              {/* Always mounted so the grid-rows reveal animates the group
+                  open/closed; collapsed content leaves tab order via the
+                  .reveal visibility flip. */}
+              <div className="reveal" data-open={!isCollapsed}>
+                <div>
+                  <div className="grid gap-2.5 p-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
+                    {g.projects.map((p) => (
+                      <ProjectCard key={p.id} project={p} developments={developments} />
+                    ))}
+                  </div>
                 </div>
-              ) : null}
+              </div>
             </div>
           );
         })
