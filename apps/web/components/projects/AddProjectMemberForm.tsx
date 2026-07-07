@@ -80,7 +80,7 @@ export function AddProjectMemberForm({
       <div>
         <label
           htmlFor={`${formId}-staff`}
-          className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
+          className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
         >
           Staf
         </label>
@@ -101,7 +101,7 @@ export function AddProjectMemberForm({
       <div>
         <label
           htmlFor={`${formId}-role`}
-          className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
+          className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
         >
           Peran di proyek
         </label>

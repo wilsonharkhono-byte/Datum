@@ -621,7 +621,7 @@ function AddAreaForm({
       <div>
         <label
           htmlFor={`${formId}-code`}
-          className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
+          className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
         >
           Kode area
         </label>
@@ -638,7 +638,7 @@ function AddAreaForm({
       <div>
         <label
           htmlFor={`${formId}-name`}
-          className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
+          className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
         >
           Nama area
         </label>
@@ -655,7 +655,7 @@ function AddAreaForm({
       <div>
         <label
           htmlFor={`${formId}-floor`}
-          className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
+          className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
         >
           Lantai
         </label>
@@ -671,7 +671,7 @@ function AddAreaForm({
       <div>
         <label
           htmlFor={`${formId}-type`}
-          className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
+          className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
         >
           Jenis
         </label>
@@ -692,7 +692,7 @@ function AddAreaForm({
       <div>
         <label
           htmlFor={`${formId}-sqm`}
-          className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
+          className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]"
         >
           Luas m²
         </label>

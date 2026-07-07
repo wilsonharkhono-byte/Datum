@@ -78,19 +78,19 @@ export function ProjectEditDialog({
         >
           <div className="flex flex-col gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Nama proyek</span>
+              <span className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">Nama proyek</span>
               <input value={name} onChange={(e) => setName(e.target.value)} disabled={pending} maxLength={120} required className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Klien</span>
+              <span className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">Klien</span>
               <input value={client} onChange={(e) => setClient(e.target.value)} disabled={pending} maxLength={120} className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Lokasi</span>
+              <span className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">Lokasi</span>
               <input value={location} onChange={(e) => setLocation(e.target.value)} disabled={pending} maxLength={200} className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Status</span>
+              <span className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">Status</span>
               <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={pending} className="w-full min-w-0 select-brand-sm">
                 <option value="design">Desain</option>
                 <option value="construction">Konstruksi</option>
@@ -100,11 +100,11 @@ export function ProjectEditDialog({
               </select>
             </label>
             <label className="flex flex-col gap-1 sm:col-span-2">
-              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Target serah terima</span>
+              <span className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">Target serah terima</span>
               <input type="date" value={target} onChange={(e) => setTarget(e.target.value)} disabled={pending} className="w-full min-w-0 rounded border border-[var(--border)] px-2 py-1.5 text-sm" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Pengembangan</span>
+              <span className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">Pengembangan</span>
               <input
                 value={development}
                 onChange={(e) => setDevelopment(e.target.value)}
@@ -119,7 +119,7 @@ export function ProjectEditDialog({
               </datalist>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Sampul (cover)</span>
+              <span className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">Sampul (cover)</span>
               <input type="file" accept="image/png,image/jpeg,image/webp" onChange={onPickCover} disabled={pending || uploading} className="w-full min-w-0 text-xs" />
               {uploading ? <span className="text-[10px] text-[var(--text-muted)]">Mengunggah…</span> : null}
               {coverPath ? (

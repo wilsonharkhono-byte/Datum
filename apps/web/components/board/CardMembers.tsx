@@ -75,7 +75,7 @@ export function CardMembers({
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-[#7A6B56]">Anggota:</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-[#7A6B56]">Anggota:</span>
       <div className="flex flex-wrap gap-1">
         {members.length === 0 ? (
           <span className="text-[10px] italic text-[#847E78]">belum ada</span>
