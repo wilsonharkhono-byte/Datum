@@ -50,10 +50,10 @@ export function AddStandardStepForm({ gateCode }: { gateCode: string }) {
         <input value={name} disabled={pending} onChange={(e) => setName(e.target.value)} placeholder="Nama langkah baru"
           className="min-h-11 flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 md:min-h-0" />
         <select value={stepType} disabled={pending} onChange={(e) => setStepType(e.target.value as StepType)}
-          className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 md:min-h-0">
+          className="select-brand-sm min-h-11 md:min-h-0">
           {TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
-        <input value={trade} disabled={pending} onChange={(e) => setTrade(e.target.value)} placeholder="Trade"
+        <input value={trade} disabled={pending} onChange={(e) => setTrade(e.target.value)} placeholder="Tukang (mis. tukang_marmer)"
           className="min-h-11 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 md:min-h-0" />
         <label className="flex items-center gap-1">Durasi
           <input value={dur} disabled={pending} inputMode="numeric" onChange={(e) => setDur(e.target.value.replace(/[^0-9]/g, ""))}

@@ -196,7 +196,7 @@ export function ProposalCard({
 
       // Invalidate queries
       void qc.invalidateQueries({ queryKey: keys.board(proposal.cardSlug.split("-")[0] ?? "") });
-      void qc.invalidateQueries({ queryKey: ["card-comments", cardId] });
+      void qc.invalidateQueries({ queryKey: keys.cardComments(cardId) });
 
       setSavedCard({ slug: cardSlug, title: cardTitle });
       setStatus("saved");

@@ -30,7 +30,15 @@ describe("query keys", () => {
     expect(keys.projectSettings("ARIN-1")).toEqual(["project-settings", "ARIN-1"]);
   });
   it("declares the persisted roots", () => {
-    expect(PERSISTED_KEY_ROOTS).toEqual(["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints", "rooms", "areas"]);
+    expect(PERSISTED_KEY_ROOTS).toEqual(["board", "projects", "card", "brief", "advisor", "review", "notifications", "activity", "schedule", "areaTargets", "matrix", "gateCheckpoints", "rooms", "areas", "card-comments", "card-members", "card-attachments", "topics", "developments"]);
+  });
+  it("card-detail sub-resource keys are persisted (offline field use), search is not", () => {
+    const roots = PERSISTED_KEY_ROOTS as readonly string[];
+    expect(roots.includes("card-comments")).toBe(true);
+    expect(roots.includes("card-members")).toBe(true);
+    expect(roots.includes("card-attachments")).toBe(true);
+    expect(roots.includes("search")).toBe(false);
+    expect(roots.includes("project-staff")).toBe(false);
   });
   it("areaProposal is NOT in PERSISTED_KEY_ROOTS", () => {
     expect((PERSISTED_KEY_ROOTS as readonly string[]).includes("areaProposal")).toBe(false);

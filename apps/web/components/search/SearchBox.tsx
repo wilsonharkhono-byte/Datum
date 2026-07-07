@@ -25,7 +25,7 @@ export function SearchBox({ initialQ = "" }: { initialQ?: string }) {
       />
       <button
         type="submit"
-        className="inline-flex min-h-11 items-center justify-center rounded bg-[#141210] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#FDFAF6] hover:bg-[#3a3527] md:min-h-0"
+        className="inline-flex min-h-11 items-center justify-center rounded bg-[var(--foreground)] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--surface)] hover:bg-[var(--sand-darker)] md:min-h-0"
       >
         Cari
       </button>

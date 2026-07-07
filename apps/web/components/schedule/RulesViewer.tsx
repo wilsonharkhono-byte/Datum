@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { RULE_VERSION } from "@/lib/gates/readiness-rules";
+import { STATUS_STYLE } from "./status-style";
 
 type StatusKey =
   | "not_started"
@@ -10,15 +11,6 @@ type StatusKey =
   | "blocked"
   | "passed"
   | "not_applicable";
-
-const STATUS_STYLE: Record<StatusKey, { bg: string; fg: string; border: string }> = {
-  not_started:       { bg: "#e9e5dd", fg: "#524e49", border: "#cfc8bc" },
-  in_progress:       { bg: "rgba(230, 81, 0, 0.18)",  fg: "#9a3c00", border: "#e65100" },
-  ready_for_handoff: { bg: "rgba(21, 101, 192, 0.18)", fg: "#0d3d77", border: "#1565c0" },
-  blocked:           { bg: "rgba(191, 54, 12, 0.18)",  fg: "#7a2208", border: "#bf360c" },
-  passed:            { bg: "rgba(61, 139, 64, 0.18)",  fg: "#235425", border: "#3d8b40" },
-  not_applicable:    { bg: "#f2efe9", fg: "#847e78", border: "#d8d3ca" },
-};
 
 const STATUS_ROWS: { key: StatusKey; label: string; rule: string }[] = [
   { key: "not_started",       label: "Belum mulai",   rule: "Belum ada aktivitas relevan di area ini." },
@@ -70,7 +62,7 @@ const EVENT_KIND_LABEL_ID: Record<string, string> = {
 const GATE_ORDER = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 
 function StatusChip({ s }: { s: StatusKey }) {
-  const style = STATUS_STYLE[s];
+  const style = STATUS_STYLE[s] ?? STATUS_STYLE.not_started!;
   return (
     <span
       className="inline-block rounded px-2 py-0.5 text-xs font-medium"

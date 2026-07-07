@@ -1,7 +1,7 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { keys } from "./keys";
-import { applyAddCard, applyMoveCard } from "@/lib/cards/optimisticBoard";
+import { applyAddCard, applyMoveCard, removeCardById } from "@/lib/cards/optimisticBoard";
 import { createCard, moveCard, createComment } from "@/lib/cards/mutations";
 import type { Board } from "@/lib/cards/queries";
 import type { CardPayload } from "@/app/api/card/[code]/[slug]/route";
@@ -24,10 +24,15 @@ export function useAddCard(code: string) {
       await qc.cancelQueries({ queryKey: keys.board(code) });
       const prev = qc.getQueryData<Board>(keys.board(code));
       if (prev) qc.setQueryData(keys.board(code), applyAddCard(prev, topicId, title, optimisticId));
-      return { prev };
+      return { optimisticId };
     },
+    // Surgical rollback: remove only this mutation's ghost from the *current*
+    // cache. Restoring a whole onMutate snapshot would clobber sibling
+    // optimistic updates that landed after this one started.
     onError: (_e, _fd, ctx) => {
-      if (ctx?.prev) qc.setQueryData(keys.board(code), ctx.prev);
+      if (!ctx) return;
+      const cur = qc.getQueryData<Board>(keys.board(code));
+      if (cur) qc.setQueryData(keys.board(code), removeCardById(cur, ctx.optimisticId));
     },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.board(code) }),
   });
@@ -56,9 +61,10 @@ export function useAddComment(code: string, slug: string) {
       const projectId = String(fd.get("projectId") ?? "");
       await qc.cancelQueries({ queryKey: keys.card(code, slug) });
       const prev = qc.getQueryData<CardPayload>(keys.card(code, slug));
+      const ghostId = `optimistic:${crypto.randomUUID()}`;
       if (prev) {
         const ghost: CardComment = {
-          id: `optimistic:${crypto.randomUUID()}`,
+          id: ghostId,
           card_id: cardId,
           project_id: projectId,
           body,
@@ -73,10 +79,19 @@ export function useAddComment(code: string, slug: string) {
           comments: [...prev.comments, ghost],
         });
       }
-      return { prev };
+      return { ghostId };
     },
+    // Surgical rollback: drop only this mutation's ghost comment (see
+    // useAddCard for why snapshot-restore is wrong under concurrency).
     onError: (_e, _fd, ctx) => {
-      if (ctx?.prev) qc.setQueryData(keys.card(code, slug), ctx.prev);
+      if (!ctx) return;
+      const cur = qc.getQueryData<CardPayload>(keys.card(code, slug));
+      if (cur) {
+        qc.setQueryData<CardPayload>(keys.card(code, slug), {
+          ...cur,
+          comments: cur.comments.filter((c) => c.id !== ctx.ghostId),
+        });
+      }
     },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.card(code, slug) }),
   });
@@ -95,11 +110,21 @@ export function useMoveCard(code: string) {
       const newTopicId = String(fd.get("newTopicId"));
       await qc.cancelQueries({ queryKey: keys.board(code) });
       const prev = qc.getQueryData<Board>(keys.board(code));
-      if (prev) qc.setQueryData(keys.board(code), applyMoveCard(prev, cardId, newTopicId));
-      return { prev };
+      let fromTopicId: string | null = null;
+      if (prev) {
+        for (const col of prev.columns) {
+          if (col.cards.some((c) => c.id === cardId)) { fromTopicId = col.topic.id; break; }
+        }
+        qc.setQueryData(keys.board(code), applyMoveCard(prev, cardId, newTopicId));
+      }
+      return { cardId, fromTopicId };
     },
+    // Surgical rollback: move only this card back to where it came from (see
+    // useAddCard for why snapshot-restore is wrong under concurrency).
     onError: (_e, _fd, ctx) => {
-      if (ctx?.prev) qc.setQueryData(keys.board(code), ctx.prev);
+      if (!ctx?.fromTopicId) return;
+      const cur = qc.getQueryData<Board>(keys.board(code));
+      if (cur) qc.setQueryData(keys.board(code), applyMoveCard(cur, ctx.cardId, ctx.fromTopicId));
     },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.board(code) }),
   });

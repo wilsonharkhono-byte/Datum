@@ -25,7 +25,10 @@ import {
   removeCardMember as coreRemoveCardMember,
   approveCardEventDraft as coreApproveCardEventDraft,
   rejectCardEventDraft as coreRejectCardEventDraft,
+  linkCardToArea as coreLinkCardToArea,
+  getProjectAreas,
 } from "@datum/core";
+import { suggestAreaForCard } from "@/lib/areas/match-hint";
 import {
   EVENT_KINDS,
   EventPayloadSchemas,
@@ -44,16 +47,24 @@ import {
   notifyPrincipalsOfHighRiskEvent,
 } from "@/lib/notifications/producers";
 import { sendExpoPush } from "@/lib/notifications/push-send";
-import { recomputeProjectGates } from "@/lib/gates/recompute";
+import { recomputeProjectGatesSystem } from "@/lib/gates/recompute-system";
 import { processPendingStepInference } from "@/lib/steps/run-inference";
+import { INFERABLE_KINDS } from "@/lib/steps/infer";
 import * as Sentry from "@sentry/nextjs";
 
-// Union of RELEVANT_KINDS in lib/gates/readiness-rules.ts — the kinds that can
-// move an (area, gate) cell. note and photo never affect readiness, so their
-// inserts skip the recompute trigger.
-const GATE_RELEVANT_KINDS: ReadonlySet<EventKind> = new Set([
-  "work", "material", "decision", "vendor", "drawing", "client_request", "document",
-]);
+// B4 fix: the DB trigger `card_events_mark_stale` (packages/db/supabase/
+// migrations/20260601000013_area_gate_stale_trigger.sql) marks EVERY area
+// linked to the card stale on ANY card_events insert/update — it does not
+// filter by event kind at all. The old GATE_RELEVANT_KINDS allowlist here
+// (work/material/decision/vendor/drawing/client_request/document) undercounted
+// that: a `note` or `photo` event marks cells stale via the trigger but never
+// triggered a recompute, so "N stale" cells piled up until someone clicked
+// "Hitung ulang readiness" manually (live bug B4). recomputeProjectGates
+// itself is safe to run unconditionally — it re-derives every (area, gate)
+// cell for the project and clears `stale` regardless of which kinds moved the
+// needle — so we fire it for every event kind now, mirroring the trigger
+// exactly instead of maintaining a second allowlist that can drift out of
+// sync with the SQL.
 
 // Re-export core type so web callers that import CreateCardResult from here still work.
 export type CreateCardResult =
@@ -88,6 +99,26 @@ export async function createCard(formData: FormData): Promise<CreateCardResult> 
     title:     input.title,
   });
   if (!result.ok) return result;
+
+  // Card-create room inheritance: same deterministic matcher used at capture
+  // time (Task 5) — if the topic name room-matches an area, auto-link it so
+  // the card starts life on the readiness matrix. Never fails the create.
+  try {
+    const [{ data: topicRow }, areas] = await Promise.all([
+      supabase.from("topics").select("name").eq("id", input.topicId).maybeSingle(),
+      getProjectAreas(supabase, input.projectId),
+    ]);
+    const hint = suggestAreaForCard({
+      cardTitle: input.title,
+      topicName: topicRow?.name ?? null,
+      areas,
+    });
+    if (hint) {
+      await coreLinkCardToArea(supabase, { cardId: result.id, areaId: hint.area.id });
+    }
+  } catch (err) {
+    Sentry.captureException(err, { tags: { scope: "createCard.roomInheritance" } });
+  }
 
   revalidatePath(`/project/${input.projectCode}`);
   return result;
@@ -179,12 +210,6 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   if (!result.ok) return result;
 
   // ── Web-only side effects ─────────────────────────────────────────────────
-  // Gate matrix cells depend on this event — recompute best-effort,
-  // fire-and-forget so the save never waits on it.
-  if (GATE_RELEVANT_KINDS.has(input.eventKind)) {
-    void recomputeProjectGates(input.projectId, input.projectCode).catch(console.warn);
-  }
-
   // Re-parse the payload so notification helpers have a typed value.
   const schema = EventPayloadSchemas[input.eventKind as EventKind];
   const parsedPayload = schema.parse(rawPayload) as Record<string, unknown>;
@@ -192,7 +217,7 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
   const { data: cardRow } = await supabase
     .from("cards").select("title, slug").eq("id", input.cardId).maybeSingle();
   if (cardRow) {
-    await notifyWatchersOfEvent(supabase, {
+    const watcherIds = await notifyWatchersOfEvent(supabase, {
       eventId: result.eventId,
       eventKind: input.eventKind,
       payload: parsedPayload,
@@ -203,21 +228,13 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
       cardSlug: cardRow.slug,
       cardTitle: cardRow.title,
     });
-    // Best-effort Expo push for watcher event — derive recipients same way producer does.
-    void (async () => {
-      const { data: members } = await supabase
-        .from("card_members").select("staff_id")
-        .eq("card_id", input.cardId).is("removed_at", null);
-      const recipientIds = [...new Set(
-        (members ?? []).map((m) => m.staff_id)
-          .filter((id): id is string => typeof id === "string" && id !== user.id),
-      )];
-      await sendExpoPush(recipientIds, {
-        title: `${input.eventKind} baru di "${cardRow.title}"`,
-        body:  `${input.eventKind} baru di "${cardRow.title}"`,
-        data:  { link: `/project/${input.projectCode}/cards/${cardRow.slug}` },
-      });
-    })().catch(console.warn);
+    // Best-effort Expo push to the same recipients the producer notified —
+    // same list, same kind filter (routine work logs no longer push).
+    void sendExpoPush(watcherIds, {
+      title: `${input.eventKind} baru di "${cardRow.title}"`,
+      body:  `${input.eventKind} baru di "${cardRow.title}"`,
+      data:  { link: `/project/${input.projectCode}/cards/${cardRow.slug}` },
+    }).catch(console.warn);
     if (HIGH_RISK_KINDS.has(input.eventKind)) {
       const preview = pickPreview(parsedPayload);
       // notifyPrincipalsOfHighRiskEvent uses the service-role admin client —
@@ -236,13 +253,29 @@ export async function createCardEvent(formData: FormData): Promise<CreateCardEve
     }
   }
 
-  if (input.eventKind === "work") {
-    after(() =>
-      processPendingStepInference(createSupabaseAdminClient(), 5).catch((e) => {
-        Sentry.captureException(e, { extra: { where: "createCardEvent.after" } });
-      }),
-    );
-  }
+  // B4 fix: this card_event just made the DB trigger mark its areas' gate
+  // cells stale (packages/db/supabase/migrations/
+  // 20260601000013_area_gate_stale_trigger.sql — every insert, no kind
+  // filter). Self-heal in the same after() used for inference, unconditionally,
+  // so stale cells never require the manual "Hitung ulang readiness" button.
+  // processPendingStepInference recomputes internally for any project it
+  // writes AI step progress to, but we still recompute again unconditionally
+  // afterward here — this covers non-inferable kinds too (e.g. a plain
+  // "note", which the trigger stales but inference never touches).
+  after(async () => {
+    try {
+      if (INFERABLE_KINDS.has(input.eventKind)) {
+        await processPendingStepInference(createSupabaseAdminClient(), 5);
+      }
+    } catch (e) {
+      Sentry.captureException(e, { extra: { where: "createCardEvent.after.inference" } });
+    }
+    try {
+      await recomputeProjectGatesSystem(input.projectId, input.projectCode);
+    } catch (e) {
+      Sentry.captureException(e, { extra: { where: "createCardEvent.after.recompute" } });
+    }
+  });
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
   return { ok: true, eventId: result.eventId };
@@ -649,7 +682,7 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
     const { data: cardRow } = await supabase
       .from("cards").select("title").eq("id", input.cardId).maybeSingle();
     if (cardRow) {
-      await notifyCardStatusChange(supabase, {
+      const memberIds = await notifyCardStatusChange(supabase, {
         cardId: input.cardId,
         cardTitle: cardRow.title,
         cardSlug: input.cardSlug,
@@ -658,21 +691,12 @@ export async function updateCard(formData: FormData): Promise<UpdateCardResult> 
         newStatus: input.status,
         actorId: user.id,
       });
-      // Best-effort Expo push for status change — same recipient derivation as producer.
-      void (async () => {
-        const { data: members } = await supabase
-          .from("card_members").select("staff_id")
-          .eq("card_id", input.cardId).is("removed_at", null);
-        const recipientIds = [...new Set(
-          (members ?? []).map((m) => m.staff_id)
-            .filter((id): id is string => typeof id === "string" && id !== user.id),
-        )];
-        await sendExpoPush(recipientIds, {
-          title: "Status kartu diperbarui",
-          body:  `Status "${cardRow.title}" diubah ke ${input.status}`,
-          data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
-        });
-      })().catch(console.warn);
+      // Best-effort Expo push to the same recipients the producer notified.
+      void sendExpoPush(memberIds, {
+        title: "Status kartu diperbarui",
+        body:  `Status "${cardRow.title}" diubah ke ${input.status}`,
+        data:  { link: `/project/${input.projectCode}/cards/${input.cardSlug}` },
+      }).catch(console.warn);
     }
   }
 
@@ -794,7 +818,7 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
   const { data: cardRow } = await supabase
     .from("cards").select("title").eq("id", input.cardId).maybeSingle();
   if (cardRow) {
-    await notifyDraftPending(supabase, {
+    const principalIds = await notifyDraftPending(supabase, {
       draftId: data.id,
       actorId: user.id,
       projectId: input.projectId,
@@ -802,18 +826,12 @@ export async function createCardEventDraft(formData: FormData): Promise<CreateDr
       cardTitle: cardRow.title,
       cardId: input.cardId,
     });
-    // Best-effort Expo push for draft pending — same principal query as producer.
-    void (async () => {
-      const { data: principals } = await supabase
-        .from("staff").select("id").eq("active", true).eq("role", "principal");
-      const recipientIds = (principals ?? [])
-        .map((s) => s.id).filter((id) => id !== user.id);
-      await sendExpoPush(recipientIds, {
-        title: "Draft menunggu approval",
-        body:  `Draft ${input.eventKind} baru menunggu approval untuk "${cardRow.title}"`,
-        data:  { link: "/review" },
-      });
-    })().catch(console.warn);
+    // Best-effort Expo push to the same principals the producer notified.
+    void sendExpoPush(principalIds, {
+      title: "Draft menunggu approval",
+      body:  `Draft ${input.eventKind} baru menunggu approval untuk "${cardRow.title}"`,
+      data:  { link: "/review" },
+    }).catch(console.warn);
   }
 
   revalidatePath(`/project/${input.projectCode}/cards/${input.cardSlug}`);
@@ -851,9 +869,6 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
   if (!result.ok) return result;
 
   // Web-only side effects using metadata returned by core
-  if (result.gateRelevant && result.projectCode) {
-    void recomputeProjectGates(result.projectId, result.projectCode).catch(console.warn);
-  }
   if (result.cardSlug && result.projectCode && result.draftAuthorId) {
     await notifyDraftApproved(supabase, {
       draftId: input.draftId,
@@ -875,12 +890,30 @@ export async function approveCardEventDraft(formData: FormData): Promise<Approve
     }
   }
 
-  if (result.eventKind === "work") {
-    after(() =>
-      processPendingStepInference(createSupabaseAdminClient(), 5).catch((e) => {
-        Sentry.captureException(e, { extra: { where: "approveCardEventDraft.after" } });
-      }),
-    );
+  // B4 fix: the approved draft's card_events insert fires the same
+  // card_events_mark_stale trigger as createCardEvent — recompute
+  // unconditionally in after() rather than gating on the old gateRelevant
+  // allowlist (see comment near GATE_RELEVANT_KINDS above). This path
+  // previously never fired the fix applied to createCardEvent, so approved
+  // drafts left "N stale" cells behind exactly like the direct-log path did.
+  if (result.projectCode) {
+    const projectId = result.projectId;
+    const projectCode = result.projectCode;
+    const eventKind = result.eventKind;
+    after(async () => {
+      try {
+        if (INFERABLE_KINDS.has(eventKind)) {
+          await processPendingStepInference(createSupabaseAdminClient(), 5);
+        }
+      } catch (e) {
+        Sentry.captureException(e, { extra: { where: "approveCardEventDraft.after.inference" } });
+      }
+      try {
+        await recomputeProjectGatesSystem(projectId, projectCode);
+      } catch (e) {
+        Sentry.captureException(e, { extra: { where: "approveCardEventDraft.after.recompute" } });
+      }
+    });
   }
 
   revalidatePath("/review");

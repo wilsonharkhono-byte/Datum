@@ -14,7 +14,7 @@ export function useProjectRealtime(projectId: string | undefined, code: string |
   useEffect(() => {
     if (!projectId) return;
     return subscribeToProjectChanges(supabase, projectId, () => {
-      if (code) qc.invalidateQueries({ queryKey: ["board", code] });
+      if (code) qc.invalidateQueries({ queryKey: keys.board(code) });
     });
   }, [projectId, code, qc]);
 }

@@ -25,15 +25,15 @@ export function RoomsView({ data, now, stepViews }: { data: ProjectRooms; now: n
       </div>
 
       <header className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">Ruangan</p>
-        <h1 className="text-2xl font-semibold text-[#141210]">{data.projectName}</h1>
-        <p className="mt-1 text-sm text-[#524E49]">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--sand-dark)]">Ruangan</p>
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">{data.projectName}</h1>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           {count > 0 ? (
             <>
               {count} ruangan ·{" "}
               <Link
                 href={`/project/${data.projectCode}/schedule`}
-                className="font-medium text-[#7A6B56] underline hover:text-[#3a3527]"
+                className="font-medium text-[var(--sand-dark)] underline hover:text-[var(--sand-darker)]"
               >
                 Lihat matrix detail →
               </Link>
@@ -57,8 +57,8 @@ export function RoomsView({ data, now, stepViews }: { data: ProjectRooms; now: n
 
 function EmptyState({ projectCode }: { projectCode: string }) {
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[#FDFAF6] p-6 text-sm text-[#524E49]">
-      <p className="font-medium text-[#141210]">Proyek ini belum punya ruangan.</p>
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-secondary)]">
+      <p className="font-medium text-[var(--foreground)]">Proyek ini belum punya ruangan.</p>
       <p className="mt-2">
         Ruangan dibuat dari area proyek. Tambahkan area secara manual, atau jalankan
         {" "}

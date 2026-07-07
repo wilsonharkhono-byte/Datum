@@ -33,15 +33,15 @@ export function CommentsSection({
 }) {
   return (
     <section className="mt-8">
-      <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#7A6B56]">
+      <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--sand-dark)]">
         Diskusi ({comments.length})
       </h2>
 
       <ol className="space-y-2">
         {comments.length === 0 ? (
-          <li className="rounded border border-dashed border-[#B5AFA8] p-6">
-            <p className="text-xs italic text-[#524E49]">Belum ada komentar. Mulai diskusi di bawah.</p>
-            <p className="mt-1 text-[10px] text-[#847E78]">Gunakan @nama untuk menyebut rekan kerja.</p>
+          <li className="rounded border border-dashed border-[var(--border)] p-6">
+            <p className="text-xs italic text-[var(--text-secondary)]">Belum ada komentar. Mulai diskusi di bawah.</p>
+            <p className="mt-1 text-[10px] text-[var(--text-muted)]">Gunakan @nama untuk menyebut rekan kerja.</p>
           </li>
         ) : null}
         {comments.map((c) => (

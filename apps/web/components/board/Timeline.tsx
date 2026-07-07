@@ -98,7 +98,7 @@ export function Timeline({
         </ol>
       )}
       {visible.length > 0 && visible.length !== events.length ? (
-        <p className="mt-3 text-[10px] italic text-[#847E78]">
+        <p className="mt-3 text-[10px] italic text-[var(--text-muted)]">
           {visible.length} dari {events.length} aktivitas (klik chip "semua" untuk reset filter).
         </p>
       ) : null}

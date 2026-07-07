@@ -19,6 +19,7 @@ import {
   getGateCheckpoints,
   getProjectRooms,
   getProjectAreas,
+  getCardAreas,
   getProjectMembers,
   getAvailableStaff,
   getProjectBySlug,
@@ -37,7 +38,7 @@ export function useProjects() {
 
 export function useDevelopments() {
   return useQuery({
-    queryKey: ["developments"],
+    queryKey: keys.developments(),
     queryFn: () => getDevelopments(supabase),
   });
 }
@@ -51,7 +52,7 @@ export function useBoard(code: string) {
 
 export function useProjectTopics(projectId: string | undefined) {
   return useQuery({
-    queryKey: ["topics", projectId],
+    queryKey: projectId ? keys.topics(projectId) : ["topics", "none"],
     enabled: !!projectId,
     queryFn: () => getProjectTopics(supabase, projectId!),
   });
@@ -70,7 +71,7 @@ export function useCard(code: string, slug: string) {
 /** Load all comments for a card. Disabled until cardId is known. */
 export function useCardComments(cardId: string | undefined) {
   return useQuery({
-    queryKey: ["card-comments", cardId],
+    queryKey: cardId ? keys.cardComments(cardId) : ["card-comments", "none"],
     enabled: !!cardId,
     queryFn: () => getCardComments(supabase, cardId!),
   });
@@ -79,7 +80,7 @@ export function useCardComments(cardId: string | undefined) {
 /** Load all active members for a card. Disabled until cardId is known. */
 export function useCardMembers(cardId: string | undefined) {
   return useQuery({
-    queryKey: ["card-members", cardId],
+    queryKey: cardId ? keys.cardMembers(cardId) : ["card-members", "none"],
     enabled: !!cardId,
     queryFn: () => getCardMembers(supabase, cardId!),
   });
@@ -88,9 +89,18 @@ export function useCardMembers(cardId: string | undefined) {
 /** Load attachments keyed by event id. Disabled until cardId is known. */
 export function useCardAttachments(cardId: string | undefined) {
   return useQuery({
-    queryKey: ["card-attachments", cardId],
+    queryKey: cardId ? keys.cardAttachments(cardId) : ["card-attachments", "none"],
     enabled: !!cardId,
     queryFn: () => getCardAttachments(supabase, cardId!),
+  });
+}
+
+/** Load areas linked to a card. Disabled until cardId is known. */
+export function useCardAreas(cardId: string | undefined) {
+  return useQuery({
+    queryKey: ["card-areas", cardId],
+    enabled: !!cardId,
+    queryFn: () => getCardAreas(supabase, cardId!),
   });
 }
 

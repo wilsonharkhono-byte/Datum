@@ -14,6 +14,7 @@ import {
   type ScheduleCell,
 } from "../brief/bottlenecks";
 import { compareEventTime, type OrderableEvent } from "../cards/event-order";
+import { must } from "../db/must";
 import { ACTOR_LABELS } from "../cards/labels";
 import { isTemplateCardTitle } from "../cards/template-card";
 import { gateShortName } from "../gates/labels";
@@ -129,14 +130,15 @@ export async function getAdvisorData(
     .limit(PER_SOURCE_CAP);
   if (projectId) staleQ = staleQ.eq("project_id", projectId);
 
-  const [
-    { data: gateRows },
-    { data: blockedRaw },
-    { data: decEvs },
-    { data: crEvs },
-    { data: vendorEvs },
-    { data: staleCards },
-  ] = await Promise.all([gateQ, blockedQ, decisionQ, requestQ, vendorQ, staleQ]);
+  const [gateRes, blockedRes, decRes, crRes, vendorRes, staleRes] =
+    await Promise.all([gateQ, blockedQ, decisionQ, requestQ, vendorQ, staleQ]);
+  // A failed query must NOT render as an empty "nothing needs attention" feed.
+  const { data: gateRows } = must(gateRes, "advisor.gates");
+  const { data: blockedRaw } = must(blockedRes, "advisor.blockers");
+  const { data: decEvs } = must(decRes, "advisor.decisions");
+  const { data: crEvs } = must(crRes, "advisor.clientRequests");
+  const { data: vendorEvs } = must(vendorRes, "advisor.vendorQuotes");
+  const { data: staleCards } = must(staleRes, "advisor.staleCards");
 
   const signals: AdvisorSignal[] = [];
 
@@ -287,11 +289,14 @@ export async function getAdvisorData(
   const blockedCardIds = [...new Set((blockedRaw ?? []).map((e) => e.card_id))];
   const lastNonBlockedByCard = new Map<string, OrderableEvent>();
   if (blockedCardIds.length > 0) {
-    const { data: workEvs } = await supabase
-      .from("card_events")
-      .select("id, card_id, occurred_at, created_at, payload")
-      .eq("event_kind", "work")
-      .in("card_id", blockedCardIds);
+    const { data: workEvs } = must(
+      await supabase
+        .from("card_events")
+        .select("id, card_id, occurred_at, created_at, payload")
+        .eq("event_kind", "work")
+        .in("card_id", blockedCardIds),
+      "advisor.supersession",
+    );
     for (const w of workEvs ?? []) {
       const status = (w.payload as { status?: string } | null)?.status;
       if (status === "blocked") continue;

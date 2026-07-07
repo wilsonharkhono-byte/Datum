@@ -1,15 +1,21 @@
 import Link from "next/link";
+import { getProjectBySlug, must } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { fetchMatrix } from "@/lib/matrix/fetch-matrix";
 import { AreaGateMatrix } from "@/components/matrix/area-gate-matrix";
 import { RecomputeButton } from "@/components/schedule/RecomputeButton";
+import { RecomputeScheduleButton } from "@/components/schedule/RecomputeScheduleButton";
 import { RULE_VERSION } from "@/lib/gates/readiness-rules";
 import { Gantt } from "@/components/schedule/Gantt";
 import { RulesViewer } from "@/components/schedule/RulesViewer";
 import { getProjectScheduleCells, getAreaTargetDates } from "@/lib/gates/schedule";
 import { AreaTargetEditor } from "@/components/schedule/AreaTargetEditor";
-import { getProjectStepSignals } from "@/lib/steps/queries";
+import { getProjectStepSignals, groupSignalsByStep } from "@/lib/steps/queries";
 import { SignalSummaryPanel } from "@/components/schedule/SignalSummaryPanel";
+import { CollapsibleSection } from "@/components/schedule/CollapsibleSection";
+import { HealthStrip } from "@/components/schedule/HealthStrip";
+import { summarizeSchedule } from "@/components/schedule/health-summary";
+import { AreaGatesRefresher } from "@/components/realtime/AreaGatesRefresher";
 
 export default async function ProjectSchedulePage({
   params,
@@ -19,11 +25,7 @@ export default async function ProjectSchedulePage({
   const { slug } = await params;
   const supabase = await createSupabaseServerClient();
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, project_code, project_name")
-    .eq("project_code", slug.toUpperCase())
-    .maybeSingle();
+  const project = await getProjectBySlug(supabase, slug);
   if (!project) {
     return (
       <div className="m-6 rounded border border-[var(--flag-critical)] bg-[var(--flag-critical-bg)] p-6 text-sm text-[var(--flag-critical)]">
@@ -33,43 +35,71 @@ export default async function ProjectSchedulePage({
     );
   }
 
-  const matrix = await fetchMatrix(project.id);
-  const scheduleCells = await getProjectScheduleCells(project.id);
-  const areaTargets = await getAreaTargetDates(project.id);
-
   // WIB (Asia/Jakarta) today — same pattern as Board + MiniCard.
   const jakartaToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
   const nowIso = new Date().toISOString();
 
-  // Fetch project-wide signals (one round-trip for steps, one for deps, one for area names).
-  const projectSignals = await getProjectStepSignals(supabase, project.id, jakartaToday, nowIso);
+  // These six fetches are independent — run them in one round-trip batch
+  // instead of paying ~6 sequential RTTs on the heaviest page.
+  const [matrix, scheduleCells, areaTargets, projectSignals, staleRes, latestRes] =
+    await Promise.all([
+      fetchMatrix(project.id),
+      getProjectScheduleCells(project.id),
+      getAreaTargetDates(project.id),
+      getProjectStepSignals(supabase, project.id, jakartaToday, nowIso),
+      // Count stale cells
+      supabase
+        .from("area_gate_status")
+        .select("*", { count: "exact", head: true })
+        .eq("project_id", project.id)
+        .eq("stale", true),
+      // Latest recompute time across all cells
+      supabase
+        .from("area_gate_status")
+        .select("last_recomputed_at")
+        .eq("project_id", project.id)
+        .order("last_recomputed_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+  const { count: staleCount } = must(staleRes, "schedule.staleCount");
+  const { data: latest } = must(latestRes, "schedule.lastRecompute");
 
-  // Count stale cells
-  const { count: staleCount } = await supabase
-    .from("area_gate_status")
-    .select("*", { count: "exact", head: true })
-    .eq("project_id", project.id)
-    .eq("stale", true);
+  // Collapse the flat signal list to one row per (area × step) so the panel
+  // reads as a to-do list rather than 5 near-duplicate rows per step.
+  const groupedSignals = groupSignalsByStep(projectSignals);
+  const health = summarizeSchedule(projectSignals, scheduleCells, jakartaToday);
 
-  // Latest recompute time across all cells
-  const { data: latest } = await supabase
-    .from("area_gate_status")
-    .select("last_recomputed_at")
-    .eq("project_id", project.id)
-    .order("last_recomputed_at", { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
+  // Gantt date span for the collapsed section subtitle.
+  const scheduledDates = scheduleCells
+    .flatMap((c) => [c.target_start_date, c.target_end_date])
+    .filter((d): d is string => d !== null)
+    .sort();
+  const dateFmt = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const ganttSpan =
+    scheduledDates.length > 0
+      ? `${dateFmt(scheduledDates[0]!)} – ${dateFmt(scheduledDates[scheduledDates.length - 1]!)}`
+      : undefined;
+
+  const areasWithTarget = matrix
+    ? matrix.areas.filter((a) => areaTargets.get(a.id)).length
+    : 0;
 
   return (
     // No local padding — the (app) layout already provides the page gutters
     // (px-2 py-2 sm:px-8 sm:py-8); a local p-4 double-padded desktop and
     // misaligned this page against the rest of the app.
     <div className="mx-auto w-full max-w-6xl">
+      <AreaGatesRefresher projectId={project.id} projectEvents />
       <div className="mb-3 flex items-center justify-between">
         <Link href={`/project/${project.project_code}`} className="text-xs text-[var(--text-muted)] hover:underline">
           ← {project.project_code} Board
         </Link>
-        <RecomputeButton projectId={project.id} projectCode={project.project_code} />
+        <div className="flex flex-wrap items-center gap-2">
+          <RecomputeScheduleButton projectId={project.id} projectCode={project.project_code} />
+          <RecomputeButton projectId={project.id} projectCode={project.project_code} />
+        </div>
       </div>
 
       {staleCount && staleCount > 0 ? (
@@ -79,31 +109,53 @@ export default async function ProjectSchedulePage({
       ) : null}
 
       <header className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--sand-dark)]">
           Jadwal & Readiness
         </p>
-        <h1 className="text-2xl font-semibold text-[#141210]">
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">
           {project.project_code} · {project.project_name}
         </h1>
-        <p className="mt-1 text-sm text-[#524E49]">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Status per area × gate, dihitung dari card_events oleh rule engine v{RULE_VERSION}.
-          {latest?.last_recomputed_at ? (
-            <> Terakhir dihitung: <span className="font-medium">{new Date(latest.last_recomputed_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</span>.</>
-          ) : (
+          {latest?.last_recomputed_at ? null : (
             <> Belum pernah dihitung — klik &quot;hitung ulang readiness&quot; di kanan atas.</>
           )}
         </p>
       </header>
 
-      <section className="mb-4">
-        <RulesViewer />
-      </section>
+      <HealthStrip health={health} lastRecomputedAt={latest?.last_recomputed_at ?? null} />
+
+      <SignalSummaryPanel signals={groupedSignals} />
+
+      <CollapsibleSection title="Gantt rencana" subtitle={ganttSpan} defaultOpen={false}>
+        <Gantt
+          areas={matrix?.areas ?? []}
+          gates={(matrix?.gates ?? []).map((c) => ({ code: c, name: c }))}
+          cells={scheduleCells}
+          todayIso={jakartaToday}
+        />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Matrix area × gate"
+        badge={matrix ? `${matrix.areas.length} area` : undefined}
+        defaultOpen={false}
+      >
+        {matrix ? (
+          <AreaGateMatrix data={matrix} />
+        ) : (
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-secondary)]">
+            Matrix belum tersedia.
+          </div>
+        )}
+      </CollapsibleSection>
 
       {matrix && matrix.areas.length > 0 ? (
-        <section className="mb-6">
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
-            Target handover per area
-          </h2>
+        <CollapsibleSection
+          title="Target handover per area"
+          badge={`${areasWithTarget} target`}
+          defaultOpen={false}
+        >
           <p className="mb-3 text-xs text-[var(--text-secondary)]">
             Set tanggal target nyata per area. Jika diisi, window gate area itu
             dihitung mundur dari target (gate H berakhir di tanggal target),
@@ -147,29 +199,12 @@ export default async function ProjectSchedulePage({
               );
             })}
           </div>
-        </section>
+        </CollapsibleSection>
       ) : null}
 
-      <SignalSummaryPanel signals={projectSignals} />
-
-      <section className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
-          Gantt rencana
-        </h2>
-        <Gantt
-          areas={matrix?.areas ?? []}
-          gates={(matrix?.gates ?? []).map((c) => ({ code: c, name: c }))}
-          cells={scheduleCells}
-        />
+      <section className="mb-4">
+        <RulesViewer />
       </section>
-
-      {matrix ? (
-        <AreaGateMatrix data={matrix} />
-      ) : (
-        <div className="rounded border border-[#B5AFA8] bg-[#FDFAF6] p-6 text-sm text-[#524E49]">
-          Matrix belum tersedia.
-        </div>
-      )}
     </div>
   );
 }

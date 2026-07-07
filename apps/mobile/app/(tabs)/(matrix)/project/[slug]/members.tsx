@@ -25,7 +25,7 @@ import {
 import { Stack, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { onlineManager } from "@tanstack/react-query";
-import { canManageAccess } from "@datum/core";
+import { canManageAccess, keys } from "@datum/core";
 import type { ProjectMemberRow } from "@datum/core";
 import { Text } from "@/components/ui/Text";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -301,7 +301,7 @@ export default function MembersScreen() {
                   onCreated={() => {
                     // Invalidate the available-staff query so the add-member
                     // picker shows the newly created staff.
-                    void queryClient.invalidateQueries({ queryKey: ["available-staff"] });
+                    void queryClient.invalidateQueries({ queryKey: keys.availableStaff() });
                   }}
                 />
               </View>

@@ -59,6 +59,8 @@ const mockGetCardWithTimelineByProjectCode = jest.fn();
 const mockGetCardComments = jest.fn();
 const mockGetCardMembers = jest.fn();
 const mockGetCardAttachments = jest.fn();
+const mockGetCardAreas = jest.fn();
+const mockGetProjectAreas = jest.fn();
 
 jest.mock("@datum/core", () => {
   const actual = jest.requireActual("@datum/core");
@@ -69,6 +71,8 @@ jest.mock("@datum/core", () => {
     getCardComments: (...args: unknown[]) => mockGetCardComments(...args),
     getCardMembers: (...args: unknown[]) => mockGetCardMembers(...args),
     getCardAttachments: (...args: unknown[]) => mockGetCardAttachments(...args),
+    getCardAreas: (...args: unknown[]) => mockGetCardAreas(...args),
+    getProjectAreas: (...args: unknown[]) => mockGetProjectAreas(...args),
   };
 });
 
@@ -180,6 +184,23 @@ const FIXTURE_ATTACHMENTS: Map<string, CardAttachment[]> = new Map([
   ],
 ]);
 
+const FIXTURE_AREAS: import("@datum/db").Area[] = [
+  {
+    id: "area-uuid-1",
+    project_id: PROJECT_ID,
+    area_code: "L1-RT01",
+    area_name: "Ruang Tamu Lt.1",
+    area_type: "living",
+    floor: "Lt.1",
+    area_sqm: null,
+    sort_order: 1,
+    target_date: null,
+    finish_profile: {},
+    created_at: "2026-01-01T08:00:00Z",
+    updated_at: "2026-01-01T08:00:00Z",
+  } as unknown as import("@datum/db").Area,
+];
+
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
 function makeClient(): QueryClient {
@@ -207,6 +228,8 @@ describe("CardDetailScreen", () => {
     mockGetCardComments.mockResolvedValue(FIXTURE_COMMENTS);
     mockGetCardMembers.mockResolvedValue(FIXTURE_MEMBERS);
     mockGetCardAttachments.mockResolvedValue(FIXTURE_ATTACHMENTS);
+    mockGetCardAreas.mockResolvedValue(FIXTURE_AREAS);
+    mockGetProjectAreas.mockResolvedValue(FIXTURE_AREAS);
   });
 
   it("renders card title and summary once loaded", async () => {
@@ -216,11 +239,26 @@ describe("CardDetailScreen", () => {
     client.setQueryData(["card-comments", CARD_ID], FIXTURE_COMMENTS);
     client.setQueryData(["card-members", CARD_ID], FIXTURE_MEMBERS);
     client.setQueryData(["card-attachments", CARD_ID], FIXTURE_ATTACHMENTS);
+    client.setQueryData(["card-areas", CARD_ID], FIXTURE_AREAS);
 
     const { getByText } = render(<CardDetailScreen />, { wrapper: wrapper(client) });
 
     expect(getByText("Pasang keramik lantai")).toBeTruthy();
     expect(getByText("Keramik 60x60 warna krem dipasang di ruang tamu.")).toBeTruthy();
+  });
+
+  it("renders linked area chips in the Area terkait section", async () => {
+    const client = makeClient();
+    client.setQueryData(keys.card(CODE, SLUG), FIXTURE_DETAIL);
+    client.setQueryData(["card-comments", CARD_ID], FIXTURE_COMMENTS);
+    client.setQueryData(["card-members", CARD_ID], FIXTURE_MEMBERS);
+    client.setQueryData(["card-attachments", CARD_ID], FIXTURE_ATTACHMENTS);
+    client.setQueryData(["card-areas", CARD_ID], FIXTURE_AREAS);
+
+    const { getByText } = render(<CardDetailScreen />, { wrapper: wrapper(client) });
+
+    expect(getByText("Area terkait")).toBeTruthy();
+    expect(getByText("L1-RT01 · Ruang Tamu Lt.1 (Lt.1)")).toBeTruthy();
   });
 
   it("renders status badge for active card", async () => {
@@ -229,6 +267,7 @@ describe("CardDetailScreen", () => {
     client.setQueryData(["card-comments", CARD_ID], FIXTURE_COMMENTS);
     client.setQueryData(["card-members", CARD_ID], FIXTURE_MEMBERS);
     client.setQueryData(["card-attachments", CARD_ID], FIXTURE_ATTACHMENTS);
+    client.setQueryData(["card-areas", CARD_ID], FIXTURE_AREAS);
 
     const { getByText } = render(<CardDetailScreen />, { wrapper: wrapper(client) });
     // NativeWind `uppercase` class is CSS-only — text renders as the raw prop value
@@ -241,6 +280,7 @@ describe("CardDetailScreen", () => {
     client.setQueryData(["card-comments", CARD_ID], FIXTURE_COMMENTS);
     client.setQueryData(["card-members", CARD_ID], FIXTURE_MEMBERS);
     client.setQueryData(["card-attachments", CARD_ID], FIXTURE_ATTACHMENTS);
+    client.setQueryData(["card-areas", CARD_ID], FIXTURE_AREAS);
 
     const { getByText } = render(<CardDetailScreen />, { wrapper: wrapper(client) });
 
@@ -256,6 +296,7 @@ describe("CardDetailScreen", () => {
     client.setQueryData(["card-comments", CARD_ID], FIXTURE_COMMENTS);
     client.setQueryData(["card-members", CARD_ID], FIXTURE_MEMBERS);
     client.setQueryData(["card-attachments", CARD_ID], FIXTURE_ATTACHMENTS);
+    client.setQueryData(["card-areas", CARD_ID], FIXTURE_AREAS);
 
     const { getByText } = render(<CardDetailScreen />, { wrapper: wrapper(client) });
     expect(getByText("Pastikan nat sudah kering sebelum dilanjutkan.")).toBeTruthy();
@@ -267,6 +308,7 @@ describe("CardDetailScreen", () => {
     client.setQueryData(["card-comments", CARD_ID], FIXTURE_COMMENTS);
     client.setQueryData(["card-members", CARD_ID], FIXTURE_MEMBERS);
     client.setQueryData(["card-attachments", CARD_ID], FIXTURE_ATTACHMENTS);
+    client.setQueryData(["card-areas", CARD_ID], FIXTURE_AREAS);
 
     const { getByText } = render(<CardDetailScreen />, { wrapper: wrapper(client) });
     expect(getByText("Budi Santoso")).toBeTruthy();
@@ -280,6 +322,7 @@ describe("CardDetailScreen", () => {
     client.setQueryData(["card-comments", CARD_ID], FIXTURE_COMMENTS);
     client.setQueryData(["card-members", CARD_ID], FIXTURE_MEMBERS);
     client.setQueryData(["card-attachments", CARD_ID], FIXTURE_ATTACHMENTS);
+    client.setQueryData(["card-areas", CARD_ID], FIXTURE_AREAS);
 
     const { getByText } = render(<CardDetailScreen />, { wrapper: wrapper(client) });
     expect(getByText("Pemasangan keramik lantai ruang tamu.")).toBeTruthy();

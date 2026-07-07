@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCard } from "@/lib/query/hooks";
 import { keys } from "@/lib/query/keys";
@@ -9,6 +9,8 @@ import type { CardAttachment, Staff } from "@datum/db";
 import { Timeline } from "@/components/board/Timeline";
 import { CommentsSection } from "@/components/board/CommentsSection";
 import { CardMembers } from "@/components/board/CardMembers";
+import { StaleDataNotice } from "@/components/shared/StaleDataNotice";
+import { PendingSyncNotice } from "@/components/shared/PendingSyncNotice";
 
 type StaffLite = Pick<Staff, "id" | "full_name" | "role">;
 
@@ -57,12 +59,17 @@ export function CardDetailClient({
   links: ReactNode;
 }) {
   const queryClient = useQueryClient();
-  const { data } = useCard(code, slug, initialCard);
+  const { data, isError } = useCard(code, slug, initialCard);
   const card = data ?? initialCard;
+  const [realtimeDown, setRealtimeDown] = useState(false);
 
   useEffect(() => {
-    return subscribeToProjectChanges(projectId, () => {
+    const invalidate = () =>
       queryClient.invalidateQueries({ queryKey: keys.card(code, slug) });
+    return subscribeToProjectChanges(projectId, invalidate, (h) => {
+      setRealtimeDown(h === "down");
+      // Changes during the outage were missed — refetch to catch up.
+      if (h === "recovered") invalidate();
     });
   }, [projectId, code, slug, queryClient]);
 
@@ -74,6 +81,10 @@ export function CardDetailClient({
 
   return (
     <div className="grid gap-0 md:grid-cols-[1fr_280px]">
+      <div className="md:col-span-2">
+        <StaleDataNotice realtimeDown={realtimeDown} refetchFailed={isError} />
+        <PendingSyncNotice />
+      </div>
       {/* Main column — the focused content */}
       <div className="border-b border-[var(--border)] px-4 py-4 md:border-b-0 md:border-r md:px-6 md:py-5">
         {header}

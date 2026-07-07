@@ -1,4 +1,5 @@
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBoardForProject } from "@/lib/cards/queries";
 import { getAdvisorItems } from "@/lib/advisor/queries";
@@ -33,7 +34,12 @@ export default async function ProjectBoardPage({
   const [caller, advisorItems] = await Promise.all([
     getCurrentStaff(),
     getAdvisorItems(supabase, { projectId: board.project.id, now: new Date(), limit: 3 })
-      .catch(() => []),
+      // Advisor is an optional garnish — fail open, but record it: a silently
+      // vanished strip is indistinguishable from "no advice" for the user.
+      .catch((e) => {
+        Sentry.captureException(e, { extra: { where: "board/advisor-strip" } });
+        return [];
+      }),
   ]);
   // Any signed-in staff can open settings (non-admins land on the Areas tab to
   // add/edit areas). Tab-level gating lives in the settings page itself.
@@ -68,19 +74,19 @@ export default async function ProjectBoardPage({
               </Link>
               <Link
                 href={`/project/${board.project.project_code}/rooms`}
-                className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+                className="text-xs font-semibold uppercase tracking-wide text-[var(--sand-dark)] hover:text-[var(--sand-darker)]"
               >
                 Ruangan →
               </Link>
               <Link
                 href={`/project/${board.project.project_code}/activity`}
-                className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+                className="text-xs font-semibold uppercase tracking-wide text-[var(--sand-dark)] hover:text-[var(--sand-darker)]"
               >
                 Aktivitas →
               </Link>
               <Link
                 href={`/project/${board.project.project_code}/schedule`}
-                className="text-xs font-semibold uppercase tracking-wide text-[#7A6B56] hover:text-[#3a3527]"
+                className="text-xs font-semibold uppercase tracking-wide text-[var(--sand-dark)] hover:text-[var(--sand-darker)]"
               >
                 Jadwal & Readiness →
               </Link>

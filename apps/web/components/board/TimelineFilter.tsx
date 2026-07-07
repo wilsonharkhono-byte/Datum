@@ -57,7 +57,7 @@ export function TimelineFilter({
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-      <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7A6B56]">filter</span>
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--sand-dark)]">filter</span>
       {shown.map((k) => {
         const on = active.has(k);
         return (
@@ -78,7 +78,7 @@ export function TimelineFilter({
           type="button"
           onClick={onAll}
           aria-label="Tampilkan semua jenis aktivitas"
-          className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#7A6B56] hover:underline"
+          className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--sand-dark)] hover:underline"
         >
           semua
         </button>
@@ -86,7 +86,7 @@ export function TimelineFilter({
           type="button"
           onClick={onNone}
           aria-label="Sembunyikan semua jenis aktivitas"
-          className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#7A6B56] hover:underline"
+          className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--sand-dark)] hover:underline"
         >
           tidak ada
         </button>

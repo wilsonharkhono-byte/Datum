@@ -75,9 +75,13 @@ export async function createArea(
   }
 
   // Best-effort: seed the firm-standard A–H checklist for the new room. Never
-  // fail area creation if seeding hiccups — steps can be re-seeded (backfill).
+  // fail area creation if seeding hiccups — steps can be re-seeded (backfill),
+  // but a room silently missing its checklist must show up in logs.
   if (created?.id) {
-    await sb.rpc("seed_area_steps", { p_area_id: created.id });
+    const { error: seedErr } = await sb.rpc("seed_area_steps", { p_area_id: created.id });
+    if (seedErr) {
+      console.error(`[areas] seed_area_steps gagal untuk area ${created.id} — checklist kosong, perlu backfill: ${seedErr.message}`);
+    }
   }
 
   return { ok: true };

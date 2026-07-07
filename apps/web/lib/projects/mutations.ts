@@ -10,7 +10,9 @@ import {
   UpdateProjectInput,
   type UpdateProjectResult,
   updateProject as coreUpdateProject,
+  getProjectCodeById,
 } from "@datum/core";
+import { cascadePlannedDates } from "@/lib/steps/mutations";
 
 export type { CreateProjectResult } from "@datum/core";
 export type { UpdateProjectResult } from "@datum/core";
@@ -61,6 +63,7 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
   try {
     input = UpdateProjectInput.parse({
       projectId:       formData.get("projectId"),
+      projectCode:     formData.get("projectCode") ? String(formData.get("projectCode")).trim().toUpperCase() : undefined,
       projectName:     formData.get("projectName") || undefined,
       clientName:      formData.get("clientName") === null ? undefined : (formData.get("clientName") === "" ? null : formData.get("clientName")),
       location:        formData.get("location") === null ? undefined : (formData.get("location") === "" ? null : formData.get("location")),
@@ -82,20 +85,37 @@ export async function updateProject(formData: FormData): Promise<UpdateProjectRe
   const supabase = await createSupabaseServerClient();
 
   // Fetch the project_code for revalidation *before* the update
-  const { data: existing } = await supabase
-    .from("projects")
-    .select("project_code")
-    .eq("id", input.projectId)
-    .maybeSingle();
+  const existingCode = await getProjectCodeById(supabase, input.projectId);
+
+  // Pre-read kickoff so the (expensive) planned-dates cascade below only runs
+  // when the kickoff actually moved — the settings form always submits the
+  // field, changed or not.
+  let previousKickoff: string | null = null;
+  if (input.kickoffDate !== undefined) {
+    const { data: prev } = await supabase
+      .from("projects").select("kickoff_date").eq("id", input.projectId).maybeSingle();
+    previousKickoff = prev?.kickoff_date ?? null;
+  }
 
   const result = await coreUpdateProject(supabase, input);
 
   if (result.ok) {
+    if (input.kickoffDate !== undefined && input.kickoffDate !== previousKickoff) {
+      // The DB trigger already recomputed area_gate_status windows inside the
+      // UPDATE; cascade them onto area_steps.planned_* so step reminders track
+      // the new kickoff instead of the schedule the areas were created under.
+      await cascadePlannedDates(supabase, input.projectId);
+    }
     revalidatePath("/");
-    if (existing?.project_code) {
-      revalidatePath(`/project/${existing.project_code}`);
-      revalidatePath(`/project/${existing.project_code}/settings`);
-      revalidatePath(`/project/${existing.project_code}/schedule`);
+    // Revalidate both the old and (if renamed) the new code's paths so neither
+    // the stale nor the fresh URL serves a cached copy.
+    const codes = new Set<string>();
+    if (existingCode) codes.add(existingCode);
+    if (input.projectCode) codes.add(input.projectCode);
+    for (const code of codes) {
+      revalidatePath(`/project/${code}`);
+      revalidatePath(`/project/${code}/settings`);
+      revalidatePath(`/project/${code}/schedule`);
     }
   }
 

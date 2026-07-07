@@ -14,8 +14,8 @@ export default async function StepLibraryPage() {
   return (
     <div className="mx-auto w-full max-w-4xl p-4">
       <header className="mb-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">Pengaturan firma</p>
-        <h1 className="text-2xl font-semibold text-[#141210]">Pustaka Langkah</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--sand-dark)]">Pengaturan firma</p>
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Pustaka Langkah</h1>
       </header>
       <div className="mb-4 rounded border border-[var(--sand)] bg-[var(--sand-tint)] px-3 py-2 text-xs text-[var(--sand-dark)]">
         Perubahan di sini hanya memengaruhi seeding ruangan BARU dan langkah yang ditambahkan lewat

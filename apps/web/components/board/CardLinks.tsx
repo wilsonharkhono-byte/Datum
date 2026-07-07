@@ -141,7 +141,7 @@ export function CardLinks({
                 disabled={pending}
                 aria-label={`Hapus tautan ke ${l.otherCard.title}`}
                 title="Hapus tautan"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-[var(--sand-dark)] hover:text-red-700 disabled:opacity-50 md:h-5 md:w-5"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-[var(--sand-dark)] hover:text-[var(--flag-critical)] disabled:opacity-50 md:h-5 md:w-5"
               >
                 <XIcon size={10} />
               </button>
@@ -162,7 +162,7 @@ export function CardLinks({
                 setTerm("");
               }}
               aria-label="Batalkan pilihan kartu"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded hover:text-red-700 md:h-4 md:w-4"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded hover:text-[var(--flag-critical)] md:h-4 md:w-4"
             >
               <XIcon size={10} />
             </button>
@@ -228,7 +228,7 @@ export function CardLinks({
         </button>
       </div>
 
-      {error ? <p className="text-[11px] text-red-700">{error}</p> : null}
+      {error ? <p className="text-[11px] text-[var(--flag-critical)]">{error}</p> : null}
     </div>
   );
 }

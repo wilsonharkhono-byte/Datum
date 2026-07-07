@@ -1,6 +1,7 @@
 import type { GateCode } from "@datum/types";
 import { GateCodes } from "@datum/types";
 import type { DatumClient } from "../client";
+import { must } from "../db/must";
 
 export type MatrixCell = {
   project_id: string;
@@ -38,23 +39,34 @@ export async function fetchMatrix(
   sb: DatumClient,
   projectId: string,
 ): Promise<MatrixData | null> {
-  const { data: project } = await sb
+  const { data: project, error: projErr } = await sb
     .from("projects")
     .select("id, project_code, project_name")
     .eq("id", projectId)
     .single();
+  // PGRST116 = no row: genuinely not found / hidden by RLS → null. Any other
+  // error must NOT render as "project not accessible" — surface it.
+  if (projErr && projErr.code !== "PGRST116") {
+    throw new Error(`[db] matrix.project: ${projErr.message}`);
+  }
   if (!project) return null;
 
-  const { data: areaRows } = await sb
-    .from("areas")
-    .select("id, area_code, area_name, floor, sort_order, area_type")
-    .eq("project_id", projectId)
-    .order("sort_order");
+  const { data: areaRows } = must(
+    await sb
+      .from("areas")
+      .select("id, area_code, area_name, floor, sort_order, area_type")
+      .eq("project_id", projectId)
+      .order("sort_order"),
+    "matrix.areas",
+  );
 
-  const { data: cellRows } = await sb
-    .from("area_gate_status")
-    .select("project_id, area_id, gate_code, status, blocking_reason, current_owner_id")
-    .eq("project_id", projectId);
+  const { data: cellRows } = must(
+    await sb
+      .from("area_gate_status")
+      .select("project_id, area_id, gate_code, status, blocking_reason, current_owner_id")
+      .eq("project_id", projectId),
+    "matrix.cells",
+  );
 
   const cells = new Map<string, MatrixCell>();
   for (const c of cellRows ?? []) {

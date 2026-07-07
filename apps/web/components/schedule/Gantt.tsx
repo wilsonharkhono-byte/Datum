@@ -1,30 +1,11 @@
+"use client";
+import { useState } from "react";
 import type { ScheduledCell } from "@/lib/gates/schedule-overlay";
 import { gateShortName } from "@/lib/gates/labels";
+import { STATUS_STYLE, STATUS_LABELS } from "./status-style";
 
 type Area = { id: string; area_name: string; area_code: string };
 type Gate = { code: string; name: string };
-
-/** Brand-aligned status palette. Soft tints on warm surfaces, never the
- *  generic stone/amber/blue/green/red — those got swept earlier and no
- *  longer exist as Tailwind utilities. Values used inline so they can't
- *  silently disappear if the JIT misses them. */
-const STATUS_STYLE: Record<string, { bg: string; fg: string; border: string }> = {
-  not_started:       { bg: "#e9e5dd", fg: "#524e49", border: "#cfc8bc" },
-  in_progress:       { bg: "rgba(230, 81, 0, 0.18)",  fg: "#9a3c00", border: "#e65100" },
-  ready_for_handoff: { bg: "rgba(21, 101, 192, 0.18)", fg: "#0d3d77", border: "#1565c0" },
-  blocked:           { bg: "rgba(191, 54, 12, 0.18)",  fg: "#7a2208", border: "#bf360c" },
-  passed:            { bg: "rgba(61, 139, 64, 0.18)",  fg: "#235425", border: "#3d8b40" },
-  not_applicable:    { bg: "#f2efe9", fg: "#847e78", border: "#d8d3ca" },
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  not_started:       "Belum mulai",
-  in_progress:       "Dikerjakan",
-  ready_for_handoff: "Siap handoff",
-  blocked:           "Terblokir",
-  passed:            "Lulus",
-  not_applicable:    "Tidak relevan",
-};
 
 const ROW_HEIGHT = 22;
 
@@ -32,11 +13,18 @@ export function Gantt({
   areas,
   gates,
   cells,
+  todayIso,
 }: {
   areas: Area[];
   gates: Gate[];
   cells: ScheduledCell[];
+  /** Server-provided WIB date (YYYY-MM-DD) so SSR and hydration agree. */
+  todayIso: string;
 }) {
+  // Bar details used to live only in `title` tooltips — unreachable on touch.
+  // Tapping/clicking a bar now selects it and shows the detail strip below.
+  const [selected, setSelected] = useState<ScheduledCell | null>(null);
+
   if (cells.length === 0) {
     return (
       <div className="rounded border border-dashed border-[var(--border)] p-6 text-center text-sm italic text-[var(--text-secondary)]">
@@ -71,11 +59,13 @@ export function Gantt({
     cellsByArea.set(c.area_id, arr);
   }
 
-  const today = new Date();
+  const today = new Date(todayIso);
   const todayPct = ((today.getTime() - minDate.getTime()) / totalMs) * 100;
   const todayInRange = todayPct >= 0 && todayPct <= 100;
 
   const orderedGates = gates.length > 0 ? gates : inferGates(cells);
+  const areaById = new Map(areas.map((a) => [a.id, a]));
+  const selectedArea = selected ? areaById.get(selected.area_id) : null;
 
   return (
     <>
@@ -215,8 +205,13 @@ export function Gantt({
                         {cell && cell.target_start_date && cell.target_end_date ? (
                           <GateBar
                             cell={cell}
+                            areaName={area.area_name}
                             left={pctOf(cell.target_start_date)}
                             right={pctOf(cell.target_end_date)}
+                            isSelected={selected === cell}
+                            onSelect={() =>
+                              setSelected((prev) => (prev === cell ? null : cell))
+                            }
                           />
                         ) : null}
                       </div>
@@ -236,6 +231,37 @@ export function Gantt({
             );
           })}
         </div>
+
+        {/* Selected bar detail — tap a bar to fill this (title tooltips don't
+            exist on touch). */}
+        {selected && selectedArea ? (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+            <span className="font-semibold text-[var(--foreground)]">
+              {selectedArea.area_name} · Gate {selected.gate_code}
+            </span>
+            <span>{gateShortName(selected.gate_code)}</span>
+            <span
+              className="rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{
+                background: (STATUS_STYLE[selected.status] ?? STATUS_STYLE.not_started!).bg,
+                borderColor: (STATUS_STYLE[selected.status] ?? STATUS_STYLE.not_started!).border,
+                color: (STATUS_STYLE[selected.status] ?? STATUS_STYLE.not_started!).fg,
+              }}
+            >
+              {STATUS_LABELS[selected.status] ?? selected.status}
+            </span>
+            <span>
+              {selected.target_start_date} → {selected.target_end_date}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="ml-auto min-h-11 px-2 text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--foreground)] md:min-h-0"
+            >
+              tutup
+            </button>
+          </div>
+        ) : null}
 
         {/* Legend */}
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-[var(--text-secondary)]">
@@ -262,27 +288,38 @@ export function Gantt({
 
 function GateBar({
   cell,
+  areaName,
   left,
   right,
+  isSelected,
+  onSelect,
 }: {
   cell: ScheduledCell;
+  areaName: string;
   left: number;
   right: number;
+  isSelected: boolean;
+  onSelect: () => void;
 }) {
   const style = STATUS_STYLE[cell.status] ?? STATUS_STYLE.not_started!;
   const width = Math.max(0.4, right - left);
+  const label = `${areaName} · Gate ${cell.gate_code} · ${gateShortName(cell.gate_code)} · ${STATUS_LABELS[cell.status] ?? cell.status} · ${cell.target_start_date} → ${cell.target_end_date}`;
   return (
-    <div
-      className="absolute rounded-sm"
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-label={label}
+      aria-pressed={isSelected}
+      className="absolute rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--sand-dark)]"
       style={{
         left: `${left}%`,
         width: `${width}%`,
         top: "3px",
         bottom: "3px",
         background: style.bg,
-        border: `1px solid ${style.border}`,
+        border: isSelected ? `2px solid ${style.border}` : `1px solid ${style.border}`,
       }}
-      title={`Gate ${cell.gate_code} · ${gateShortName(cell.gate_code)} · ${STATUS_LABELS[cell.status] ?? cell.status} · ${cell.target_start_date} → ${cell.target_end_date}`}
+      title={label}
     />
   );
 }

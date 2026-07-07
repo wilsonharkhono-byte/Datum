@@ -87,7 +87,9 @@ export function shouldNotifyWatchers(
   return true;
 }
 
-/** Fan out watcher notifications to all active card_members (owner/watcher/assignee). */
+/** Fan out watcher notifications to all active card_members (owner/watcher/assignee).
+    Returns the recipient staff ids so callers (e.g. Expo push) reuse the same
+    derivation instead of re-querying card_members. */
 export async function notifyWatchersOfEvent(
   supabase: Supa,
   args: {
@@ -101,13 +103,17 @@ export async function notifyWatchersOfEvent(
     cardSlug:    string;
     cardTitle:   string;
   },
-): Promise<void> {
-  if (!shouldNotifyWatchers(args.eventKind, args.payload)) return;
-  const { data: members } = await supabase
+): Promise<string[]> {
+  if (!shouldNotifyWatchers(args.eventKind, args.payload)) return [];
+  const { data: members, error } = await supabase
     .from("card_members")
     .select("staff_id")
     .eq("card_id", args.cardId)
     .is("removed_at", null);
+  if (error) {
+    console.warn("[notifications] watcher recipient read failed:", error.message);
+    return [];
+  }
   const recipients = (members ?? [])
     .map((m) => m.staff_id)
     .filter((id): id is string => typeof id === "string" && id !== args.actorId);
@@ -125,11 +131,12 @@ export async function notifyWatchersOfEvent(
       link:               `/project/${args.projectCode}/cards/${args.cardSlug}`,
     })),
   );
+  return unique;
 }
 
 // ─── 3. Card status changed ───────────────────────────────────────────────────
 
-/** Notify all card members when a card's status changes. */
+/** Notify all card members when a card's status changes. Returns recipient ids. */
 export async function notifyCardStatusChange(
   supabase: Supa,
   args: {
@@ -141,18 +148,23 @@ export async function notifyCardStatusChange(
     newStatus:   string;
     actorId:     string;
   },
-): Promise<void> {
-  const { data: members } = await supabase
+): Promise<string[]> {
+  const { data: members, error } = await supabase
     .from("card_members")
     .select("staff_id")
     .eq("card_id", args.cardId)
     .is("removed_at", null);
+  if (error) {
+    console.warn("[notifications] status-change recipient read failed:", error.message);
+    return [];
+  }
   const recipients = (members ?? [])
     .map((m) => m.staff_id)
     .filter((id): id is string => typeof id === "string" && id !== args.actorId);
+  const unique = [...new Set(recipients)];
   await safeInsert(
     supabase,
-    [...new Set(recipients)].map((staffId) => ({
+    unique.map((staffId) => ({
       recipient_staff_id: staffId,
       kind:               "card_status" as const,
       project_id:         args.projectId,
@@ -162,6 +174,7 @@ export async function notifyCardStatusChange(
       link:               `/project/${args.projectCode}/cards/${args.cardSlug}`,
     })),
   );
+  return unique;
 }
 
 // ─── 4. Draft approved ────────────────────────────────────────────────────────
@@ -244,12 +257,16 @@ export async function notifyDraftPending(
     cardTitle: string;
     cardId:    string;
   },
-): Promise<void> {
-  const { data: principals } = await supabase
+): Promise<string[]> {
+  const { data: principals, error } = await supabase
     .from("staff")
     .select("id")
     .eq("active", true)
     .eq("role", "principal");
+  if (error) {
+    console.warn("[notifications] principal recipient read failed:", error.message);
+    return [];
+  }
   const recipients = (principals ?? [])
     .map((s) => s.id)
     .filter((id) => id !== args.actorId);
@@ -266,4 +283,5 @@ export async function notifyDraftPending(
       link:               "/review",
     })),
   );
+  return recipients;
 }

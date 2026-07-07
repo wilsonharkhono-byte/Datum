@@ -3,6 +3,7 @@ import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createSupabaseClientForRequest } from "@/lib/supabase/from-request";
 import { retrieveProjectContext } from "@/lib/assistant/retrieval";
+import { getCurrentStaff, getProjectAreas } from "@datum/core";
 import {
   AnthropicNotConfiguredError,
   getAnthropicClient,
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { data: staff } = await supabase.from("staff").select("id").eq("id", user.id).maybeSingle();
+  const staff = await getCurrentStaff(supabase);
   if (!staff) return NextResponse.json({ error: "no staff record" }, { status: 403 });
 
   let body: z.infer<typeof Body>;
@@ -77,12 +78,7 @@ export async function POST(req: Request) {
 
   // Fetch the project's existing areas so the AI can hint which room the note
   // refers to. Read-only, room-naming fields only — no cost data.
-  const { data: areaRows } = await supabase
-    .from("areas")
-    .select("id, area_code, area_name, floor")
-    .eq("project_id", body.projectId)
-    .order("sort_order", { ascending: true });
-  const areas = areaRows ?? [];
+  const areas = await getProjectAreas(supabase, body.projectId);
   const validAreaCodes = new Set(areas.map((a) => a.area_code));
   const areaBlock = areas.length > 0
     ? `\n\nAREA TERSEDIA (untuk area_hint — pilih hanya dari sini):\n${areas

@@ -91,18 +91,19 @@ export async function markGatePassed(
     return { ok: false, error: "Data tidak valid" };
   }
 
-  // 2. Membership + state guard in one read. RLS already restricts this row to
-  //    projects the caller can read; the explicit project_id filter + the
-  //    not-found check below turn "no access" and "wrong project" into the
-  //    same safe rejection (never trust the client's projectId).
-  const { data: cell, error: cellErr } = await sb
+  // 2. Membership + state guard in one read — fetch the whole area's row set so
+  //    the predecessor check below costs no extra round-trip. RLS already
+  //    restricts these rows to projects the caller can read; the explicit
+  //    project_id filter + the not-found check below turn "no access" and
+  //    "wrong project" into the same safe rejection (never trust the client's
+  //    projectId).
+  const { data: areaCells, error: cellErr } = await sb
     .from("area_gate_status")
-    .select("status, actual_end_date, project_id")
+    .select("gate_code, status, actual_end_date, project_id")
     .eq("project_id", input.projectId)
-    .eq("area_id", input.areaId)
-    .eq("gate_code", input.gateCode)
-    .maybeSingle();
+    .eq("area_id", input.areaId);
   if (cellErr) return { ok: false, error: cellErr.message };
+  const cell = (areaCells ?? []).find((c) => c.gate_code === input.gateCode);
   if (!cell) {
     return { ok: false, error: "Gate tidak ditemukan atau tidak punya akses" };
   }
@@ -117,6 +118,28 @@ export async function markGatePassed(
       ok: false,
       error: "Gate ini belum siap diselesaikan — masih ada pekerjaan terkait",
     };
+  }
+
+  // 3b. Predecessor guard: gates are a sequence (A→H) — passing gate N with
+  //     gate N-1 not passed would render sequence-valid progress that isn't.
+  //     Walk back past not_applicable gates; the nearest applicable
+  //     predecessor must be passed. A missing row counts as not_started.
+  //     (DB-level enforcement can follow as a trigger; this closes the gap
+  //     for both web and mobile, which share this function.)
+  const byGate = new Map((areaCells ?? []).map((c) => [c.gate_code, c]));
+  const gateIdx = GateCodes.indexOf(input.gateCode);
+  for (let i = gateIdx - 1; i >= 0; i--) {
+    const prevCode = GateCodes[i]!;
+    const prev = byGate.get(prevCode);
+    if (prev?.status === "not_applicable") continue; // skip over — walk further back
+    const prevPassed = prev != null && (prev.status === "passed" || prev.actual_end_date != null);
+    if (!prevPassed) {
+      return {
+        ok: false,
+        error: `Gate ${prevCode} belum selesai — gate harus diselesaikan berurutan`,
+      };
+    }
+    break; // nearest applicable predecessor is passed — sequence holds
   }
 
   const completedDate =
@@ -157,10 +180,15 @@ export async function markGatePassed(
       passed_by_staff_id: staffId,
       passed_at: passedAt,
     }));
-    // onConflict on the natural key avoids dupes if confirmed twice; ignore err.
-    await sb
+    // onConflict on the natural key avoids dupes if confirmed twice. The gate
+    // pass itself already succeeded so don't fail it — but a lost checkpoint
+    // audit trail must at least be visible in logs.
+    const { error: cpErr } = await sb
       .from("area_gate_checkpoints")
       .upsert(rows, { onConflict: "project_id,area_id,gate_code,template_id" });
+    if (cpErr) {
+      console.error(`[gates] markGatePassed: checkpoint rows not recorded for area ${input.areaId} gate ${input.gateCode}: ${cpErr.message}`);
+    }
   }
 
   // NOTE: Web wrapper (apps/web/lib/gates/advance.ts) calls revalidatePath after

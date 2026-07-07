@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProjectBySlug } from "@datum/core";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCardWithTimelineByProjectCode, getCardAttachments, getCardMembers, getCardComments, getProjectStaff, getProjectTopics } from "@/lib/cards/queries";
 import { getCardAreas } from "@/lib/cards/area-link-queries";
@@ -23,20 +24,18 @@ export default async function CardDetailPage({
   const currentStaffId = user?.id ?? null;
 
   const [projectRes, detailRes] = await Promise.allSettled([
-    supabase
-      .from("projects").select("id, project_code, project_name")
-      .eq("project_code", slug.toUpperCase()).maybeSingle(),
+    getProjectBySlug(supabase, slug),
     getCardWithTimelineByProjectCode(supabase, slug.toUpperCase(), cardSlug),
   ]);
   if (projectRes.status === "rejected") throw projectRes.reason;
-  const project = projectRes.value.data;
+  const project = projectRes.value;
   if (!project) {
-    return <div className="p-6 text-red-700">Proyek tidak ditemukan: {slug}</div>;
+    return <div className="p-6 text-[var(--flag-critical)]">Proyek tidak ditemukan: {slug}</div>;
   }
 
   if (detailRes.status === "rejected") {
     return (
-      <div className="p-6 text-red-700">
+      <div className="p-6 text-[var(--flag-critical)]">
         Kartu tidak ditemukan: <code>{cardSlug}</code>
         <div className="mt-3"><Link href={`/project/${slug}`} className="underline">← kembali ke board</Link></div>
       </div>
@@ -118,6 +117,10 @@ export default async function CardDetailPage({
                 cardSlug={cardSlug}
                 cardCode={project.project_code}
                 cardQuerySlug={cardSlug}
+                cardTitle={detail.card.title}
+                topicName={topicName === "—" ? null : topicName}
+                hasLinkedArea={cardAreas.length > 0}
+                projectAreas={projectAreas}
               />
             }
             moveControl={

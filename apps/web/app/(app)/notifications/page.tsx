@@ -10,8 +10,8 @@ export default async function NotificationsPage() {
   return (
     <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
       <Link href="/" className="text-xs text-[var(--text-muted)] hover:underline">← Beranda</Link>
-      <h1 className="mt-2 text-2xl font-semibold text-[#141210]">Notifikasi</h1>
-      <p className="mt-1 text-sm text-[#524E49]">
+      <h1 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">Notifikasi</h1>
+      <p className="mt-1 text-sm text-[var(--text-secondary)]">
         @mention di komentar, aktivitas di kartu yang Anda tonton, dan status draft.
       </p>
       <div className="mt-6">

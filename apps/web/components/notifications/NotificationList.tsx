@@ -37,23 +37,23 @@ export function NotificationList({ items }: { items: Notification[] }) {
   return (
     <div>
       {items.length === 0 ? (
-        <div className="rounded border border-dashed border-[#B5AFA8] p-6">
-          <p className="italic text-sm text-[#524E49]">Tidak ada notifikasi.</p>
-          <p className="mt-1 text-xs text-[#847E78]">
+        <div className="rounded border border-dashed border-[var(--border)] p-6">
+          <p className="italic text-sm text-[var(--text-secondary)]">Tidak ada notifikasi.</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             Notifikasi muncul saat ada @mention, draft yang menunggu approval, atau aktivitas di kartu yang Anda tonton.
           </p>
         </div>
       ) : null}
       {items.length > 0 ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-[#524E49]">{unread} belum dibaca dari {items.length} terbaru</p>
+          <p className="text-sm text-[var(--text-secondary)]">{unread} belum dibaca dari {items.length} terbaru</p>
           {unread > 0 ? (
             <button
               type="button"
               onClick={markAll}
               disabled={busy}
               aria-label="Tandai semua notifikasi sebagai dibaca"
-              className="inline-flex min-h-11 items-center justify-center rounded border border-[#B5AFA8] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56] disabled:opacity-50 md:min-h-0"
+              className="inline-flex min-h-11 items-center justify-center rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)] disabled:opacity-50 md:min-h-0"
             >
               tandai semua dibaca
             </button>
@@ -75,8 +75,8 @@ export function NotificationList({ items }: { items: Notification[] }) {
                 {KIND_LABEL[n.kind] ?? n.kind}
               </span>
               <div className="flex-1">
-                <Link href={n.link} className="text-[#141210] hover:underline">{n.summary}</Link>
-                <div className="mt-1 text-[10px] text-[#847E78]">
+                <Link href={n.link} className="text-[var(--foreground)] hover:underline">{n.summary}</Link>
+                <div className="mt-1 text-[10px] text-[var(--text-muted)]">
                   {new Date(n.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
                 </div>
               </div>
@@ -85,7 +85,7 @@ export function NotificationList({ items }: { items: Notification[] }) {
                   type="button"
                   onClick={() => markOne(n.id)}
                   aria-label="Tandai notifikasi ini sebagai dibaca"
-                  className="inline-flex min-h-11 shrink-0 items-center px-2 py-1 text-xs text-[#7A6B56] hover:underline md:min-h-0"
+                  className="inline-flex min-h-11 shrink-0 items-center px-2 py-1 text-xs text-[var(--sand-dark)] hover:underline md:min-h-0"
                 >
                   tandai dibaca
                 </button>

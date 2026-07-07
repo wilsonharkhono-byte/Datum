@@ -12,9 +12,9 @@ import type { getRoomStepView } from "@/lib/steps/queries";
 type StepView = Awaited<ReturnType<typeof getRoomStepView>>;
 
 const ACTION_TONE: Record<Room["action"]["tone"], string> = {
-  urgent: "text-[#C62828]",
-  active: "text-[#7A6B56]",
-  ready: "text-[#1565C0]",
+  urgent: "text-[var(--flag-critical)]",
+  active: "text-[var(--sand-dark)]",
+  ready: "text-[var(--flag-info)]",
   idle: "text-[var(--text-muted)]",
 };
 
@@ -53,14 +53,14 @@ export function RoomRow({
         >
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold text-[#141210]">{room.areaName}</span>
+              <span className="truncate text-sm font-semibold text-[var(--foreground)]">{room.areaName}</span>
               {room.floor ? (
-                <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.08em] text-[#7A6B56]">
+                <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--sand-dark)]">
                   {room.floor}
                 </span>
               ) : null}
               {room.blockers > 0 ? (
-                <span className="shrink-0 rounded bg-[rgba(198,40,40,0.10)] px-1.5 py-0.5 text-[10px] font-bold text-[#C62828]">
+                <span className="shrink-0 rounded bg-[rgba(198,40,40,0.10)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--flag-critical)]">
                   {room.blockers} blocker
                 </span>
               ) : null}

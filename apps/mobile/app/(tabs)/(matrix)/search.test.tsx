@@ -10,6 +10,7 @@ import SearchScreen from "./search";
 // Mock @datum/core searchAll
 const mockSearchAll = jest.fn();
 jest.mock("@datum/core", () => ({
+  ...jest.requireActual("@datum/core"),
   searchAll: (...args: any[]) => mockSearchAll(...args),
 }));
 

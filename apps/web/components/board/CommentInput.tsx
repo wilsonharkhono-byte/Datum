@@ -46,7 +46,9 @@ export function CommentInput({
     });
   }
 
-  const pending = addComment.isPending;
+  // Paused (offline) mutations must not lock the form — the queued comment is
+  // already painted optimistically and PendingSyncNotice shows the count.
+  const pending = addComment.isPending && !addComment.isPaused;
 
   return (
     <form onSubmit={submit} className="mt-3">
@@ -59,12 +61,12 @@ export function CommentInput({
         placeholder="Tambah komentar…"
         className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none"
       />
-      {error ? <div className="mt-1 text-[11px] text-red-700">{error}</div> : null}
+      {error ? <div className="mt-1 text-[11px] text-[var(--flag-critical)]">{error}</div> : null}
       <div className="mt-1.5">
         <button
           type="submit"
           disabled={pending || !body.trim()}
-          className="rounded bg-[#141210] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#FDFAF6] disabled:bg-[var(--text-muted)]"
+          className="rounded bg-[var(--foreground)] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--surface)] disabled:bg-[var(--text-muted)]"
         >
           {pending ? "Mengirim…" : "Kirim komentar"}
         </button>

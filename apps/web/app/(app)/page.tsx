@@ -22,14 +22,14 @@ export default async function HomePage() {
 
   if (error) {
     return (
-      <div className="rounded-[8px] border border-[#C62828]/25 bg-[rgba(198,40,40,0.08)] p-4 text-sm font-medium text-[#C62828]">
+      <div className="rounded-[8px] border border-[var(--flag-critical)]/25 bg-[var(--flag-critical-bg)] p-4 text-sm font-medium text-[var(--flag-critical)]">
         Gagal memuat proyek: {error.message}
       </div>
     );
   }
   if (!projects || projects.length === 0) {
     return (
-      <div className="rounded-[8px] border border-[#B5AFA8] bg-[#FDFAF6] p-6 text-[#524E49]">
+      <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--text-secondary)]">
         Belum ada proyek yang ditugaskan.
       </div>
     );
@@ -40,13 +40,13 @@ export default async function HomePage() {
   return (
     <div className="grid gap-6">
       <section>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7A6B56]">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--sand-dark)]">
           DATUM
         </p>
-        <h1 className="max-w-2xl text-3xl font-semibold leading-tight text-[#141210]">
+        <h1 className="max-w-2xl text-3xl font-semibold leading-tight text-[var(--foreground)]">
           Pilih proyek untuk membuka papan kartu dan asisten.
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[#524E49]">
+        <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
           {projects.length} proyek aktif · {developments.length} pengembangan. Klik salah satu untuk melihat semua kartu per topik, timeline keputusan, dan bertanya pada asisten.
         </p>
         {pendingDraftCount && pendingDraftCount > 0 ? (
@@ -58,13 +58,13 @@ export default async function HomePage() {
           <Link href="/projects/new" aria-label="Buat proyek baru" className="rounded bg-[var(--foreground)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-inverse)] hover:bg-[var(--sand-dark)]">
             + Buat proyek
           </Link>
-          <Link href="/activity" aria-label="Aktivitas terbaru" className="inline-flex items-center gap-1.5 rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
+          <Link href="/activity" aria-label="Aktivitas terbaru" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
             <ClipboardIcon size={13} /> Aktivitas terbaru
           </Link>
-          <Link href="/brief" aria-label="Morning brief" className="inline-flex items-center gap-1.5 rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
+          <Link href="/brief" aria-label="Morning brief" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
             <BookIcon size={13} /> Morning brief
           </Link>
-          <Link href="/search" aria-label="Cari" className="inline-flex items-center gap-1.5 rounded border border-[#B5AFA8] bg-white px-3 py-1 font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56]">
+          <Link href="/search" aria-label="Cari" className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)]">
             <SearchIcon size={13} /> Cari
           </Link>
         </div>

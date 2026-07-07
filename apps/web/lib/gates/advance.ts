@@ -6,6 +6,7 @@ import { getCurrentStaff } from "@/lib/auth/require-role";
 import {
   markGatePassed as coreMarkGatePassed,
   getGateCheckpoints as coreGetGateCheckpoints,
+  getProjectCodeById,
 } from "@datum/core";
 
 // A "use server" file may only export async functions. Re-export TYPES only;
@@ -46,13 +47,7 @@ export async function markGatePassed(
 
   if (result.ok) {
     // Refresh every surface that reads gate status.
-    const sb2 = await createSupabaseServerClient();
-    const { data: proj } = await sb2
-      .from("projects")
-      .select("project_code")
-      .eq("id", (raw as { projectId: string }).projectId)
-      .maybeSingle();
-    const code = proj?.project_code;
+    const code = await getProjectCodeById(supabase, (raw as { projectId: string }).projectId);
     if (code) {
       revalidatePath(`/project/${code}/schedule`);
       revalidatePath(`/project/${code}/rooms`);

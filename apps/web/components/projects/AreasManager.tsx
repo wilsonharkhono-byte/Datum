@@ -69,6 +69,12 @@ export function AreasManager({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [setupMode, setSetupMode] = useState<"suggest" | "backfill">("suggest");
+
+  function openSetup(mode: "suggest" | "backfill") {
+    setSetupMode(mode);
+    setSetupOpen(true);
+  }
 
   function startEdit(id: string) {
     setError(null);
@@ -125,13 +131,22 @@ export function AreasManager({
             {areas.length} area
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setSetupOpen(true)}
-          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md border border-[var(--sand)] bg-[var(--sand-tint)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--surface)]"
-        >
-          <SparkIcon size={13} /> Deteksi ruangan otomatis
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => openSetup("backfill")}
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md border border-[var(--sand)] bg-[var(--sand-tint)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--sand-dark)] hover:border-[var(--sand-dark)] hover:bg-[var(--surface)]"
+          >
+            <SparkIcon size={13} /> Tautkan kartu ke ruangan (AI)
+          </button>
+          <button
+            type="button"
+            onClick={() => openSetup("suggest")}
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)] hover:text-[var(--sand-dark)]"
+          >
+            <SparkIcon size={13} /> Deteksi ruangan otomatis
+          </button>
+        </div>
       </div>
 
       {areas.length === 0 ? (
@@ -295,6 +310,7 @@ export function AreasManager({
         <AreaSetup
           projectId={projectId}
           projectCode={projectCode}
+          mode={setupMode}
           onClose={() => setSetupOpen(false)}
           onApplied={() => router.refresh()}
         />

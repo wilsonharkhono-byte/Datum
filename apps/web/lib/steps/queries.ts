@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
 import { computeAreaFlags, type AreaFlags } from "@/lib/steps/flags";
-import type { TradeStepDep } from "@/lib/steps/types";
+import { getTradeStepDeps, getStandardCatalogSteps } from "@/lib/steps/reference";
 import { computeStepSignals } from "@/lib/steps/signals";
 import type { StepSignal } from "@/lib/steps/signals";
 import { gateShortName } from "@datum/core";
@@ -197,11 +197,7 @@ export async function getProjectStepSignals(
   if (stepsErr) throw stepsErr;
 
   // 2. Fetch dep edges once (shared across all areas).
-  const { data: depsRaw, error: depsErr } = await supabase
-    .from("trade_step_deps")
-    .select("step_code, predecessor_code");
-  if (depsErr) throw depsErr;
-  const deps = (depsRaw ?? []) as TradeStepDep[];
+  const deps = await getTradeStepDeps(supabase);
 
   // 3. Fetch area names for all areas that appear in the step list.
   const areaIds = [...new Set((rawSteps ?? []).map((r) => r.area_id))];
@@ -296,6 +292,30 @@ export async function getProjectStepSignals(
   return allSignalRows;
 }
 
+/**
+ * One reminder row per step: the flat signal list can carry up to 5 signals
+ * for a single step (behind_plan + lead_time_risk + stale_decision …), which
+ * reads as near-duplicate rows. Collapse to the highest-severity signal per
+ * (areaId, stepCode) — input is already severity-sorted, so the first row wins
+ * — and count the collapsed rest so the UI can show "+N sinyal lain".
+ * Pure + unit-testable.
+ */
+export type GroupedStepSignal = ProjectStepSignalRow & { otherSignalCount: number };
+
+export function groupSignalsByStep(rows: ProjectStepSignalRow[]): GroupedStepSignal[] {
+  const byStep = new Map<string, GroupedStepSignal>();
+  for (const row of rows) {
+    const key = `${row.areaId}:${row.stepCode}`;
+    const existing = byStep.get(key);
+    if (existing) {
+      existing.otherSignalCount += 1;
+    } else {
+      byStep.set(key, { ...row, otherSignalCount: 0 });
+    }
+  }
+  return [...byStep.values()];
+}
+
 /** Steps for an area plus the per-area flags (siap dimulai / perlu keputusan / blocked). */
 export async function getAreaStepView(
   supabase: SupabaseClient<Database>,
@@ -306,13 +326,10 @@ export async function getAreaStepView(
   // (step_code, predecessor_code)), so there is nothing to filter on here.
   // computeAreaFlags intersects deps against this area's own step_codes, so
   // foreign deps are harmlessly ignored.
-  const { data: deps, error } = await supabase
-    .from("trade_step_deps")
-    .select("step_code, predecessor_code");
-  if (error) throw error;
+  const deps = await getTradeStepDeps(supabase);
   const flags = computeAreaFlags(
     steps.map((s) => ({ step_code: s.step_code, step_type: s.step_type, status: s.status })),
-    (deps ?? []) as TradeStepDep[],
+    deps,
   );
   return { steps, flags };
 }
@@ -341,13 +358,11 @@ export async function getAddableCatalogSteps(
 ): Promise<CatalogStep[]> {
   const { data: area } = await supabase.from("areas").select("area_type").eq("id", areaId).single();
   const areaType = area?.area_type ?? null;
-  const [{ data: existing, error: e1 }, { data: catalog, error: e2 }] = await Promise.all([
+  const [{ data: existing, error: e1 }, catalog] = await Promise.all([
     supabase.from("area_steps").select("step_code").eq("area_id", areaId),
-    supabase.from("trade_steps").select("code, name, applies_to_area_types")
-      .eq("active", true).is("project_id", null).order("gate_code").order("sort_order"),
+    getStandardCatalogSteps(supabase),
   ]);
   if (e1) throw e1;
-  if (e2) throw e2;
   const applicable = (catalog ?? []).filter((c) => {
     const types = (c.applies_to_area_types as string[] | null) ?? null;
     return types === null || (areaType !== null && types.includes(areaType));
@@ -425,26 +440,16 @@ export async function getRoomStepViews(
       .eq("project_id", projectId)
       .not("removed_at", "is", null),
     // 3. trade_step_deps once
-    supabase
-      .from("trade_step_deps")
-      .select("step_code, predecessor_code"),
+    getTradeStepDeps(supabase),
     // 4. Firm-standard catalog once
-    supabase
-      .from("trade_steps")
-      .select("code, name, applies_to_area_types")
-      .eq("active", true)
-      .is("project_id", null)
-      .order("gate_code")
-      .order("sort_order"),
+    getStandardCatalogSteps(supabase),
   ]);
 
   if (rawStepsRes.error) throw rawStepsRes.error;
   if (removedRes.error) throw removedRes.error;
-  if (depsRes.error) throw depsRes.error;
-  if (catalogRes.error) throw catalogRes.error;
 
-  const deps = (depsRes.data ?? []) as TradeStepDep[];
-  const catalogAll = catalogRes.data ?? [];
+  const deps = depsRes;
+  const catalogAll = catalogRes;
 
   // Group non-removed steps by area_id, sorted
   const stepsByArea = new Map<string, AreaStepRow[]>();

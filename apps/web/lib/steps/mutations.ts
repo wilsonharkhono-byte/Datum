@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@datum/db";
-import { backScheduleSteps } from "@/lib/steps/back-schedule";
+import { backScheduleSteps, daysBetween, addDays } from "@/lib/steps/back-schedule";
 import { projectStepStatus } from "@/lib/steps/status";
-import type { TradeStepDep, TradeStepTemplate } from "@/lib/steps/types";
+import type { TradeStepTemplate } from "@/lib/steps/types";
+import { getTradeStepDeps } from "@/lib/steps/reference";
 import type { SelectedMatch } from "@/lib/steps/infer";
 
 /** Call the SQL instantiation function for an area (idempotent). */
@@ -17,33 +18,92 @@ export async function instantiateAreaSteps(
 /**
  * Compute planned windows for an area's steps from each gate's target window
  * and persist them onto area_steps. Gates with no target window are skipped.
+ *
+ * Honors the area's handover target (areas.target_date): the same translation
+ * overlayAreaTargetDates applies read-time to the Gantt — shift every gate
+ * window so the last gate ends on the target — is applied here before
+ * back-scheduling, so reminders and planned dates agree with what the
+ * schedule page shows.
  */
 export async function writePlannedDates(
   supabase: SupabaseClient<Database>,
   areaId: string,
 ): Promise<void> {
-  const { data: gates } = await supabase
+  // Every read here MUST be checked: back-scheduling with a silently-empty
+  // dependency graph or template set would PERSIST wrong planned windows.
+  const { data: gates, error: gatesErr } = await supabase
     .from("area_gate_status")
     .select("gate_code, target_start_date, target_end_date")
     .eq("area_id", areaId);
-  const { data: deps } = await supabase
-    .from("trade_step_deps").select("step_code, predecessor_code");
+  if (gatesErr) throw gatesErr;
+  const { data: area, error: areaErr } = await supabase
+    .from("areas")
+    .select("project_id, target_date")
+    .eq("id", areaId)
+    .single();
+  if (areaErr) throw areaErr;
+  const deps = await getTradeStepDeps(supabase);
+
+  // Overlay delta (days): mirror overlayAreaTargetDates — anchor on the
+  // highest gate code that has a stored end date, shift all windows so that
+  // gate ends on areas.target_date. 0 when no target (kickoff schedule as-is).
+  let delta = 0;
+  if (area.target_date) {
+    const anchor = (gates ?? [])
+      .filter((g) => g.target_end_date)
+      .sort((a, b) => a.gate_code.localeCompare(b.gate_code))
+      .pop();
+    if (anchor?.target_end_date) {
+      delta = daysBetween(anchor.target_end_date, area.target_date);
+    }
+  }
 
   for (const g of gates ?? []) {
     if (!g.target_start_date || !g.target_end_date) continue;
-    const { data: tmpl } = await supabase
+    // Global templates + this project's custom steps (Approach-B rows) — both
+    // are instantiated on areas, so both need planned windows.
+    const { data: tmpl, error: tmplErr } = await supabase
       .from("trade_steps")
       .select("code, gate_code, name, step_type, trade_role, typical_duration_days, lead_time_days, sort_order, applicability")
-      .eq("gate_code", g.gate_code).eq("active", true).is("project_id", null);
+      .eq("gate_code", g.gate_code).eq("active", true)
+      .or(`project_id.is.null,project_id.eq.${area.project_id}`);
+    if (tmplErr) throw tmplErr;
     const plan = backScheduleSteps(
       (tmpl ?? []) as unknown as TradeStepTemplate[],
-      (deps ?? []) as TradeStepDep[],
-      { start: g.target_start_date, end: g.target_end_date },
+      deps,
+      {
+        start: delta === 0 ? g.target_start_date : addDays(g.target_start_date, delta),
+        end: delta === 0 ? g.target_end_date : addDays(g.target_end_date, delta),
+      },
     );
     for (const [code, win] of plan) {
-      await supabase.from("area_steps")
+      const { error: writeErr } = await supabase.from("area_steps")
         .update({ planned_start: win.planned_start, planned_end: win.planned_end })
         .eq("area_id", areaId).eq("step_code", code);
+      if (writeErr) throw writeErr;
+    }
+  }
+}
+
+/**
+ * Re-derive planned step windows for EVERY area of a project. Best-effort per
+ * area — one area's template gap must not abort the rest. Call after anything
+ * that moves gate windows: kickoff_date change (the DB trigger recomputes
+ * area_gate_status synchronously inside the UPDATE, so windows are fresh by
+ * the time this runs) or an area handover target change.
+ */
+export async function cascadePlannedDates(
+  supabase: SupabaseClient<Database>,
+  projectId: string,
+): Promise<void> {
+  const { data: areas, error } = await supabase
+    .from("areas").select("id").eq("project_id", projectId);
+  if (error) throw error;
+  for (const area of areas ?? []) {
+    try {
+      await writePlannedDates(supabase, area.id);
+    } catch (e) {
+      console.warn(`[steps] writePlannedDates failed for area ${area.id}:`, (e as Error).message);
     }
   }
 }
@@ -198,7 +258,7 @@ export async function restoreAreaStep(
  */
 export async function applyStepInference(
   supabase: SupabaseClient<Database>,
-  args: { cardEventId: string; projectId: string; selected: SelectedMatch[] },
+  args: { cardEventId: string; projectId: string; occurredAt: string; selected: SelectedMatch[] },
 ): Promise<void> {
   for (const m of args.selected) {
     const { error } = await supabase.from("area_step_events").insert({
@@ -206,10 +266,11 @@ export async function applyStepInference(
       project_id: args.projectId,
       status: m.status,
       note: m.blocked_on,
-      percent_complete: m.status === "done" ? 100 : null,
+      percent_complete: null,
       source: "ai",
       confidence: m.confidence,
       card_event_id: args.cardEventId,
+      occurred_at: args.occurredAt,
     });
     // 23505 = unique_violation (already inferred for this card event) → skip re-project.
     if (error) {

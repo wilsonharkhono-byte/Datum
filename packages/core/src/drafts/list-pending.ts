@@ -47,6 +47,7 @@ export async function listPendingCardEventDrafts(
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) return [];
+  // Do NOT swallow: an empty review queue on DB failure hides pending drafts.
+  if (error) throw new Error(`[db] drafts.listPending: ${error.message}`);
   return (data ?? []) as unknown as PendingDraft[];
 }

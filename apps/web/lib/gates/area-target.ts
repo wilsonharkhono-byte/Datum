@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentStaff } from "@/lib/auth/get-current-user";
-import { setAreaTargetDate as coreSetAreaTargetDate } from "@datum/core";
+import { setAreaTargetDate as coreSetAreaTargetDate, getProjectCodeById } from "@datum/core";
+import { writePlannedDates } from "@/lib/steps/mutations";
 
 // A "use server" file may only export async functions. Types only here; the
 // TargetInput schema value is imported from "@datum/core" directly where needed.
@@ -29,17 +30,19 @@ export async function setAreaTargetDate(input: {
   const result = await coreSetAreaTargetDate(supabase, staff.id, input);
 
   if (result.ok) {
+    // Re-baselining shifts the area's gate windows → re-derive step planned
+    // dates so reminders track the new target. Best-effort: a template gap
+    // must not fail the target save itself.
+    try {
+      await writePlannedDates(supabase, input.areaId);
+    } catch (e) {
+      console.warn(`[area-target] writePlannedDates failed for area ${input.areaId}:`, (e as Error).message);
+    }
     // Re-baselining shifts derived gate windows → refresh schedule + board.
-    // We need the project_code for the path. Re-query it (RLS already checked
-    // inside core, so this is safe and cheap).
-    const { data: project } = await supabase
-      .from("projects")
-      .select("project_code")
-      .eq("id", input.projectId)
-      .maybeSingle();
-    if (project) {
-      revalidatePath(`/project/${project.project_code}/schedule`);
-      revalidatePath(`/project/${project.project_code}`);
+    const code = await getProjectCodeById(supabase, input.projectId);
+    if (code) {
+      revalidatePath(`/project/${code}/schedule`);
+      revalidatePath(`/project/${code}`);
     }
   }
 

@@ -25,14 +25,23 @@ export type RecomputeResult =
  *
  * NOTE: recomputeProjectGates is NOT a "use server" export in core — it is the
  * extracted query body. The web "use server" file wraps it; mobile calls directly.
+ *
+ * opts.skipAuthCheck: system/background callers (e.g. the Next `after()` hook
+ * that fires post-inference using the service-role admin client) have no
+ * end-user session to check — the admin client already bypasses RLS by design,
+ * so the getUser() guard would always fail there. Only pass this from trusted
+ * server-only call sites (never from a request path driven by end-user input).
  */
 export async function recomputeProjectGates(
   sb: DatumClient,
   projectId:   string,
   projectCode: string,
+  opts?: { skipAuthCheck?: boolean },
 ): Promise<RecomputeResult> {
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+  if (!opts?.skipAuthCheck) {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return { ok: false, error: "Sesi tidak ditemukan" };
+  }
 
   // 1. Load all areas for the project
   const { data: areas, error: aErr } = await sb
@@ -72,25 +81,26 @@ export async function recomputeProjectGates(
     }
   }
 
-  // 2b. A gate the PM manually confirmed (status='passed' + actual_end_date)
-  //     is a human decision, NOT a derived value — recompute must never
-  //     clobber it back to a rule-computed state, or the next gate-relevant
-  //     card_event (which fire-and-forget triggers a recompute) would silently
-  //     "un-pass" the gate. Load those sticky cells and skip their status on
-  //     the upsert below; we still refresh their recompute bookkeeping
-  //     (readiness_score/last_recomputed_at/stale) for diagnostics.
+  // 2b. A gate the PM manually confirmed is a human decision, NOT a derived
+  //     value — recompute must never clobber it back to a rule-computed state,
+  //     or the next gate-relevant card_event (which triggers a recompute)
+  //     would silently "un-pass" the gate. `actual_end_date IS NOT NULL` alone
+  //     marks a cell sticky (not status+date): a cell that previously got its
+  //     status clobbered while keeping its date is wedged — treating the date
+  //     as the source of truth lets the upsert below restore status='passed'
+  //     and self-heal it. Bookkeeping (score/last_recomputed_at/stale) still
+  //     refreshes for diagnostics.
   const { data: passedCells, error: pErr } = await sb
     .from("area_gate_status")
     .select("area_id, gate_code")
     .eq("project_id", projectId)
-    .eq("status", "passed")
     .not("actual_end_date", "is", null);
   if (pErr) return { ok: false, error: pErr.message };
   const stickyPassed = new Set(
     (passedCells ?? []).map((c) => `${c.area_id}|${c.gate_code}`),
   );
 
-  // 3. For each (area, gate), evaluate the rule and upsert area_gate_status
+  // 3. For each (area, gate), evaluate the rule and write area_gate_status
   const now = new Date().toISOString();
   let cellsUpdated = 0;
   for (const area of areas) {
@@ -99,20 +109,58 @@ export async function recomputeProjectGates(
     for (const gate of GateCodes) {
       const result = evaluateGate(gate, { events: areaEvents });
       const isSticky = stickyPassed.has(`${area.id}|${gate}`);
-      const { error: uErr } = await sb.from("area_gate_status").upsert({
-        project_id:           projectId,
-        area_id:              area.id,
-        gate_code:            gate,
-        // Sticky-passed cells keep their confirmed status + blocking_reason;
-        // only recompute bookkeeping (score/last_recomputed_at/stale) refreshes.
-        ...(isSticky
-          ? {}
-          : { status: result.status, blocking_reason: result.blockingReason }),
-        readiness_score:      result.readinessScore,
-        last_recomputed_at:   now,
-        stale:                false,
-      }, { onConflict: "project_id,area_id,gate_code" });
-      if (uErr) return { ok: false, error: `${gate}/${area.id}: ${uErr.message}` };
+
+      if (isSticky) {
+        // Restore/hold the human decision (self-heals wedged cells) and
+        // refresh bookkeeping. blocking_reason left untouched.
+        const { error: uErr } = await sb.from("area_gate_status").upsert({
+          project_id:         projectId,
+          area_id:            area.id,
+          gate_code:          gate,
+          status:             "passed",
+          readiness_score:    result.readinessScore,
+          last_recomputed_at: now,
+          stale:              false,
+        }, { onConflict: "project_id,area_id,gate_code" });
+        if (uErr) return { ok: false, error: `${gate}/${area.id}: ${uErr.message}` };
+        cellsUpdated++;
+        continue;
+      }
+
+      // Non-sticky: guarded UPDATE so a pass confirmed *after* the sticky set
+      // was read (mid-recompute) can't be clobbered — the actual_end_date
+      // predicate re-checks at write time.
+      const { data: updRows, error: updErr } = await sb
+        .from("area_gate_status")
+        .update({
+          status:             result.status,
+          blocking_reason:    result.blockingReason,
+          readiness_score:    result.readinessScore,
+          last_recomputed_at: now,
+          stale:              false,
+        })
+        .eq("project_id", projectId)
+        .eq("area_id", area.id)
+        .eq("gate_code", gate)
+        .is("actual_end_date", null)
+        .select("area_id");
+      if (updErr) return { ok: false, error: `${gate}/${area.id}: ${updErr.message}` };
+      if ((updRows ?? []).length === 0) {
+        // Either the row doesn't exist yet (first recompute for this cell) or
+        // a pass landed mid-recompute. ignoreDuplicates inserts the former and
+        // leaves the latter completely untouched.
+        const { error: insErr } = await sb.from("area_gate_status").upsert({
+          project_id:         projectId,
+          area_id:            area.id,
+          gate_code:          gate,
+          status:             result.status,
+          blocking_reason:    result.blockingReason,
+          readiness_score:    result.readinessScore,
+          last_recomputed_at: now,
+          stale:              false,
+        }, { onConflict: "project_id,area_id,gate_code", ignoreDuplicates: true });
+        if (insErr) return { ok: false, error: `${gate}/${area.id}: ${insErr.message}` };
+      }
       cellsUpdated++;
     }
   }

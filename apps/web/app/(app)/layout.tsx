@@ -14,21 +14,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <Providers userId={staff.id}>
-      <div className="flex h-screen flex-col overflow-hidden bg-[#D2D0C4] text-[#141210]">
-        <header className="shrink-0 border-b border-[#B5AFA8] bg-[#FDFAF6]">
+      <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+        <header className="shrink-0 border-b border-[var(--border)] bg-[var(--surface)]">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2 sm:px-8 sm:py-4">
             <div className="flex items-center gap-4">
               <div>
                 <Link
                   href="/"
                   aria-label="DATUM — kembali ke beranda"
-                  className="inline-block rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#141210]/40"
+                  className="inline-block rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/40"
                 >
-                  <DatumWordmark className="h-5 w-auto text-[#141210] sm:h-6" />
+                  <DatumWordmark className="h-5 w-auto text-[var(--foreground)] sm:h-6" />
                 </Link>
                 {/* The name/role line wraps to two lines on phones and isn't
                     needed while working a board — show it from sm+ only. */}
-                <div className="mt-1.5 hidden text-xs font-medium text-[#524E49] sm:block">
+                <div className="mt-1.5 hidden text-xs font-medium text-[var(--text-secondary)] sm:block">
                   {staff.full_name} · {staff.role}
                   {staff.cost_visible && " · cost-visible"}
                 </div>
@@ -36,14 +36,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               {canManageAccess(staff) && (
                 <Link
                   href="/library/durations"
-                  className="hidden text-xs font-medium text-[#524E49] hover:text-[#141210] sm:block"
+                  className="hidden text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)] sm:block"
                 >
                   Analisa Durasi
                 </Link>
               )}
               <Link
                 href="/risiko"
-                className="hidden text-xs font-medium text-[#524E49] hover:text-[#141210] sm:block"
+                className="hidden text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)] sm:block"
               >
                 Risiko
               </Link>
@@ -52,7 +52,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               {canManageAccess(staff) && (
                 <Link
                   href="/library/steps"
-                  className="hidden rounded border border-[#B5AFA8] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#524E49] hover:border-[#7A6B56] sm:inline-flex"
+                  className="hidden rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:border-[var(--sand-dark)] sm:inline-flex"
                 >
                   Pustaka Langkah
                 </Link>
