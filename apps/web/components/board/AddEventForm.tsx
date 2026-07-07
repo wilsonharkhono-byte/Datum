@@ -303,7 +303,7 @@ export function AddEventForm({
       className="mt-4 rounded border border-[var(--border)] bg-[var(--surface)] p-3"
     >
       <div className="mb-3 flex items-center gap-2">
-        <label htmlFor={kindSelectId} className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">
+        <label htmlFor={kindSelectId} className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">
           Jenis:
         </label>
         <select
@@ -331,7 +331,7 @@ export function AddEventForm({
             "w-full rounded border border-[var(--border)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none";
           return (
             <div key={f.name}>
-              <label htmlFor={fieldId} className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+              <label htmlFor={fieldId} className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
                 {f.label}{f.required ? " *" : ""}
               </label>
               {renderInput(f, fieldId, baseInput, pending)}
@@ -344,7 +344,7 @@ export function AddEventForm({
       </div>
 
       <div className="mt-3 border-t border-[var(--border)] pt-3">
-        <label htmlFor={attachInputId} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+        <label htmlFor={attachInputId} className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
           Lampiran (opsional) — foto / PDF, maks 20MB per file
         </label>
         <input
@@ -369,7 +369,7 @@ export function AddEventForm({
       </div>
 
       <div className="mt-3 flex items-center gap-2">
-        <label htmlFor={dateInputId} className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">
+        <label htmlFor={dateInputId} className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">
           Tanggal:
         </label>
         <input

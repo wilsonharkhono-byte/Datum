@@ -68,8 +68,73 @@ export function Gantt({
   const selectedArea = selected ? areaById.get(selected.area_id) : null;
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[960px]">
+    <>
+      {/* Mobile (<md): the full Gantt can only be horizontally scrolled on a
+          phone — a 960px chart with 10px text. Show a stacked per-area list of
+          gate windows instead, mirroring the matrix's md:hidden card view. */}
+      <div className="space-y-3 md:hidden">
+        {areas.map((area) => {
+          const areaCells = (cellsByArea.get(area.id) ?? [])
+            .filter((c) => c.target_start_date && c.target_end_date)
+            .sort((a, b) => a.gate_code.localeCompare(b.gate_code));
+          return (
+            <div
+              key={area.id}
+              className="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]"
+            >
+              <div className="border-b border-[var(--border)] bg-[var(--surface-alt)] px-3 py-2">
+                <div className="text-sm font-semibold text-[var(--foreground)]">
+                  {area.area_name}
+                </div>
+                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+                  {area.area_code}
+                </div>
+              </div>
+              {areaCells.length === 0 ? (
+                <div className="px-3 py-2 text-xs italic text-[var(--text-muted)]">
+                  Belum ada tanggal target.
+                </div>
+              ) : (
+                <ul className="divide-y divide-[var(--border-sub)]">
+                  {areaCells.map((cell) => {
+                    const s = STATUS_STYLE[cell.status] ?? STATUS_STYLE.not_started!;
+                    return (
+                      <li
+                        key={cell.gate_code}
+                        className="flex items-center justify-between gap-3 px-3 py-2"
+                      >
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="inline-flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-sm bg-[var(--surface-alt)] text-[10px] font-bold text-[var(--text-secondary)]">
+                            {cell.gate_code}
+                          </span>
+                          <span className="truncate text-xs font-medium text-[var(--foreground)]">
+                            {gateShortName(cell.gate_code)}
+                          </span>
+                        </div>
+                        <div className="flex flex-shrink-0 flex-col items-end gap-0.5">
+                          <span
+                            className="rounded-sm border px-1.5 py-0.5 text-[9px] font-semibold"
+                            style={{ background: s.bg, color: s.fg, borderColor: s.border }}
+                          >
+                            {STATUS_LABELS[cell.status] ?? cell.status}
+                          </span>
+                          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">
+                            {formatShort(cell.target_start_date!)} – {formatShort(cell.target_end_date!)}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop (md+): full Gantt, horizontally scrollable if it exceeds the viewport. */}
+      <div className="hidden overflow-x-auto md:block">
+        <div className="min-w-[960px]">
         {/* Month axis */}
         <div className="ml-[19rem] mb-2 grid" style={{ gridTemplateColumns: `repeat(${monthTicks.length}, 1fr)` }}>
           {monthTicks.map((t, i) => (
@@ -215,8 +280,9 @@ export function Gantt({
             </span>
           ) : null}
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -256,6 +322,15 @@ function GateBar({
       title={label}
     />
   );
+}
+
+/** YYYY-MM-DD → "12 Mar" (UTC-anchored so the displayed day never shifts). */
+function formatShort(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
 }
 
 function monthsBetween(min: Date, max: Date): Date[] {

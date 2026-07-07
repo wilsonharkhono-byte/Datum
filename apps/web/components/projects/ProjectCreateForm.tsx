@@ -38,7 +38,7 @@ export function ProjectCreateForm() {
     });
   }
 
-  const labelCls = "mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]";
+  const labelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]";
   const inputCls = "w-full rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--sand-dark)] focus:outline-none";
 
   return (

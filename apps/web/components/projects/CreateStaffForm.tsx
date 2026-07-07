@@ -147,7 +147,7 @@ export function CreateStaffForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-email`} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+          <label htmlFor={`${formId}-email`} className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
             Email *
           </label>
           <input
@@ -162,7 +162,7 @@ export function CreateStaffForm({
           />
         </div>
         <div>
-          <label htmlFor={`${formId}-name`} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+          <label htmlFor={`${formId}-name`} className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
             Nama lengkap *
           </label>
           <input
@@ -180,7 +180,7 @@ export function CreateStaffForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-role`} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+          <label htmlFor={`${formId}-role`} className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
             Peran global *
           </label>
           <select
@@ -196,7 +196,7 @@ export function CreateStaffForm({
           </select>
         </div>
         <div>
-          <label htmlFor={`${formId}-prole`} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+          <label htmlFor={`${formId}-prole`} className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
             Peran di proyek ini
           </label>
           <select
@@ -214,7 +214,7 @@ export function CreateStaffForm({
       </div>
 
       <div>
-        <label htmlFor={`${formId}-pw`} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
+        <label htmlFor={`${formId}-pw`} className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--sand-dark)]">
           Password sementara *
         </label>
         <div className="flex flex-wrap gap-2">

@@ -134,7 +134,7 @@ export function CardHeader({
         />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <label htmlFor="card-status" className="text-[10px] uppercase tracking-wide text-[var(--sand-dark)]">Status:</label>
+        <label htmlFor="card-status" className="text-[11px] uppercase tracking-wide text-[var(--sand-dark)]">Status:</label>
         <select
           id="card-status"
           value={status}

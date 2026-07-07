@@ -1,0 +1,270 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-07T00:00:00Z",
+  "title": "Design System: DATUM (Studio Brain)",
+  "extensions": {
+    "colorMeta": {
+      "oat": {
+        "role": "neutral",
+        "displayName": "Oat",
+        "canonical": "#d2d0c4",
+        "tonalRamp": ["oklch(15% 0.012 100)", "oklch(26% 0.012 100)", "oklch(38% 0.012 100)", "oklch(49% 0.012 100)", "oklch(61% 0.012 100)", "oklch(72% 0.012 100)", "oklch(84% 0.012 100)", "oklch(95% 0.012 100)"]
+      },
+      "oat-deep": {
+        "role": "neutral",
+        "displayName": "Deep Oat",
+        "canonical": "#c6c1b6",
+        "tonalRamp": ["oklch(15% 0.013 98)", "oklch(26% 0.013 98)", "oklch(38% 0.013 98)", "oklch(49% 0.013 98)", "oklch(61% 0.013 98)", "oklch(72% 0.013 98)", "oklch(84% 0.013 98)", "oklch(95% 0.013 98)"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#fdfaf6",
+        "tonalRamp": ["oklch(15% 0.005 85)", "oklch(26% 0.005 85)", "oklch(38% 0.005 85)", "oklch(49% 0.005 85)", "oklch(61% 0.005 85)", "oklch(72% 0.005 85)", "oklch(84% 0.005 85)", "oklch(97% 0.005 85)"]
+      },
+      "linen": {
+        "role": "neutral",
+        "displayName": "Linen",
+        "canonical": "#f2efe9",
+        "tonalRamp": ["oklch(15% 0.007 90)", "oklch(26% 0.007 90)", "oklch(38% 0.007 90)", "oklch(49% 0.007 90)", "oklch(61% 0.007 90)", "oklch(72% 0.007 90)", "oklch(84% 0.007 90)", "oklch(95% 0.007 90)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "#141210",
+        "tonalRamp": ["oklch(16% 0.008 70)", "oklch(26% 0.008 70)", "oklch(38% 0.008 70)", "oklch(49% 0.008 70)", "oklch(61% 0.008 70)", "oklch(72% 0.008 70)", "oklch(84% 0.008 70)", "oklch(95% 0.008 70)"]
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Ink Secondary",
+        "canonical": "#524e49",
+        "tonalRamp": ["oklch(15% 0.008 75)", "oklch(26% 0.008 75)", "oklch(38% 0.008 75)", "oklch(49% 0.008 75)", "oklch(61% 0.008 75)", "oklch(72% 0.008 75)", "oklch(84% 0.008 75)", "oklch(95% 0.008 75)"]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted",
+        "canonical": "#847e78",
+        "tonalRamp": ["oklch(15% 0.01 70)", "oklch(26% 0.01 70)", "oklch(38% 0.01 70)", "oklch(49% 0.01 70)", "oklch(61% 0.01 70)", "oklch(72% 0.01 70)", "oklch(84% 0.01 70)", "oklch(95% 0.01 70)"]
+      },
+      "sand": {
+        "role": "primary",
+        "displayName": "Sand",
+        "canonical": "#b29f86",
+        "tonalRamp": ["oklch(15% 0.045 85)", "oklch(26% 0.045 85)", "oklch(38% 0.045 85)", "oklch(49% 0.045 85)", "oklch(61% 0.045 85)", "oklch(72% 0.045 85)", "oklch(84% 0.045 85)", "oklch(95% 0.045 85)"]
+      },
+      "sand-dark": {
+        "role": "primary",
+        "displayName": "Deep Sand",
+        "canonical": "#7a6b56",
+        "tonalRamp": ["oklch(15% 0.04 85)", "oklch(26% 0.04 85)", "oklch(38% 0.04 85)", "oklch(52% 0.04 85)", "oklch(61% 0.04 85)", "oklch(72% 0.04 85)", "oklch(84% 0.04 85)", "oklch(95% 0.04 85)"]
+      },
+      "sand-tint": {
+        "role": "primary",
+        "displayName": "Sand Tint",
+        "canonical": "rgba(178, 159, 134, 0.12)"
+      },
+      "border-taupe": {
+        "role": "neutral",
+        "displayName": "Taupe Border",
+        "canonical": "#b5afa8",
+        "tonalRamp": ["oklch(15% 0.012 80)", "oklch(26% 0.012 80)", "oklch(38% 0.012 80)", "oklch(49% 0.012 80)", "oklch(61% 0.012 80)", "oklch(75% 0.012 80)", "oklch(84% 0.012 80)", "oklch(95% 0.012 80)"]
+      },
+      "border-sub": {
+        "role": "neutral",
+        "displayName": "Subtle Border",
+        "canonical": "rgba(148, 148, 148, 0.18)"
+      },
+      "flag-ok": {
+        "role": "status",
+        "displayName": "OK Green",
+        "canonical": "#3d8b40",
+        "tonalRamp": ["oklch(15% 0.12 145)", "oklch(26% 0.12 145)", "oklch(38% 0.12 145)", "oklch(49% 0.12 145)", "oklch(56% 0.12 145)", "oklch(72% 0.12 145)", "oklch(84% 0.12 145)", "oklch(95% 0.06 145)"]
+      },
+      "flag-info": {
+        "role": "status",
+        "displayName": "Info Blue",
+        "canonical": "#1565c0",
+        "tonalRamp": ["oklch(15% 0.15 255)", "oklch(26% 0.15 255)", "oklch(38% 0.15 255)", "oklch(50% 0.15 255)", "oklch(61% 0.15 255)", "oklch(72% 0.15 255)", "oklch(84% 0.15 255)", "oklch(95% 0.06 255)"]
+      },
+      "flag-warning": {
+        "role": "status",
+        "displayName": "Warning Amber",
+        "canonical": "#e65100",
+        "tonalRamp": ["oklch(15% 0.18 45)", "oklch(26% 0.18 45)", "oklch(38% 0.18 45)", "oklch(49% 0.18 45)", "oklch(60% 0.18 45)", "oklch(72% 0.18 45)", "oklch(84% 0.18 45)", "oklch(95% 0.06 45)"]
+      },
+      "flag-high": {
+        "role": "status",
+        "displayName": "High Orange",
+        "canonical": "#bf360c",
+        "tonalRamp": ["oklch(15% 0.16 35)", "oklch(26% 0.16 35)", "oklch(38% 0.16 35)", "oklch(52% 0.16 35)", "oklch(61% 0.16 35)", "oklch(72% 0.16 35)", "oklch(84% 0.16 35)", "oklch(95% 0.06 35)"]
+      },
+      "flag-critical": {
+        "role": "status",
+        "displayName": "Critical Red",
+        "canonical": "#c62828",
+        "tonalRamp": ["oklch(15% 0.16 27)", "oklch(26% 0.16 27)", "oklch(38% 0.16 27)", "oklch(50% 0.16 27)", "oklch(61% 0.16 27)", "oklch(72% 0.16 27)", "oklch(84% 0.16 27)", "oklch(95% 0.06 27)"]
+      },
+      "flag-ok-bg": { "role": "status", "displayName": "OK Tint", "canonical": "rgba(61, 139, 64, 0.08)" },
+      "flag-info-bg": { "role": "status", "displayName": "Info Tint", "canonical": "rgba(21, 101, 192, 0.08)" },
+      "flag-warning-bg": { "role": "status", "displayName": "Warning Tint", "canonical": "rgba(230, 81, 0, 0.10)" },
+      "flag-high-bg": { "role": "status", "displayName": "High Tint", "canonical": "rgba(191, 54, 12, 0.10)" },
+      "flag-critical-bg": { "role": "status", "displayName": "Critical Tint", "canonical": "rgba(198, 40, 40, 0.08)" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Page and screen titles (PROJECT-CODE · Project Name). 20px/600." },
+      "title": { "displayName": "Title", "purpose": "Card titles, subsection headings, disclosure triggers. 14px/600." },
+      "body": { "displayName": "Body", "purpose": "The default working size — dense product register on a fixed rem scale. 14px/400; 1.625 line-height for prose." },
+      "label": { "displayName": "Tracked Caps Label", "purpose": "Section eyebrows and form labels: UPPERCASE, 0.06–0.1em tracking, usually Deep Sand (#7a6b56). Form labels are moving to 11–12px; never introduce new 10px form labels." },
+      "data": { "displayName": "Data / Code", "purpose": "Mono 12px for area/project codes; numeric columns use Space Grotesk with tabular-nums, right-aligned." }
+    },
+    "shadows": [
+      { "name": "active-segment-lift", "value": "inset 0 -2px 0 var(--sand-dark), 0 1px 0 color-mix(in oklch, var(--foreground) 10%, transparent), 0 3px 6px -1px color-mix(in oklch, #7a6b56 30%, transparent)", "purpose": "The .seg-active tab — paper surface lifting out of the deep-oat trough with a deep-sand inset underline." },
+      { "name": "pressed-chip-weight", "value": "0 1px 3px color-mix(in oklch, #7a6b56 35%, transparent)", "purpose": "Active chip fills (.chip-on / .chip-sand) — just enough warm weight to feel set into the page." },
+      { "name": "focus-glow", "value": "0 0 0 3px color-mix(in oklch, var(--sand) 28%, transparent), 0 6px 16px -6px color-mix(in oklch, var(--sand-dark) 45%, transparent), inset 0 1px 0 color-mix(in oklch, #ffffff 60%, transparent)", "purpose": "The .input-strong focused state — sand ring plus warm lift; a confident tactile target." },
+      { "name": "warm-card", "value": "0 2px 6px rgba(90, 74, 58, 0.07)", "purpose": "Native-app card elevation (#5a4a3a at 7%); on the web, reserved for floating menus and sheets. Never a gray shadow." }
+    ],
+    "motion": [
+      { "name": "ease-out-quart", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "Default exponential ease-out for menus, banners, and reveals." },
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Steeper ease-out for the full-screen mobile sheet entrance." },
+      { "name": "duration-state", "value": "120ms", "purpose": "Hover/disabled state changes on buttons, links, chips (color, background, border, shadow, opacity). Focus outlines are never transitioned." },
+      { "name": "menu-pop", "value": "160ms var(--ease-out-quart); from { opacity: 0; transform: translateY(-4px) scale(0.98); }", "purpose": "Dropdown / overflow menus popping from their anchor corner." },
+      { "name": "flag-pop", "value": "200ms var(--ease-out-quart); from { opacity: 0; transform: translateY(3px); }", "purpose": "Inline error/success flag banners settling in rather than blinking in." },
+      { "name": "sheet-in", "value": "240ms var(--ease-out-quint); from { opacity: 0.4; transform: translateY(24px); }", "purpose": "Full-screen mobile assistant sheet sliding up from its trigger pill." },
+      { "name": "reveal", "value": "grid-template-rows 0fr -> 1fr over 240ms var(--ease-out-quart)", "purpose": "Expand/collapse disclosures; collapsed content flips to visibility:hidden, leaving tab order and the a11y tree." },
+      { "name": "skeleton-pulse", "value": "1.8s ease-in-out infinite, opacity 1 -> 0.45", "purpose": "Loading ghosts on deep-oat tone. All motion, including this, is gated behind prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The commit action (Simpan / Tambah). Solid warm-ink fill, uppercase tracked label; hover shifts to deep sand.",
+      "html": "<button class=\"ds-btn-primary\">Simpan</button>",
+      "css": ".ds-btn-primary { background: var(--foreground, #141210); color: var(--text-inverse, #fdfaf6); border: none; border-radius: 4px; padding: 8px 16px; min-height: 40px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; transition: background-color 120ms ease-out; } .ds-btn-primary:hover { background: var(--sand-dark, #7a6b56); } .ds-btn-primary:focus-visible { outline: 2px solid var(--sand-dark, #7a6b56); outline-offset: 2px; } .ds-btn-primary:disabled { background: var(--text-muted, #847e78); cursor: not-allowed; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The quiet secondary action (Batal / edit). Taupe hairline on paper; hover fills linen.",
+      "html": "<button class=\"ds-btn-outline\">Batal</button>",
+      "css": ".ds-btn-outline { background: var(--surface, #fdfaf6); color: var(--foreground, #141210); border: 1px solid var(--border, #b5afa8); border-radius: 4px; padding: 8px 12px; min-height: 40px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: background-color 120ms ease-out, border-color 120ms ease-out; } .ds-btn-outline:hover { background: var(--surface-alt, #f2efe9); } .ds-btn-outline:focus-visible { outline: 2px solid var(--sand-dark, #7a6b56); outline-offset: 2px; } .ds-btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Accent Button",
+      "kind": "button",
+      "refersTo": "button-accent",
+      "description": "AI / special actions (Deteksi ruangan otomatis). Sand-tint fill, sand border, deep-sand bold uppercase label with an inline spark.",
+      "html": "<button class=\"ds-btn-accent\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 13 13\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M6.5 0l1.6 4.9L13 6.5 8.1 8.1 6.5 13 4.9 8.1 0 6.5l4.9-1.6L6.5 0z\"/></svg>Deteksi ruangan otomatis</button>",
+      "css": ".ds-btn-accent { display: inline-flex; align-items: center; gap: 6px; background: var(--sand-tint, rgba(178, 159, 134, 0.12)); color: var(--sand-dark, #7a6b56); border: 1px solid var(--sand, #b29f86); border-radius: 6px; padding: 6px 12px; min-height: 40px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.025em; text-transform: uppercase; cursor: pointer; transition: background-color 120ms ease-out, border-color 120ms ease-out; } .ds-btn-accent:hover { border-color: var(--sand-dark, #7a6b56); background: var(--surface, #fdfaf6); } .ds-btn-accent:focus-visible { outline: 2px solid var(--sand-dark, #7a6b56); outline-offset: 2px; }"
+    },
+    {
+      "name": "Filter Chips",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Status-ladder filter chips (Aktif / Tertunda / Selesai). The active chip flips to a solid warm-ink fill with a warm pressed shadow — the one permitted pill shape.",
+      "html": "<div class=\"ds-chip-row\"><button class=\"ds-chip ds-chip-on\">Aktif</button><button class=\"ds-chip\">Tertunda</button><button class=\"ds-chip\">Selesai</button></div>",
+      "css": ".ds-chip-row { display: inline-flex; gap: 8px; } .ds-chip { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 36px; padding: 8px 14px; border-radius: 999px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid var(--border, #b5afa8); background: var(--surface, #fdfaf6); color: var(--text-secondary, #524e49); cursor: pointer; white-space: nowrap; transition: color 120ms ease-out, background-color 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out; } .ds-chip:hover:not(.ds-chip-on) { color: var(--foreground, #141210); border-color: var(--text-secondary, #524e49); } .ds-chip:focus-visible { outline: 2px solid var(--sand-dark, #7a6b56); outline-offset: 2px; } .ds-chip-on { background: var(--foreground, #141210); color: var(--text-inverse, #fdfaf6); border-color: var(--foreground, #141210); box-shadow: 0 1px 3px color-mix(in oklch, #7a6b56 35%, transparent); } @media (max-width: 767px) { .ds-chip { min-height: 44px; } }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "nav",
+      "refersTo": "chip",
+      "description": "Trello-style tab group: a deep-oat trough whose active segment is a paper surface lifting via a warm shadow and deep-sand inset underline.",
+      "html": "<div class=\"ds-seg\"><button class=\"ds-seg-btn ds-seg-active\">Papan</button><button class=\"ds-seg-btn\">Jadwal</button><button class=\"ds-seg-btn\">Matrix</button></div>",
+      "css": ".ds-seg { display: inline-flex; align-items: stretch; padding: 3px; border-radius: 8px; background: var(--oat-deep, #c6c1b6); border: 1px solid color-mix(in oklch, #b5afa8 70%, #c6c1b6); gap: 2px; } .ds-seg-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; border-radius: 5px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in oklch, #524e49 75%, transparent); background: transparent; border: 0; cursor: pointer; white-space: nowrap; transition: color 120ms ease-out, background-color 120ms ease-out; } .ds-seg-btn:hover:not(.ds-seg-active) { color: var(--foreground, #141210); background: color-mix(in oklch, #fdfaf6 50%, transparent); } .ds-seg-btn:focus-visible { outline: 2px solid var(--sand-dark, #7a6b56); outline-offset: 2px; } .ds-seg-active { color: var(--foreground, #141210); background: var(--surface, #fdfaf6); font-weight: 700; letter-spacing: 0.05em; box-shadow: inset 0 -2px 0 var(--sand-dark, #7a6b56), 0 1px 0 color-mix(in oklch, #141210 10%, transparent), 0 3px 6px -1px color-mix(in oklch, #7a6b56 30%, transparent); }"
+    },
+    {
+      "name": "Strong Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "The assistant-grade text input: taupe hairline at rest, and a sand focus glow with warm lift so focus feels like a confident, tactile target.",
+      "html": "<input class=\"ds-input-strong\" type=\"text\" placeholder=\"Tanya asisten proyek…\" />",
+      "css": ".ds-input-strong { background: var(--surface, #fdfaf6); border: 1px solid var(--border, #b5afa8); border-radius: 6px; padding: 8px 12px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 14px; color: var(--foreground, #141210); min-width: 260px; transition: border-color 120ms ease-out, box-shadow 160ms ease-out, background-color 120ms ease-out; } .ds-input-strong::placeholder { color: var(--text-muted, #847e78); } .ds-input-strong:hover:not(:focus) { border-color: var(--text-secondary, #524e49); } .ds-input-strong:focus, .ds-input-strong:focus-visible { outline: none; border-color: var(--sand-dark, #7a6b56); background: #ffffff; box-shadow: 0 0 0 3px color-mix(in oklch, #b29f86 28%, transparent), 0 6px 16px -6px color-mix(in oklch, #7a6b56 45%, transparent), inset 0 1px 0 color-mix(in oklch, #ffffff 60%, transparent); }"
+    },
+    {
+      "name": "Form Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "The standard labeled field: tracked-caps deep-sand label over a bordered input. Code fields go mono; numeric fields right-align with tabular-nums.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-field-demo\">Nama area</label><input class=\"ds-field-input\" id=\"ds-field-demo\" type=\"text\" placeholder=\"Living Lt.1\" /></div>",
+      "css": ".ds-field { display: block; max-width: 280px; font-family: 'Space Grotesk', system-ui, sans-serif; } .ds-field-label { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--sand-dark, #7a6b56); } .ds-field-input { width: 100%; background: var(--surface, #fdfaf6); border: 1px solid var(--border, #b5afa8); border-radius: 4px; padding: 8px 10px; font-family: inherit; font-size: 14px; color: var(--foreground, #141210); transition: border-color 120ms ease-out; } .ds-field-input::placeholder { color: var(--text-muted, #847e78); } .ds-field-input:hover:not(:focus) { border-color: var(--text-secondary, #524e49); } .ds-field-input:focus-visible { outline: 2px solid var(--sand-dark, #7a6b56); outline-offset: 2px; border-color: var(--sand-dark, #7a6b56); }"
+    },
+    {
+      "name": "Data Table",
+      "kind": "custom",
+      "refersTo": "table-header",
+      "description": "The signature graphic device: a solid warm-ink header row with paper 10px tracked-caps text over bordered paper rows. Hidden below 768px in favor of stacked cards.",
+      "html": "<div class=\"ds-table-wrap\"><table class=\"ds-table\"><thead><tr><th>Kode</th><th>Nama</th><th class=\"ds-table-num\">Luas m²</th></tr></thead><tbody><tr><td class=\"ds-table-code\">LIVING-LT1</td><td>Living Lt.1</td><td class=\"ds-table-num\">24,5</td></tr><tr><td class=\"ds-table-code\">KM-LT2</td><td>Kamar mandi Lt.2</td><td class=\"ds-table-num\">6</td></tr></tbody></table></div>",
+      "css": ".ds-table-wrap { overflow-x: auto; border: 1px solid var(--border, #b5afa8); border-radius: 4px; } .ds-table { width: 100%; min-width: 320px; border-collapse: collapse; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 14px; } .ds-table thead tr { background: var(--foreground, #141210); color: var(--text-inverse, #fdfaf6); } .ds-table th { padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.025em; text-transform: uppercase; } .ds-table td { padding: 8px 12px; background: var(--surface, #fdfaf6); color: var(--foreground, #141210); border-top: 1px solid var(--border, #b5afa8); } .ds-table tbody tr:hover td { background: var(--surface-alt, #f2efe9); } .ds-table-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 500; } .ds-table-num, .ds-table th.ds-table-num { text-align: right; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Status Flag Badges",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "The 5-step flag ladder as badges: darkened status color on its 8–10% tint, uppercase micro-label. Fires only when something needs attention.",
+      "html": "<div class=\"ds-flag-row\"><span class=\"ds-flag ds-flag-ok\">Lulus</span><span class=\"ds-flag ds-flag-info\">Siap handoff</span><span class=\"ds-flag ds-flag-warning\">Dikerjakan</span><span class=\"ds-flag ds-flag-high\">Terblokir</span><span class=\"ds-flag ds-flag-critical\">Lewat 3 hari</span></div>",
+      "css": ".ds-flag-row { display: inline-flex; flex-wrap: wrap; gap: 6px; font-family: 'Space Grotesk', system-ui, sans-serif; } .ds-flag { display: inline-flex; align-items: center; border-radius: 4px; padding: 3px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid currentColor; } .ds-flag-ok { color: var(--flag-ok, #3d8b40); background: var(--flag-ok-bg, rgba(61, 139, 64, 0.08)); } .ds-flag-info { color: var(--flag-info, #1565c0); background: var(--flag-info-bg, rgba(21, 101, 192, 0.08)); } .ds-flag-warning { color: var(--flag-warning, #e65100); background: var(--flag-warning-bg, rgba(230, 81, 0, 0.10)); } .ds-flag-high { color: var(--flag-high, #bf360c); background: var(--flag-high-bg, rgba(191, 54, 12, 0.10)); } .ds-flag-critical { color: var(--flag-critical, #c62828); background: var(--flag-critical-bg, rgba(198, 40, 40, 0.08)); }"
+    },
+    {
+      "name": "Work Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The kanban mini-card: label/deadline micro-chips, medium title, secondary summary, muted date. Border-only at rest; hover swaps the border to deep sand. Meaning rides on chips, never a colored left border.",
+      "html": "<a class=\"ds-work-card\" href=\"#\"><span class=\"ds-work-card-chips\"><span class=\"ds-work-card-chip\" style=\"background: rgba(178, 159, 134, 0.12); color: #7a6b56;\">Material</span><span class=\"ds-work-card-chip\" style=\"background: rgba(230, 81, 0, 0.10); color: #e65100;\">B · 5 hari</span></span><span class=\"ds-work-card-title\">Pasang keramik lantai kamar mandi Lt.2</span><span class=\"ds-work-card-summary\">Menunggu kedatangan keramik 60×60; vendor konfirmasi kirim Kamis.</span><span class=\"ds-work-card-date\">5 Jul 2026</span></a>",
+      "css": ".ds-work-card { display: block; max-width: 320px; min-height: 44px; background: var(--surface, #fdfaf6); border: 1px solid var(--border, #b5afa8); border-radius: 4px; padding: 6px 8px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 12px; color: var(--foreground, #141210); text-decoration: none; transition: border-color 120ms ease-out; } .ds-work-card:hover { border-color: var(--sand-dark, #7a6b56); } .ds-work-card:focus-visible { outline: 2px solid var(--sand-dark, #7a6b56); outline-offset: 2px; } .ds-work-card-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; } .ds-work-card-chip { display: inline-flex; align-items: center; border-radius: 2px; padding: 1px 6px; font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.3; } .ds-work-card-title { display: block; font-weight: 500; } .ds-work-card-summary { display: block; margin-top: 2px; font-size: 10px; color: var(--text-secondary, #524e49); } .ds-work-card-date { display: block; margin-top: 2px; font-size: 10px; color: var(--text-muted, #847e78); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Field Notebook",
+    "overview": "DATUM looks and behaves like a well-made field notebook in the hands of a quantity surveyor: warm paper surfaces on an oat ground, one engineered typeface, dense tabular truth, and color that appears only when something on site needs attention. It is the visual world of an Indonesian construction-control system — sand, oat, and warm near-black; concrete, raw earth, paper, and timber. The register is product, not marketing: quiet confidence, no decoration for its own sake, truth-on-the-page. UI language is Bahasa Indonesia by design.\n\nThe system explicitly rejects cold blue/white generic SaaS. It rejects dashboard-slop — gradient text, glassmorphism, hero-metric cards, cyan-on-dark — and it rejects decorative motion and page-load choreography, because its users are mid-task on a construction site, often outdoors in bright light on a phone with a flaky connection. Density is welcome where the data needs it; the surface stays calm and matte everywhere else. Emphasis is earned through weight, spacing, and the sand accent — never through extra colors or extra boxes.\n\nMotion exists only to convey state — feedback, reveal, transition — at 150–250ms on exponential ease-out curves (--ease-out-quart, --ease-out-quint), and every animation is gated behind prefers-reduced-motion. Layout is mobile-first with a hard split at 768px: data-heavy surfaces (tables, the area × gate matrix, the Gantt) get real stacked-card alternatives on phones, not horizontal scroll. Every interactive target on a phone is at least 44px tall.",
+    "keyCharacteristics": [
+      "Warm-tinted everything — no pure black, no pure white, no cold gray, anywhere.",
+      "One typeface (Space Grotesk) at varied weights; hierarchy from weight + tracking, not families.",
+      "Solid near-black data-table headers — the signature graphic device.",
+      "Status color (the 5-step flag ladder) fires only when something needs attention.",
+      "Flat, matte surfaces; shadows are warm, subtle, and state-driven.",
+      "Field-first mobile: stacked-card fallbacks, 44px touch targets, outdoor-readable contrast.",
+      "State-conveying motion only, 150–250ms, reduced-motion respected."
+    ],
+    "rules": [
+      { "name": "The Warm Tint Rule", "body": "Every color in the system is tinted warm — toward sand. Pure #000, pure #fff, and cold gray are forbidden. If a swatch would look at home in a cold blue SaaS demo, it is off-brand.", "section": "colors" },
+      { "name": "The Flag Silence Rule", "body": "Status colors fire only when something needs attention. A calm project reads as oat, paper, and ink; if a screen is colorful, something is genuinely wrong on site. Color is never decoration.", "section": "colors" },
+      { "name": "The Token Rule", "body": "All color flows through the CSS custom properties in apps/web/app/globals.css. Hardcoding hex in components is prohibited.", "section": "colors" },
+      { "name": "The One Family Rule", "body": "Space Grotesk is the only typeface. A second font family is forbidden — vary weight (300–700), case, and tracking instead.", "section": "typography" },
+      { "name": "The Tracked Caps Rule", "body": "Anything that names a section, a column, or a field is uppercase, semibold-or-bolder, and letter-spaced (0.06–0.1em). Small but assertive; this is how the notebook labels its margins.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. Shadows appear only as a response to state (active, focus, overlay) — and they are always warm-mixed from #7a6b56, never gray, never black.", "section": "elevation" },
+      { "name": "The Card Fallback Rule", "body": "Every data-dense surface (table, matrix, Gantt, board) ships a real stacked-card mobile alternative behind the 768px breakpoint. Horizontal panning is not a mobile strategy.", "section": "components" },
+      { "name": "The 44px Field Rule", "body": "On phones, every interactive target is at least 44px tall. Site supervisors wear gloves and squint in sunlight; elegance never outranks tappability.", "section": "components" }
+    ],
+    "dos": [
+      "Do route every color through the CSS custom properties in apps/web/app/globals.css — tokens, not hex, in components.",
+      "Do tint every neutral warm, toward sand. Oat (#d2d0c4) ground, Warm Paper (#fdfaf6) surfaces, Warm Ink (#141210) text.",
+      "Do use the solid near-black table header (white 10px uppercase on #141210) as the primary data device.",
+      "Do reserve color for status meaning (the 5-flag ladder) and the sand accent; everything else stays neutral.",
+      "Do ship stacked-card mobile fallbacks for tables, the matrix, and the Gantt (md:hidden pattern), with 44px touch targets on phones.",
+      "Do keep motion state-conveying only: 150–250ms, --ease-out-quart/--ease-out-quint, always gated behind prefers-reduced-motion.",
+      "Do keep shadows warm (mixed from #7a6b56) and radii soft (4/6/8px).",
+      "Do write UI copy in Bahasa Indonesia, directly in the components.",
+      "Do hold WCAG AA: --text-secondary for small secondary text, --text-muted at large sizes only, visible 2px Deep Sand focus outlines everywhere."
+    ],
+    "donts": [
+      "Don't use cold blue/white generic SaaS styling — the brand deliberately rejects it. Never pure black (#000), pure white (#fff), or cold gray; every color is tinted warm.",
+      "Don't ship dashboard-slop: gradient text, glassmorphism, hero-metric cards, or cyan-on-dark.",
+      "Don't add decorative motion or page-load choreography — users are mid-task on site.",
+      "Don't reach for a paid third-party service or a heavy new dependency; every solution must stay maintainable by 1–2 people.",
+      "Don't introduce a second font family. Space Grotesk, weights 300–700, is the entire typographic voice.",
+      "Don't use bright/neon stoplight status colors — only the darkened flag set (#3d8b40 / #1565c0 / #e65100 / #bf360c / #c62828).",
+      "Don't carry meaning with a colored left border on cards — the 4px-stripe pattern was explicitly retired as lazy. Use the dot or a label chip.",
+      "Don't default to pill buttons or sharp 0px corners; the pill radius belongs to filter chips alone.",
+      "Don't let tables, the matrix, or the Gantt clip or pan horizontally on a 320–375px screen — reflow into cards instead.",
+      "Don't abstract UI text into i18n keys — Bahasa Indonesia is by design."
+    ]
+  }
+}

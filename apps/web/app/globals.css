@@ -278,6 +278,105 @@ body {
   }
 }
 
+/* === MOTION ==============================================================
+   State-conveying motion only (feedback, reveal, transition) — never
+   decoration. 150–250ms, exponential ease-out, all gated behind
+   prefers-reduced-motion. */
+:root {
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Hover/disabled state changes on interactive elements ease instead of
+     snapping. Element-level selector so any class-level transition (e.g.
+     .seg-btn, .chip) still wins the cascade. Outline is intentionally NOT
+     transitioned — keyboard focus must appear instantly. */
+  button,
+  a {
+    transition:
+      color 120ms ease-out,
+      background-color 120ms ease-out,
+      border-color 120ms ease-out,
+      box-shadow 120ms ease-out,
+      opacity 120ms ease-out;
+  }
+}
+
+/* Dropdown / overflow menus — pop from their anchor corner. */
+@keyframes menu-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+.menu-pop {
+  transform-origin: top right;
+  animation: menu-pop 160ms var(--ease-out-quart);
+}
+
+/* Inline status banners (error / success) — settle in rather than blink in. */
+@keyframes flag-pop {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+.flag-pop {
+  animation: flag-pop 200ms var(--ease-out-quart);
+}
+
+/* Full-screen mobile sheet (assistant) — slides up from the trigger pill. */
+@keyframes sheet-in {
+  from {
+    opacity: 0.4;
+    transform: translateY(24px);
+  }
+}
+.sheet-in {
+  animation: sheet-in 240ms var(--ease-out-quint);
+}
+
+/* Expand/collapse via grid-template-rows (0fr → 1fr) so layout reflows
+   smoothly without animating height. Padding/borders must live one level
+   deeper than the direct child, which is the clipping element:
+     <div class="reveal" data-open>
+       <div>            ← bare clipping layer
+         <div class="p-4 border-t">…content…</div>
+       </div>
+     </div>
+   Collapsed content flips to visibility:hidden at the end of the
+   transition, removing it from tab order and the accessibility tree. */
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 240ms var(--ease-out-quart);
+}
+.reveal[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.reveal > * {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 240ms;
+}
+.reveal[data-open="true"] > * {
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-pop,
+  .flag-pop,
+  .sheet-in {
+    animation: none;
+  }
+  .reveal,
+  .reveal > * {
+    transition: none;
+  }
+}
+
 /* === LOADING SKELETONS (route-level loading.tsx) =========================
    One shared shape class. Tone sits on the darker-oat divider color so
    ghosts read as part of the surface system, not gray placeholders.

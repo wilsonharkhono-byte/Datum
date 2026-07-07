@@ -51,7 +51,7 @@ export function BoardHeaderMenu({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-40 mt-1 w-48 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.35)]"
+          className="menu-pop absolute right-0 top-full z-40 mt-1 w-48 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.35)]"
         >
           <Link href={`/project/${projectCode}/print`} className={item} role="menuitem" onClick={() => setOpen(false)}>
             Cetak
