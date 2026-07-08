@@ -32,10 +32,11 @@ type Supa = SupabaseClient<Database>;
 // can spot-check it. Fires from createCardEvent when the event_kind is in
 // HIGH_RISK_KINDS. Best-effort, never throws.
 //
-// Uses the service-role client because the caller (e.g. a designer) is rarely
-// allowed to read principal/admin staff rows under the project-scoped staff
-// RLS — without it the staff select returns only the caller's own row and the
-// principal notification never fires.
+// Uses the service-role client because this select must see ALL active
+// principals/admins firm-wide: under the shared-project staff policy
+// (staff_read_shared_project_colleagues, 20260708000001) a caller who shares
+// no project with a given principal/admin cannot read that row, so a caller's
+// own client could silently miss reviewers and the notification never fires.
 export async function notifyPrincipalsOfHighRiskEvent(
   _supabase: Supa,
   args: {

@@ -11,27 +11,48 @@
 -- they can plainly see the comment/event row itself, which already names the
 -- author's staff_id in a column.
 --
--- Fix: a narrow additional SELECT policy that lets any authenticated *active*
--- staff member read other staff rows. This only widens ROW visibility (RLS
--- can't restrict columns); app code continues the existing convention of
--- selecting just `(id, full_name, role)` off `staff` for these joins (see
--- getCardComments/getCardMembers/getTimelineEvents in
--- packages/core/src/cards/queries.ts) so day-to-day reads stay narrow in
--- practice. Sensitive columns (email, whatsapp_number, cost_visible) remain
--- selectable at the Postgres privilege layer for any matching row (GRANT is
--- table-wide, same limitation the material_items fix
--- (20260704000005) called out) — that is a pre-existing gap this migration
--- does not attempt to close, since column-level lockdown here would also need
--- to keep self-reads of email/whatsapp_number/cost_visible working
--- (getCurrentStaffRow does `select("*")` on the caller's own row) and is a
--- separate, larger security change. Flagged for a follow-up if Wilson wants
--- comparable column-level hardening on `staff`.
+-- Fix: an additional SELECT policy scoped to SHARED-PROJECT colleagues — a
+-- caller may read the staff row of anyone who shares (or has EVER shared) a
+-- project_staff assignment with them. Deliberately no active_from/active_until
+-- filtering: past co-membership keeps an ex-colleague's name renderable on
+-- their old comments/events. The helper is SECURITY DEFINER with a locked
+-- search_path, matching current_is_assigned / current_has_cross_project_read
+-- in 20260531000002 — it bypasses RLS internally, so there is no
+-- policy-recursion concern reading project_staff here.
+--
+-- Scope note: RLS is row-level only, so email/whatsapp_number/cost_visible on
+-- those SAME-PROJECT rows remain readable at the Postgres privilege layer
+-- (GRANT is table-wide) — narrowed from the firm-wide exposure an
+-- all-active-staff policy would have created, but not name-only. App code
+-- keeps the existing convention of selecting just `(id, full_name, role)` off
+-- `staff` for these joins (see getCardComments/getCardMembers/
+-- getTimelineEvents in packages/core/src/cards/queries.ts). If Wilson wants
+-- true name-only exposure, the follow-up is column-level grants, precedent:
+-- 20260704000005_protect_material_items_cost_columns.sql (with care: self
+-- reads via getCurrentStaffRow's `select("*")` need full columns).
 
 begin;
 
-create policy staff_read_active_colleagues on public.staff
-  for select using (
-    public.current_staff_id() is not null and active
+create or replace function public.current_shares_project_with(target_staff_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists(
+    select 1
+    from public.project_staff a
+    join public.project_staff b on a.project_id = b.project_id
+    where a.staff_id = auth.uid()
+      and b.staff_id = target_staff_id
   );
+$$;
+
+revoke all on function public.current_shares_project_with(uuid) from public;
+grant execute on function public.current_shares_project_with(uuid) to authenticated;
+
+create policy staff_read_shared_project_colleagues on public.staff
+  for select using (public.current_shares_project_with(id));
 
 commit;

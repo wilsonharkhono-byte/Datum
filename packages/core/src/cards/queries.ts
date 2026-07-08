@@ -132,7 +132,10 @@ export async function getProjectStaff(
   supabase: SupabaseClient<Database>,
   projectId: string,
 ): Promise<Pick<Staff, "id" | "full_name" | "role">[]> {
-  // Staff assigned to this project plus cross-project-read roles
+  // No project filter in the query — rows are RLS-scoped: self and
+  // cross-project-read roles (principal/admin/estimator) see all active staff;
+  // other callers see active staff who share/shared a project with them
+  // (staff_read_shared_project_colleagues, 20260708000001).
   const { data, error } = await supabase
     .from("staff")
     .select("id, full_name, role")

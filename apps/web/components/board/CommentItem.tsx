@@ -4,8 +4,9 @@ import type { CardCommentWithAuthor } from "@datum/core";
 import { editComment, deleteComment } from "@/lib/cards/mutations";
 
 function initials(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+  const trimmed = name?.trim();
+  if (!trimmed) return "?";
+  return trimmed.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
 function renderBody(body: string): React.ReactNode[] {
