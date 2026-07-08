@@ -10,4 +10,6 @@ export {
   getProjectStaff,
   type CardDetail,
   type CardMemberWithStaff,
+  type CardCommentWithAuthor,
+  type CardEventWithLogger,
 } from "@datum/core";

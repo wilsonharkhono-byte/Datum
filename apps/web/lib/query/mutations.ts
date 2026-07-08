@@ -5,7 +5,7 @@ import { applyAddCard, applyMoveCard, removeCardById } from "@/lib/cards/optimis
 import { createCard, moveCard, createComment } from "@/lib/cards/mutations";
 import type { Board } from "@/lib/cards/queries";
 import type { CardPayload } from "@/app/api/card/[code]/[slug]/route";
-import type { CardComment } from "@datum/db";
+import type { CardCommentWithAuthor } from "@datum/core";
 
 export function useAddCard(code: string) {
   const qc = useQueryClient();
@@ -63,7 +63,7 @@ export function useAddComment(code: string, slug: string) {
       const prev = qc.getQueryData<CardPayload>(keys.card(code, slug));
       const ghostId = `optimistic:${crypto.randomUUID()}`;
       if (prev) {
-        const ghost: CardComment = {
+        const ghost: CardCommentWithAuthor = {
           id: ghostId,
           card_id: cardId,
           project_id: projectId,
@@ -73,6 +73,7 @@ export function useAddComment(code: string, slug: string) {
           created_at: new Date().toISOString(),
           edited_at: null,
           deleted_at: null,
+          author: null,
         };
         qc.setQueryData<CardPayload>(keys.card(code, slug), {
           ...prev,

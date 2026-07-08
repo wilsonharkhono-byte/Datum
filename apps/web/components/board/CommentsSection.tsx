@@ -1,5 +1,5 @@
 "use client";
-import type { CardComment } from "@datum/db";
+import type { CardCommentWithAuthor } from "@datum/core";
 import { CommentItem } from "./CommentItem";
 import { CommentInput } from "./CommentInput";
 
@@ -29,7 +29,7 @@ export function CommentsSection({
   cardCode: string;
   cardQuerySlug: string;
   currentStaffId: string | null;
-  comments: CardComment[];
+  comments: CardCommentWithAuthor[];
 }) {
   return (
     <section className="mt-8">

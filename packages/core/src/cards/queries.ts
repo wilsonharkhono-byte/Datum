@@ -9,23 +9,31 @@ import type {
   Staff,
 } from "@datum/db";
 
-export type CardDetail = { card: Card; events: CardEvent[] };
+export type CardDetail = { card: Card; events: CardEventWithLogger[] };
 
 export type CardMemberWithStaff = CardMember & {
   staff: Pick<Staff, "id" | "full_name" | "role"> | null;
 };
 
+export type CardCommentWithAuthor = CardComment & {
+  author: Pick<Staff, "id" | "full_name" | "role"> | null;
+};
+
+export type CardEventWithLogger = CardEvent & {
+  logger: Pick<Staff, "id" | "full_name"> | null;
+};
+
 async function getTimelineEvents(
   supabase: SupabaseClient<Database>,
   cardId: string,
-): Promise<CardEvent[]> {
+): Promise<CardEventWithLogger[]> {
   const { data: events, error: evErr } = await supabase
     .from("card_events")
-    .select("*")
+    .select("*, logger:logged_by_staff_id (id, full_name)")
     .eq("card_id", cardId)
     .order("occurred_at", { ascending: false });
   if (evErr) throw evErr;
-  return events ?? [];
+  return (events as unknown as CardEventWithLogger[]) ?? [];
 }
 
 export async function getCardWithTimeline(
@@ -95,15 +103,15 @@ export async function getCardAttachments(
 export async function getCardComments(
   supabase: SupabaseClient<Database>,
   cardId: string,
-): Promise<CardComment[]> {
+): Promise<CardCommentWithAuthor[]> {
   const { data, error } = await supabase
     .from("card_comments")
-    .select("*")
+    .select("*, author:created_by_staff_id (id, full_name, role)")
     .eq("card_id", cardId)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data as unknown as CardCommentWithAuthor[]) ?? [];
 }
 
 export async function getCardMembers(
