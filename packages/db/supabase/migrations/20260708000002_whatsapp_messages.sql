@@ -1,4 +1,4 @@
--- 20260708000001_whatsapp_messages.sql
+-- 20260708000002_whatsapp_messages.sql
 -- WhatsApp (Meta Cloud API) send log — Phase 1, one-way, own team only.
 -- Records every outbound template-message attempt made by the server-side
 -- sendWhatsAppTemplate() fan-out (apps/web/lib/notifications/whatsapp-send.ts),
