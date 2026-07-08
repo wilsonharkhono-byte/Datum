@@ -2878,6 +2878,69 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_messages: {
+        Row: {
+          created_at: string
+          dedupe_key: string | null
+          error: string | null
+          id: string
+          payload: Json
+          phone: string
+          recipient_kind: string
+          staff_id: string | null
+          status: string
+          template_name: string
+          updated_at: string
+          vendor_id: string | null
+          wamid: string | null
+        }
+        Insert: {
+          created_at?: string
+          dedupe_key?: string | null
+          error?: string | null
+          id?: string
+          payload?: Json
+          phone: string
+          recipient_kind: string
+          staff_id?: string | null
+          status?: string
+          template_name: string
+          updated_at?: string
+          vendor_id?: string | null
+          wamid?: string | null
+        }
+        Update: {
+          created_at?: string
+          dedupe_key?: string | null
+          error?: string | null
+          id?: string
+          payload?: Json
+          phone?: string
+          recipient_kind?: string
+          staff_id?: string | null
+          status?: string
+          template_name?: string
+          updated_at?: string
+          vendor_id?: string | null
+          wamid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -19,6 +19,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildReadinessReminders, READINESS_REMINDER_KIND } from "@/lib/steps/reminders";
 import type { ReminderIntent } from "@/lib/steps/reminders";
 import { sendExpoPush } from "@/lib/notifications/push-send";
+import { sendWhatsAppTemplate, WHATSAPP_TEMPLATES } from "@/lib/notifications/whatsapp-send";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -127,6 +128,7 @@ export async function GET(req: Request) {
   let written = 0;
   let skippedDup = 0;
   let failed = 0;
+  let waSent = 0;
 
   for (const intent of intents) {
     try {
@@ -154,6 +156,12 @@ export async function GET(req: Request) {
           body: intent.message,
           data: { link: intent.link },
         });
+        await sendWhatsAppTemplate(admin, [intent.recipientStaffId], {
+          template: WHATSAPP_TEMPLATES.readinessReminder,
+          bodyParams: [intent.message],
+          dedupeKey: intent.dedupeKey,
+        });
+        waSent++;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -165,7 +173,7 @@ export async function GET(req: Request) {
 
   console.log(
     `${LOG} summary: projects_scanned=${projectsScanned} signals_found=${signalsFound} ` +
-    `intents=${intents.length} written=${written} skipped_dup=${skippedDup} failed=${failed}`,
+    `intents=${intents.length} written=${written} skipped_dup=${skippedDup} failed=${failed} wa_sent=${waSent}`,
   );
 
   return NextResponse.json({
