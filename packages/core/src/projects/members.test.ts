@@ -2,8 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 import {
   AddProjectMemberInput,
   RemoveProjectMemberInput,
+  UpdateProjectMemberInput,
   addProjectMember,
   removeProjectMember,
+  updateProjectMember,
 } from "./member-write";
 import { UpdateProjectInput, updateProject } from "./update";
 import { CreateStaffInput, STAFF_ROLES } from "../validation/staff";
@@ -27,6 +29,16 @@ describe("AddProjectMemberInput", () => {
       roleOnProject: "designer",
     });
     expect(r.success).toBe(false);
+  });
+
+  it("accepts an optional costVisible flag", () => {
+    const r = AddProjectMemberInput.safeParse({
+      projectId:     "00000000-0000-0000-0000-000000000001",
+      staffId:       "00000000-0000-0000-0000-000000000002",
+      roleOnProject: "site supervisor",
+      costVisible:   true,
+    });
+    expect(r.success).toBe(true);
   });
 
   it("rejects empty roleOnProject", () => {
@@ -138,6 +150,22 @@ describe("addProjectMember", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toBe("FK violation");
   });
+
+  it("defaults cost_visible to false on insert when omitted", async () => {
+    const supabase = makeAddSupabase({ existingRow: null });
+    await addProjectMember(supabase, input);
+    const fromFn = supabase.from as unknown as ReturnType<typeof vi.fn>;
+    const insertFn = fromFn.mock.results[0]!.value.insert as ReturnType<typeof vi.fn>;
+    expect(insertFn).toHaveBeenCalledWith(expect.objectContaining({ cost_visible: false }));
+  });
+
+  it("passes cost_visible: true through to insert when provided", async () => {
+    const supabase = makeAddSupabase({ existingRow: null });
+    await addProjectMember(supabase, { ...input, costVisible: true });
+    const fromFn = supabase.from as unknown as ReturnType<typeof vi.fn>;
+    const insertFn = fromFn.mock.results[0]!.value.insert as ReturnType<typeof vi.fn>;
+    expect(insertFn).toHaveBeenCalledWith(expect.objectContaining({ cost_visible: true }));
+  });
 });
 
 // ─── removeProjectMember ─────────────────────────────────────────────────────
@@ -167,6 +195,77 @@ describe("removeProjectMember", () => {
     const r = await removeProjectMember(supabase, input);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toBe("RLS denied");
+  });
+});
+
+// ─── UpdateProjectMemberInput schema ─────────────────────────────────────────
+
+describe("UpdateProjectMemberInput", () => {
+  it("accepts a valid input", () => {
+    const r = UpdateProjectMemberInput.safeParse({
+      projectId:     PROJ_ID,
+      staffId:       STAFF_ID,
+      roleOnProject: "site supervisor",
+      costVisible:   true,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects missing costVisible", () => {
+    const r = UpdateProjectMemberInput.safeParse({
+      projectId:     PROJ_ID,
+      staffId:       STAFF_ID,
+      roleOnProject: "site supervisor",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects empty roleOnProject", () => {
+    const r = UpdateProjectMemberInput.safeParse({
+      projectId:     PROJ_ID,
+      staffId:       STAFF_ID,
+      roleOnProject: "",
+      costVisible:   false,
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+// ─── updateProjectMember ──────────────────────────────────────────────────────
+
+function makeUpdateMemberSupabase(opts: { updateError?: { message: string } | null } = {}) {
+  // .from("project_staff").update(...).eq().eq().is()  → result
+  const isChain = vi.fn().mockResolvedValue({ error: opts.updateError ?? null });
+  const eqChain = { eq: vi.fn().mockReturnThis(), is: isChain };
+  (eqChain.eq as ReturnType<typeof vi.fn>).mockReturnValue(eqChain);
+  const update = vi.fn().mockReturnValue(eqChain);
+
+  const from = vi.fn().mockReturnValue({ update });
+  return { from } as unknown as Parameters<typeof updateProjectMember>[0];
+}
+
+describe("updateProjectMember", () => {
+  const input = { projectId: PROJ_ID, staffId: STAFF_ID, roleOnProject: "site supervisor", costVisible: true };
+
+  it("returns ok: true on success", async () => {
+    const supabase = makeUpdateMemberSupabase();
+    const r = await updateProjectMember(supabase, input);
+    expect(r.ok).toBe(true);
+  });
+
+  it("returns error on DB failure", async () => {
+    const supabase = makeUpdateMemberSupabase({ updateError: { message: "RLS denied" } });
+    const r = await updateProjectMember(supabase, input);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("RLS denied");
+  });
+
+  it("passes role_on_project and cost_visible to the update payload", async () => {
+    const supabase = makeUpdateMemberSupabase();
+    await updateProjectMember(supabase, input);
+    const fromFn = supabase.from as unknown as ReturnType<typeof vi.fn>;
+    const updateFn = fromFn.mock.results[0]!.value.update as ReturnType<typeof vi.fn>;
+    expect(updateFn).toHaveBeenCalledWith({ role_on_project: "site supervisor", cost_visible: true });
   });
 });
 

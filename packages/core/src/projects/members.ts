@@ -6,6 +6,7 @@ import type { Staff } from "@datum/db";
 export type ProjectMemberRow = {
   staff_id: string;
   role_on_project: string;
+  cost_visible: boolean;
   active_from: string;
   active_until: string | null;
   staff: Pick<Staff, "id" | "full_name" | "role" | "email" | "active"> | null;
@@ -23,7 +24,7 @@ export async function getProjectMembers(
 ): Promise<ProjectMemberRow[]> {
   const { data, error } = await supabase
     .from("project_staff")
-    .select(`staff_id, role_on_project, active_from, active_until,
+    .select(`staff_id, role_on_project, cost_visible, active_from, active_until,
              staff:staff_id (id, full_name, role, email, active)`)
     .eq("project_id", projectId)
     .order("active_from", { ascending: true });
