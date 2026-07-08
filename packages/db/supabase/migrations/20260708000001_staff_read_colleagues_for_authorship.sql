@@ -11,14 +11,17 @@
 -- they can plainly see the comment/event row itself, which already names the
 -- author's staff_id in a column.
 --
--- Fix: an additional SELECT policy scoped to SHARED-PROJECT colleagues — a
--- caller may read the staff row of anyone who shares (or has EVER shared) a
--- project_staff assignment with them. Deliberately no active_from/active_until
--- filtering: past co-membership keeps an ex-colleague's name renderable on
--- their old comments/events. The helper is SECURITY DEFINER with a locked
--- search_path, matching current_is_assigned / current_has_cross_project_read
--- in 20260531000002 — it bypasses RLS internally, so there is no
--- policy-recursion concern reading project_staff here.
+-- Fix: an additional SELECT policy scoped to SHARED-PROJECT colleagues — an
+-- ACTIVE caller (current_staff_id() returns null for deactivated staff, so a
+-- deactivated account whose auth still works gets nothing) may read the staff
+-- row of anyone who shares (or has EVER shared) a project_staff assignment
+-- with them. Target activity is deliberately NOT required, and neither is
+-- active_from/active_until filtering on the co-membership: past co-membership
+-- keeps an ex-colleague's name renderable on their old comments/events. The
+-- helper is SECURITY DEFINER with a locked search_path, matching
+-- current_is_assigned / current_has_cross_project_read in 20260531000002 — it
+-- bypasses RLS internally, so there is no policy-recursion concern reading
+-- project_staff here.
 --
 -- Scope note: RLS is row-level only, so email/whatsapp_number/cost_visible on
 -- those SAME-PROJECT rows remain readable at the Postgres privilege layer
@@ -53,6 +56,9 @@ revoke all on function public.current_shares_project_with(uuid) from public;
 grant execute on function public.current_shares_project_with(uuid) to authenticated;
 
 create policy staff_read_shared_project_colleagues on public.staff
-  for select using (public.current_shares_project_with(id));
+  for select using (
+    public.current_staff_id() is not null
+    and public.current_shares_project_with(id)
+  );
 
 commit;
