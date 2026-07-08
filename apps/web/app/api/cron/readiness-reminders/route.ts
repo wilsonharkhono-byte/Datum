@@ -156,12 +156,12 @@ export async function GET(req: Request) {
           body: intent.message,
           data: { link: intent.link },
         });
-        await sendWhatsAppTemplate(admin, [intent.recipientStaffId], {
+        const waResult = await sendWhatsAppTemplate(admin, [intent.recipientStaffId], {
           template: WHATSAPP_TEMPLATES.readinessReminder,
           bodyParams: [intent.message],
           dedupeKey: intent.dedupeKey,
         });
-        waSent++;
+        waSent += waResult.sent;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

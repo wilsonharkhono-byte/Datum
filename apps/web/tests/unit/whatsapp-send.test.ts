@@ -114,10 +114,11 @@ describe("sendWhatsAppTemplate", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const { from } = makeFakeAdmin({ staffRows: [{ id: "s1", whatsapp_number: "081234567890" }] });
 
-    await sendWhatsAppTemplate({ from } as never, ["s1"], OPTS);
+    const result = await sendWhatsAppTemplate({ from } as never, ["s1"], OPTS);
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(from).not.toHaveBeenCalled();
+    expect(result).toEqual({ attempted: 0, sent: 0, skipped: 0 });
   });
 
   it("no-ops when WHATSAPP_PHONE_NUMBER_ID is missing", async () => {
@@ -170,9 +171,10 @@ describe("sendWhatsAppTemplate", () => {
       dedupeRows: [{ id: "existing-msg" }],
     });
 
-    await sendWhatsAppTemplate({ from } as never, ["s1"], { ...OPTS, dedupeKey: "dedupe-abc" });
+    const result = await sendWhatsAppTemplate({ from } as never, ["s1"], { ...OPTS, dedupeKey: "dedupe-abc" });
 
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result).toEqual({ attempted: 0, sent: 0, skipped: 1 });
   });
 
   it("sends when dedupeKey is omitted (no dedupe check performed)", async () => {
@@ -196,7 +198,7 @@ describe("sendWhatsAppTemplate", () => {
       staffRows: [{ id: "s1", whatsapp_number: "081234567890" }],
     });
 
-    await sendWhatsAppTemplate({ from } as never, ["s1"], OPTS);
+    const result = await sendWhatsAppTemplate({ from } as never, ["s1"], OPTS);
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
@@ -219,15 +221,95 @@ describe("sendWhatsAppTemplate", () => {
     });
 
     expect(insertSpy).toHaveBeenCalledOnce();
-    const insertedRow = insertSpy.mock.calls[0][0];
-    expect(insertedRow).toMatchObject({
+    // Full-row equality — no dedupeKey supplied, so no dedupe_key on the row.
+    expect(insertSpy.mock.calls[0][0]).toEqual({
       recipient_kind: "staff",
       staff_id: "s1",
       phone: "6281234567890",
       template_name: WHATSAPP_TEMPLATES.readinessReminder,
+      payload: { bodyParams: ["Test reminder message"] },
       status: "sent",
       wamid: "wamid.XYZ",
     });
+    expect(result).toEqual({ attempted: 1, sent: 1, skipped: 0 });
+  });
+
+  it("writes dedupe_key on the inserted row when dedupeKey is supplied", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ messages: [{ id: "wamid.DK" }] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    const { from, insertSpy } = makeFakeAdmin({
+      staffRows: [{ id: "s1", whatsapp_number: "081234567890" }],
+    });
+
+    await sendWhatsAppTemplate({ from } as never, ["s1"], { ...OPTS, dedupeKey: "dedupe-abc" });
+
+    expect(insertSpy).toHaveBeenCalledOnce();
+    expect(insertSpy.mock.calls[0][0]).toEqual({
+      recipient_kind: "staff",
+      staff_id: "s1",
+      phone: "6281234567890",
+      template_name: WHATSAPP_TEMPLATES.readinessReminder,
+      payload: { bodyParams: ["Test reminder message"] },
+      status: "sent",
+      wamid: "wamid.DK",
+      dedupe_key: "dedupe-abc",
+    });
+  });
+
+  it("dedupe roundtrip: first send writes dedupe_key, second same-day call with the same key is skipped", async () => {
+    // Stateful fake: inserts accumulate and the dedupe query reads them back —
+    // proving the key wasSentToday looks for is the key insertAttempt writes.
+    const inserted: Array<Record<string, unknown>> = [];
+    const from = vi.fn((table: string) => {
+      if (table === "staff") {
+        return {
+          select: vi.fn().mockReturnThis(),
+          in: vi.fn().mockResolvedValue({
+            data: [{ id: "s1", whatsapp_number: "081234567890" }],
+            error: null,
+          }),
+        };
+      }
+      if (table === "whatsapp_messages") {
+        const filters: Record<string, unknown> = {};
+        const builder = {
+          select: vi.fn(() => builder),
+          eq: vi.fn((col: string, val: unknown) => {
+            filters[col] = val;
+            return builder;
+          }),
+          gte: vi.fn(async () => ({
+            data: inserted
+              .filter((r) => r.dedupe_key === filters.dedupe_key)
+              .map(() => ({ id: "existing" })),
+            error: null,
+          })),
+          insert: vi.fn(async (row: Record<string, unknown>) => {
+            inserted.push(row);
+            return { error: null };
+          }),
+        };
+        return builder;
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ messages: [{ id: "wamid.RT" }] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const first = await sendWhatsAppTemplate({ from } as never, ["s1"], { ...OPTS, dedupeKey: "dedupe-rt" });
+    expect(first).toEqual({ attempted: 1, sent: 1, skipped: 0 });
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]!.dedupe_key).toBe("dedupe-rt");
+
+    const second = await sendWhatsAppTemplate({ from } as never, ["s1"], { ...OPTS, dedupeKey: "dedupe-rt" });
+    expect(second).toEqual({ attempted: 0, sent: 0, skipped: 1 });
+    expect(fetchSpy).toHaveBeenCalledOnce(); // no second POST
+    expect(inserted).toHaveLength(1); // no second row
   });
 
   it("inserts a failed row with the error text when the Meta API responds with an error status", async () => {
@@ -239,18 +321,20 @@ describe("sendWhatsAppTemplate", () => {
       staffRows: [{ id: "s1", whatsapp_number: "081234567890" }],
     });
 
-    await sendWhatsAppTemplate({ from } as never, ["s1"], OPTS);
+    const result = await sendWhatsAppTemplate({ from } as never, ["s1"], OPTS);
 
     expect(insertSpy).toHaveBeenCalledOnce();
-    const insertedRow = insertSpy.mock.calls[0][0];
-    expect(insertedRow).toMatchObject({
+    // Full-row equality: failed status + error text, no wamid, no dedupe_key.
+    expect(insertSpy.mock.calls[0][0]).toEqual({
       recipient_kind: "staff",
       staff_id: "s1",
       phone: "6281234567890",
       template_name: WHATSAPP_TEMPLATES.readinessReminder,
+      payload: { bodyParams: ["Test reminder message"] },
       status: "failed",
+      error: "Invalid parameter",
     });
-    expect(insertedRow.error).toContain("Invalid parameter");
+    expect(result).toEqual({ attempted: 1, sent: 0, skipped: 0 });
   });
 
   it("inserts a failed row with the error text when fetch rejects (network error)", async () => {
@@ -273,7 +357,11 @@ describe("sendWhatsAppTemplate", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const { from } = makeFakeAdmin({ staffError: { message: "permission denied" } });
 
-    await expect(sendWhatsAppTemplate({ from } as never, ["s1"], OPTS)).resolves.toBeUndefined();
+    await expect(sendWhatsAppTemplate({ from } as never, ["s1"], OPTS)).resolves.toEqual({
+      attempted: 0,
+      sent: 0,
+      skipped: 0,
+    });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -282,7 +370,12 @@ describe("sendWhatsAppTemplate", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const { from } = makeFakeAdmin({ staffRows: [{ id: "s1", whatsapp_number: "081234567890" }] });
 
-    await expect(sendWhatsAppTemplate({ from } as never, ["s1"], OPTS)).resolves.toBeUndefined();
+    // Fetch rejection is handled per-recipient: attempted but not sent.
+    await expect(sendWhatsAppTemplate({ from } as never, ["s1"], OPTS)).resolves.toEqual({
+      attempted: 1,
+      sent: 0,
+      skipped: 0,
+    });
   });
 
   it("no-ops immediately when staffIds is empty", async () => {
