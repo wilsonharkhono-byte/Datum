@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
-import type { CardEvent, CardAttachment, CardEventKind } from "@datum/db";
+import type { CardAttachment, CardEventKind } from "@datum/db";
+import type { CardEventWithLogger } from "@datum/core";
 import { EventRow } from "./EventRow";
 import { TimelineFilter } from "./TimelineFilter";
 
@@ -15,7 +16,7 @@ export function Timeline({
   projectCode,
   cardSlug,
 }: {
-  events: CardEvent[];
+  events: CardEventWithLogger[];
   attachmentsByEvent: Map<string, CardAttachment[]>;
   projectCode: string;
   cardSlug: string;

@@ -1,5 +1,4 @@
-import type { CardComment } from "@datum/db";
-import type { CardDetail, CardMemberWithStaff } from "./queries";
+import type { CardDetail, CardCommentWithAuthor, CardMemberWithStaff } from "./queries";
 
 /**
  * The full card payload assembled for a card-detail view.
@@ -15,6 +14,6 @@ import type { CardDetail, CardMemberWithStaff } from "./queries";
  *   return { ...detail, comments, members } satisfies CardPayload;
  */
 export type CardPayload = CardDetail & {
-  comments: CardComment[];
+  comments: CardCommentWithAuthor[];
   members: CardMemberWithStaff[];
 };

@@ -1,4 +1,5 @@
 import type { CardEvent, CardAttachment } from "@datum/db";
+import type { CardEventWithLogger } from "@datum/core";
 import { HIGH_RISK_KINDS, isDecisionOpen, isClientRequestOpen, type EventKind } from "@datum/types";
 import { resolveCardEvent } from "@/lib/cards/mutations";
 import { summarize, extractUrls, looksLikeImage, safeHostname } from "@datum/core";
@@ -30,7 +31,7 @@ export function EventRow({
   projectCode,
   cardSlug,
 }: {
-  event: CardEvent;
+  event: CardEventWithLogger;
   attachments: CardAttachment[];
   projectCode: string;
   cardSlug: string;
@@ -51,6 +52,11 @@ export function EventRow({
           <span className="text-[11px] text-[var(--text-secondary)] md:w-24 md:flex-shrink-0">
             {new Date(event.occurred_at).toLocaleDateString("id-ID", { year: "2-digit", month: "short", day: "numeric" })}
           </span>
+          {event.logger ? (
+            <span className="text-[11px] text-[var(--text-secondary)]">
+              oleh {event.logger.full_name}
+            </span>
+          ) : null}
         </div>
         <span className="min-w-0 flex-1 break-words text-[var(--foreground)]">{summarize(event)}</span>
         {isHighRisk ? (

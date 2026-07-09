@@ -116,6 +116,8 @@ export {
   getProjectStaff,
   type CardDetail,
   type CardMemberWithStaff,
+  type CardCommentWithAuthor,
+  type CardEventWithLogger,
 } from "./cards/queries";
 
 export { type CardPayload } from "./cards/payload";

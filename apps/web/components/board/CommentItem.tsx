@@ -1,7 +1,13 @@
 "use client";
 import { useState, useTransition } from "react";
-import type { CardComment } from "@datum/db";
+import type { CardCommentWithAuthor } from "@datum/core";
 import { editComment, deleteComment } from "@/lib/cards/mutations";
+
+function initials(name: string | null | undefined): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return "?";
+  return trimmed.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+}
 
 function renderBody(body: string): React.ReactNode[] {
   // Split on @mention tokens and decorate them
@@ -29,7 +35,7 @@ export function CommentItem({
   cardSlug,
   canEdit,
 }: {
-  comment: CardComment;
+  comment: CardCommentWithAuthor;
   projectCode: string;
   cardSlug: string;
   canEdit: boolean;
@@ -70,12 +76,24 @@ export function CommentItem({
   return (
     <li className="rounded border border-[var(--border)] bg-[var(--surface-bright)] px-3 py-2 text-sm">
       <div className="mb-1 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
-        <span>
-          {new Date(comment.created_at).toLocaleString("id-ID", {
-            year: "2-digit", month: "short", day: "numeric",
-            hour: "2-digit", minute: "2-digit",
-          })}
-          {comment.edited_at ? <span className="ml-1 italic">(diedit)</span> : null}
+        <span className="flex items-center gap-1.5">
+          {comment.author ? (
+            <>
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--sand)]/30 text-[8px] font-bold text-[var(--text-secondary)]">
+                {initials(comment.author.full_name)}
+              </span>
+              <span className="font-semibold text-[var(--text-secondary)]">{comment.author.full_name}</span>
+            </>
+          ) : (
+            <span>—</span>
+          )}
+          <span>
+            {new Date(comment.created_at).toLocaleString("id-ID", {
+              year: "2-digit", month: "short", day: "numeric",
+              hour: "2-digit", minute: "2-digit",
+            })}
+            {comment.edited_at ? <span className="ml-1 italic">(diedit)</span> : null}
+          </span>
         </span>
         {canEdit && !editing && !confirmingDelete ? (
           <span className="flex gap-2">
