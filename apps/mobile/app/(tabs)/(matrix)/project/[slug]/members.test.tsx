@@ -139,6 +139,7 @@ const PROJECT_SETTINGS = {
 const MEMBER_BUDI: import("@datum/core").ProjectMemberRow = {
   staff_id: "staff-budi-001",
   role_on_project: "designer",
+  cost_visible: false,
   active_from: "2024-01-15",
   active_until: null,
   staff: {
@@ -153,6 +154,7 @@ const MEMBER_BUDI: import("@datum/core").ProjectMemberRow = {
 const MEMBER_DIAH: import("@datum/core").ProjectMemberRow = {
   staff_id: "staff-diah-002",
   role_on_project: "pic",
+  cost_visible: false,
   active_from: "2024-02-01",
   active_until: null,
   staff: {
@@ -167,6 +169,7 @@ const MEMBER_DIAH: import("@datum/core").ProjectMemberRow = {
 const MEMBER_INACTIVE: import("@datum/core").ProjectMemberRow = {
   staff_id: "staff-old-003",
   role_on_project: "estimator",
+  cost_visible: false,
   active_from: "2023-01-01",
   active_until: "2024-01-01",
   staff: {
