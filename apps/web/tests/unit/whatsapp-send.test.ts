@@ -222,7 +222,7 @@ describe("sendWhatsAppTemplate", () => {
 
     expect(insertSpy).toHaveBeenCalledOnce();
     // Full-row equality — no dedupeKey supplied, so no dedupe_key on the row.
-    expect(insertSpy.mock.calls[0][0]).toEqual({
+    expect(insertSpy.mock.calls[0]![0]).toEqual({
       recipient_kind: "staff",
       staff_id: "s1",
       phone: "6281234567890",
@@ -246,7 +246,7 @@ describe("sendWhatsAppTemplate", () => {
     await sendWhatsAppTemplate({ from } as never, ["s1"], { ...OPTS, dedupeKey: "dedupe-abc" });
 
     expect(insertSpy).toHaveBeenCalledOnce();
-    expect(insertSpy.mock.calls[0][0]).toEqual({
+    expect(insertSpy.mock.calls[0]![0]).toEqual({
       recipient_kind: "staff",
       staff_id: "s1",
       phone: "6281234567890",
@@ -325,7 +325,7 @@ describe("sendWhatsAppTemplate", () => {
 
     expect(insertSpy).toHaveBeenCalledOnce();
     // Full-row equality: failed status + error text, no wamid, no dedupe_key.
-    expect(insertSpy.mock.calls[0][0]).toEqual({
+    expect(insertSpy.mock.calls[0]![0]).toEqual({
       recipient_kind: "staff",
       staff_id: "s1",
       phone: "6281234567890",
@@ -347,7 +347,7 @@ describe("sendWhatsAppTemplate", () => {
     await sendWhatsAppTemplate({ from } as never, ["s1"], OPTS);
 
     expect(insertSpy).toHaveBeenCalledOnce();
-    const insertedRow = insertSpy.mock.calls[0][0];
+    const insertedRow = insertSpy.mock.calls[0]![0];
     expect(insertedRow.status).toBe("failed");
     expect(insertedRow.error).toContain("network down");
   });
