@@ -13,6 +13,7 @@ export const AddProjectMemberInput = z.object({
   projectId:     z.string().uuid(),
   staffId:       z.string().uuid(),
   roleOnProject: z.string().min(1).max(40),
+  costVisible:   z.boolean().optional(),
 });
 
 export type AddProjectMemberInputType = z.infer<typeof AddProjectMemberInput>;
@@ -24,6 +25,20 @@ export const RemoveProjectMemberInput = z.object({
 });
 
 export type RemoveProjectMemberInputType = z.infer<typeof RemoveProjectMemberInput>;
+
+/**
+ * Input for editing an existing (active) membership's role_on_project and/or
+ * cost_visible. Targets the currently-active row only — matches the
+ * soft-remove semantics of removeProjectMember (active_until IS NULL).
+ */
+export const UpdateProjectMemberInput = z.object({
+  projectId:        z.string().uuid(),
+  staffId:          z.string().uuid(),
+  roleOnProject:    z.string().min(1).max(40),
+  costVisible:      z.boolean(),
+});
+
+export type UpdateProjectMemberInputType = z.infer<typeof UpdateProjectMemberInput>;
 
 // ─── Result ───────────────────────────────────────────────────────────────────
 
@@ -61,7 +76,7 @@ export async function addProjectMember(
     }
     const { error } = await supabase
       .from("project_staff")
-      .update({ active_until: null, active_from: today })
+      .update({ active_until: null, active_from: today, cost_visible: input.costVisible ?? false })
       .eq("project_id", input.projectId)
       .eq("staff_id", input.staffId)
       .eq("role_on_project", input.roleOnProject);
@@ -71,6 +86,7 @@ export async function addProjectMember(
       project_id:      input.projectId,
       staff_id:        input.staffId,
       role_on_project: input.roleOnProject,
+      cost_visible:    input.costVisible ?? false,
       active_from:     today,
     });
     if (error) return { ok: false, error: error.message };
@@ -96,6 +112,28 @@ export async function removeProjectMember(
     .eq("project_id", input.projectId)
     .eq("staff_id", input.staffId)
     .eq("role_on_project", input.roleOnProject)
+    .is("active_until", null);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * Edit an existing membership's role_on_project and/or cost_visible.
+ * Targets the currently-active row for (projectId, staffId) — role_on_project
+ * is not part of the match here (it's the field being changed), matching the
+ * table's actual primary key of (project_id, staff_id).
+ *
+ * Does NOT call revalidatePath — that is handled by the web wrapper.
+ */
+export async function updateProjectMember(
+  supabase: DatumClient,
+  input: UpdateProjectMemberInputType,
+): Promise<MemberMutationResult> {
+  const { error } = await supabase
+    .from("project_staff")
+    .update({ role_on_project: input.roleOnProject, cost_visible: input.costVisible })
+    .eq("project_id", input.projectId)
+    .eq("staff_id", input.staffId)
     .is("active_until", null);
   if (error) return { ok: false, error: error.message };
   return { ok: true };

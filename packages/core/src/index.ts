@@ -48,9 +48,12 @@ export {
   type AddProjectMemberInputType,
   RemoveProjectMemberInput,
   type RemoveProjectMemberInputType,
+  UpdateProjectMemberInput,
+  type UpdateProjectMemberInputType,
   type MemberMutationResult,
   addProjectMember,
   removeProjectMember,
+  updateProjectMember,
 } from "./projects/member-write";
 
 // ─── Project update ───────────────────────────────────────────────────────────

@@ -10,14 +10,19 @@ type StaffOption = {
   email: string | null;
 };
 
-const ROLE_OPTIONS = [
-  { value: "principal",       label: "Principal" },
-  { value: "admin",           label: "Admin" },
-  { value: "estimator",       label: "Estimator" },
-  { value: "designer",        label: "Designer" },
-  { value: "pic",             label: "PIC" },
-  { value: "site_supervisor", label: "Site Supervisor" },
-];
+const ROLE_LABELS: Record<string, string> = {
+  principal:       "Principal",
+  admin:           "Admin",
+  estimator:       "Estimator",
+  designer:        "Designer",
+  pic:             "PIC",
+  site_supervisor: "Site Supervisor",
+};
+
+function defaultRoleFor(s: StaffOption | undefined): string {
+  if (!s?.role) return "";
+  return ROLE_LABELS[s.role] ?? s.role;
+}
 
 export function AddProjectMemberForm({
   projectId,
@@ -35,10 +40,19 @@ export function AddProjectMemberForm({
   const addable = candidates.filter((s) => !existing.has(s.id));
 
   const [staffId, setStaffId] = useState<string>(addable[0] ? addable[0].id : "");
-  const [role, setRole] = useState<string>("designer");
+  const [role, setRole] = useState<string>(defaultRoleFor(addable[0]));
+  const [costVisible, setCostVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Re-seed the role text field with a sensible default whenever the admin
+  // picks a different staff member — driven directly from the <select>'s
+  // onChange rather than an effect, so there's no cascading-render setState.
+  function pickStaff(id: string) {
+    setStaffId(id);
+    setRole(defaultRoleFor(addable.find((s) => s.id === id)));
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,17 +61,21 @@ export function AddProjectMemberForm({
     const fd = new FormData();
     fd.set("projectId", projectId);
     fd.set("staffId", staffId);
-    fd.set("roleOnProject", role);
+    fd.set("roleOnProject", role.trim());
+    fd.set("costVisible", costVisible ? "true" : "false");
     fd.set("projectCode", projectCode);
     startTransition(async () => {
       const res = await addProjectMember(fd);
       if (res.ok) {
         const name = candidates.find((s) => s.id === staffId)?.full_name ?? "anggota";
-        setSuccess(`${name} ditambahkan sebagai ${role}.`);
+        setSuccess(`${name} ditambahkan sebagai ${role.trim()}.`);
         // Pick next available staff for convenience
         const remaining = addable.filter((s) => s.id !== staffId);
         const next = remaining[0];
-        if (next) setStaffId(next.id);
+        if (next) {
+          pickStaff(next.id);
+          setCostVisible(false);
+        }
       } else {
         setError(res.error);
       }
@@ -87,7 +105,7 @@ export function AddProjectMemberForm({
         <select
           id={`${formId}-staff`}
           value={staffId}
-          onChange={(e) => setStaffId(e.target.value)}
+          onChange={(e) => pickStaff(e.target.value)}
           disabled={pending}
           className="select-brand w-full"
         >
@@ -105,29 +123,37 @@ export function AddProjectMemberForm({
         >
           Peran di proyek
         </label>
-        <select
+        <input
           id={`${formId}-role`}
+          type="text"
           value={role}
           onChange={(e) => setRole(e.target.value)}
           disabled={pending}
-          className="select-brand w-full"
-        >
-          {ROLE_OPTIONS.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
+          required
+          maxLength={40}
+          placeholder="mis. site supervisor"
+          className="rounded border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none w-full"
+        />
       </div>
       <div>
         <button
           type="submit"
-          disabled={pending || !staffId}
+          disabled={pending || !staffId || !role.trim()}
           className="rounded bg-[var(--foreground)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-inverse)] hover:bg-[var(--sand-dark)] disabled:bg-[var(--text-muted)]"
         >
           {pending ? "Menambah…" : "Tambah anggota"}
         </button>
       </div>
+      <label className="inline-flex items-center gap-2 text-xs text-[var(--text-secondary)] sm:col-span-3">
+        <input
+          type="checkbox"
+          checked={costVisible}
+          onChange={(e) => setCostVisible(e.target.checked)}
+          disabled={pending}
+          className="h-3.5 w-3.5 accent-[var(--sand-dark)]"
+        />
+        Boleh lihat data biaya (cost-visible) untuk proyek ini
+      </label>
       {error ? (
         <div className="rounded border border-[var(--flag-critical)] bg-[var(--flag-critical-bg)] px-3 py-2 text-xs text-[var(--flag-critical)] sm:col-span-3">
           {error}
