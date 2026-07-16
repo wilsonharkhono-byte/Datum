@@ -7,7 +7,17 @@
     "scheme": "datum",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": ["image/*"],
+          "androidMultiIntentFilters": ["image/*"]
+        }
+      ]
+    ],
     "experiments": { "typedRoutes": true },
     "ios": { "supportsTablet": false, "bundleIdentifier": "studio.wha.datum" },
     "android": { "package": "studio.wha.datum" }
