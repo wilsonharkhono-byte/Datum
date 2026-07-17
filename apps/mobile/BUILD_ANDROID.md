@@ -76,6 +76,11 @@ After installing the APK:
 If any step fails, capture a screenshot + the Android logcat around the
 share action (`adb logcat` while reproducing) before filing a bug.
 
+Note: photos in **HEIC/HEIF** format (some Samsung/newer camera defaults)
+are reported as "dilewati" (skipped) — the attachment pipeline accepts
+JPEG/PNG/GIF/WebP/PDF only. That message is expected behavior, not a bug.
+WhatsApp re-encodes to JPEG, so the scripted test above is unaffected.
+
 ## Follow-up: push notifications (not in this build)
 
 This build does **not** wire up push notifications (FCM). That's separate,

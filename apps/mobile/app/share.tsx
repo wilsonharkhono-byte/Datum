@@ -224,7 +224,9 @@ export default function ShareScreen() {
 
   function cancel() {
     resetShareIntent();
-    router.back();
+    // Cold-start share has no history to pop — fall back to the board tabs.
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/(matrix)");
   }
 
   const canCreateNew = !!newCardTitle.trim() && !!selectedTopicId && !submitting;

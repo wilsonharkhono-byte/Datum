@@ -44,8 +44,13 @@ jest.mock("@/lib/env", () => ({ SUPABASE_URL: "https://test.co", SUPABASE_ANON_K
 // expo-router
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
+let mockCanGoBack = true;
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockReplace, back: mockBack }),
+  useRouter: () => ({
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
 }));
 
 // expo-image → plain View so no native image loading is needed
@@ -381,5 +386,20 @@ describe("ShareScreen — Add to card", () => {
     fireEvent.press(screen.getByTestId("share-cancel"));
     expect(mockResetShareIntent).toHaveBeenCalledTimes(1);
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  // ── cold-start share: no history to pop → land on the board tabs ──
+  it("falls back to the tabs when Batal is pressed with no history", async () => {
+    mockCanGoBack = false;
+    try {
+      wrap(<ShareScreen />);
+      await waitFor(() => expect(screen.getByTestId("card-row-c1")).toBeTruthy());
+      fireEvent.press(screen.getByTestId("share-cancel"));
+      expect(mockResetShareIntent).toHaveBeenCalledTimes(1);
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith("/(tabs)/(matrix)");
+    } finally {
+      mockCanGoBack = true;
+    }
   });
 });
