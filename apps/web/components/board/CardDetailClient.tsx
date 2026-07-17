@@ -12,7 +12,7 @@ import { CardMembers } from "@/components/board/CardMembers";
 import { StaleDataNotice } from "@/components/shared/StaleDataNotice";
 import { PendingSyncNotice } from "@/components/shared/PendingSyncNotice";
 
-type StaffLite = Pick<Staff, "id" | "full_name" | "role">;
+type StaffLite = Pick<Staff, "id" | "full_name" | "role" | "handle">;
 
 /** Client wrapper for the dynamic card sections. The timeline events, comments,
     and members are sourced from the cached card query (useCard) so the screen
@@ -118,6 +118,7 @@ export function CardDetailClient({
             cardQuerySlug={slug}
             currentStaffId={currentStaffId}
             comments={card.comments}
+            mentionCandidates={candidates}
           />
         </div>
       </div>

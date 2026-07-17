@@ -131,16 +131,33 @@ export async function getCardMembers(
 export async function getProjectStaff(
   supabase: SupabaseClient<Database>,
   projectId: string,
-): Promise<Pick<Staff, "id" | "full_name" | "role">[]> {
-  // No project filter in the query — rows are RLS-scoped: self and
-  // cross-project-read roles (principal/admin/estimator) see all active staff;
-  // other callers see active staff who share/shared a project with them
+): Promise<Pick<Staff, "id" | "full_name" | "role" | "handle">[]> {
+  // Active project members plus cross-project-read roles — the people who can
+  // actually open this project's cards (Trello: card members must be board
+  // members). Feeds the card-member picker and the @mention autocomplete.
+  // RLS additionally scopes what each caller can see
   // (staff_read_shared_project_colleagues, 20260708000001).
-  const { data, error } = await supabase
-    .from("staff")
-    .select("id, full_name, role")
-    .eq("active", true)
-    .order("full_name", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Pick<Staff, "id" | "full_name" | "role">[];
+  const [membersRes, staffRes] = await Promise.all([
+    supabase
+      .from("project_staff")
+      .select("staff_id, active_until")
+      .eq("project_id", projectId),
+    supabase
+      .from("staff")
+      .select("id, full_name, role, handle")
+      .eq("active", true)
+      .order("full_name", { ascending: true }),
+  ]);
+  if (membersRes.error) throw membersRes.error;
+  if (staffRes.error) throw staffRes.error;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const memberIds = new Set(
+    (membersRes.data ?? [])
+      .filter((m) => !m.active_until || m.active_until >= today)
+      .map((m) => m.staff_id),
+  );
+  return ((staffRes.data ?? []) as Pick<Staff, "id" | "full_name" | "role" | "handle">[]).filter(
+    (s) => memberIds.has(s.id) || s.role === "principal" || s.role === "admin" || s.role === "estimator",
+  );
 }

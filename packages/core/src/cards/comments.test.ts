@@ -52,27 +52,53 @@ describe("extractMentionTokens", () => {
 
 // ─── resolveMentionStaffIds — mocked supabase ────────────────────────────────
 
-describe("resolveMentionStaffIds", () => {
-  function makeStaffMock(staff: Array<{ id: string; full_name: string | null }>) {
-    return {
-      from: (_table: string) => ({
-        select: (_cols: string) => ({
-          eq: (_col: string, _val: unknown) => Promise.resolve({ data: staff, error: null }),
-        }),
-      }),
-    } as unknown;
-  }
+const PROJECT_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
 
+type MockStaff = {
+  id: string;
+  full_name: string | null;
+  handle?: string | null;
+  role?: string;
+};
+type MockMember = { staff_id: string; active_until?: string | null };
+
+/** Table-switching mock: project_staff → members, staff → staff rows.
+    Staff not listed in members and without a cross-read role are ineligible. */
+function makeStaffMock(staff: MockStaff[], members?: MockMember[]) {
+  // Default: every staff row is an active project member (the common case).
+  const memberRows = (members ?? staff.map((s) => ({ staff_id: s.id }))).map((m) => ({
+    active_until: null,
+    ...m,
+  }));
+  const staffRows = staff.map((s) => ({ handle: null, role: "designer", ...s }));
+  return {
+    from: (table: string) => ({
+      select: (_cols: string) => ({
+        eq: (_col: string, _val: unknown) =>
+          Promise.resolve({
+            data: table === "project_staff" ? memberRows : staffRows,
+            error: null,
+          }),
+      }),
+    }),
+  } as unknown;
+}
+
+function resolve(supabase: unknown, tokens: string[]) {
+  return resolveMentionStaffIds(
+    supabase as Parameters<typeof resolveMentionStaffIds>[0],
+    tokens,
+    PROJECT_ID,
+  );
+}
+
+describe("resolveMentionStaffIds", () => {
   it("resolves a token to the matching staff id (case-insensitive first name)", async () => {
     const supabase = makeStaffMock([
       { id: "staff-001", full_name: "Budi Santoso" },
       { id: "staff-002", full_name: "Tanya Wijaya" },
     ]);
-    const ids = await resolveMentionStaffIds(
-      supabase as Parameters<typeof resolveMentionStaffIds>[0],
-      ["budi"],
-    );
-    expect(ids).toEqual(["staff-001"]);
+    expect(await resolve(supabase, ["budi"])).toEqual(["staff-001"]);
   });
 
   it("resolves multiple tokens", async () => {
@@ -80,10 +106,7 @@ describe("resolveMentionStaffIds", () => {
       { id: "staff-001", full_name: "Budi Santoso" },
       { id: "staff-002", full_name: "Tanya Wijaya" },
     ]);
-    const ids = await resolveMentionStaffIds(
-      supabase as Parameters<typeof resolveMentionStaffIds>[0],
-      ["budi", "tanya"],
-    );
+    const ids = await resolve(supabase, ["budi", "tanya"]);
     expect(ids).toContain("staff-001");
     expect(ids).toContain("staff-002");
     expect(ids).toHaveLength(2);
@@ -91,11 +114,7 @@ describe("resolveMentionStaffIds", () => {
 
   it("returns empty when no tokens match any staff", async () => {
     const supabase = makeStaffMock([{ id: "staff-001", full_name: "Budi Santoso" }]);
-    const ids = await resolveMentionStaffIds(
-      supabase as Parameters<typeof resolveMentionStaffIds>[0],
-      ["nobody"],
-    );
-    expect(ids).toEqual([]);
+    expect(await resolve(supabase, ["nobody"])).toEqual([]);
   });
 
   it("returns empty immediately when tokens array is empty (no DB call needed)", async () => {
@@ -106,22 +125,14 @@ describe("resolveMentionStaffIds", () => {
         return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
       },
     } as unknown;
-    const ids = await resolveMentionStaffIds(
-      supabase as Parameters<typeof resolveMentionStaffIds>[0],
-      [],
-    );
-    expect(ids).toEqual([]);
+    expect(await resolve(supabase, [])).toEqual([]);
     expect(called).toBe(false);
   });
 
   it("deduplicates when two tokens match the same person", async () => {
     const supabase = makeStaffMock([{ id: "staff-001", full_name: "Budi Budi" }]);
     // "budi" appears twice — should still resolve to one id
-    const ids = await resolveMentionStaffIds(
-      supabase as Parameters<typeof resolveMentionStaffIds>[0],
-      ["budi", "budi"],
-    );
-    expect(ids).toEqual(["staff-001"]);
+    expect(await resolve(supabase, ["budi", "budi"])).toEqual(["staff-001"]);
   });
 
   it("handles staff with null full_name gracefully", async () => {
@@ -129,11 +140,68 @@ describe("resolveMentionStaffIds", () => {
       { id: "staff-001", full_name: null },
       { id: "staff-002", full_name: "Tanya Wijaya" },
     ]);
-    const ids = await resolveMentionStaffIds(
-      supabase as Parameters<typeof resolveMentionStaffIds>[0],
-      ["tanya"],
+    expect(await resolve(supabase, ["tanya"])).toEqual(["staff-002"]);
+  });
+
+  it("prefers a unique handle match over first-name matches", async () => {
+    const supabase = makeStaffMock([
+      { id: "staff-001", full_name: "Budi Santoso", handle: "budi" },
+      { id: "staff-002", full_name: "Budi Hartono", handle: "budi_h" },
+    ]);
+    // Handle "budi" belongs to exactly one person — the other Budi must NOT
+    // be notified (this is the duplicate-first-name fix).
+    expect(await resolve(supabase, ["budi"])).toEqual(["staff-001"]);
+    expect(await resolve(supabase, ["budi_h"])).toEqual(["staff-002"]);
+  });
+
+  it("matches handles case-insensitively against the token", async () => {
+    const supabase = makeStaffMock([
+      { id: "staff-001", full_name: "Ariesta Putri", handle: "ariesta_p" },
+    ]);
+    // Tokens arrive lowercased from extractMentionTokens.
+    expect(await resolve(supabase, ["ariesta_p"])).toEqual(["staff-001"]);
+  });
+
+  it("falls back to first-name matching when no handle matches (may fan out)", async () => {
+    const supabase = makeStaffMock([
+      { id: "staff-001", full_name: "Putri Ayu", handle: "putri_a" },
+      { id: "staff-002", full_name: "Putri Bela", handle: "putri_b" },
+    ]);
+    // "putri" is nobody's handle → legacy first-name behavior notifies both.
+    const ids = await resolve(supabase, ["putri"]);
+    expect(ids).toContain("staff-001");
+    expect(ids).toContain("staff-002");
+  });
+
+  it("does not resolve staff who are not members of the project", async () => {
+    const supabase = makeStaffMock(
+      [
+        { id: "staff-001", full_name: "Budi Santoso", handle: "budi" },
+        { id: "staff-002", full_name: "Tanya Wijaya", handle: "tanya" },
+      ],
+      [{ staff_id: "staff-001" }], // only Budi is on the project
     );
-    expect(ids).toEqual(["staff-002"]);
+    expect(await resolve(supabase, ["tanya"])).toEqual([]);
+    expect(await resolve(supabase, ["budi"])).toEqual(["staff-001"]);
+  });
+
+  it("resolves cross-project-read roles even when not assigned to the project", async () => {
+    const supabase = makeStaffMock(
+      [
+        { id: "staff-wilson", full_name: "Wilson Harkhono", handle: "wilson", role: "principal" },
+        { id: "staff-002", full_name: "Tanya Wijaya", handle: "tanya", role: "designer" },
+      ],
+      [{ staff_id: "staff-002" }], // Wilson has no project_staff row
+    );
+    expect(await resolve(supabase, ["wilson"])).toEqual(["staff-wilson"]);
+  });
+
+  it("excludes members whose assignment already ended (active_until in the past)", async () => {
+    const supabase = makeStaffMock(
+      [{ id: "staff-001", full_name: "Budi Santoso", handle: "budi" }],
+      [{ staff_id: "staff-001", active_until: "2020-01-01" }],
+    );
+    expect(await resolve(supabase, ["budi"])).toEqual([]);
   });
 });
 
@@ -196,20 +264,22 @@ describe("EditCommentInput schema", () => {
 
 function makeCommentInsertMock(overrides: {
   insertResult?: unknown;
-  staff?: Array<{ id: string; full_name: string | null }>;
+  staff?: MockStaff[];
 } = {}) {
   const insertResult = overrides.insertResult ?? {
     data: { id: "comment-uuid-001" },
     error: null,
   };
-  const staff = overrides.staff ?? [];
+  const staff = (overrides.staff ?? []).map((s) => ({ handle: null, role: "designer", ...s }));
+  const members = staff.map((s) => ({ staff_id: s.id, active_until: null }));
 
   return {
     from: (table: string) => {
-      if (table === "staff") {
+      if (table === "staff" || table === "project_staff") {
         return {
           select: (_cols: string) => ({
-            eq: (_col: string, _val: unknown) => Promise.resolve({ data: staff, error: null }),
+            eq: (_col: string, _val: unknown) =>
+              Promise.resolve({ data: table === "staff" ? staff : members, error: null }),
           }),
         };
       }
@@ -275,25 +345,35 @@ describe("createComment", () => {
 
 function makeCommentUpdateMock(overrides: {
   updateResult?: unknown;
-  staff?: Array<{ id: string; full_name: string | null }>;
+  /** Result of the pre-update read that fetches project_id for mention scoping. */
+  readResult?: unknown;
+  staff?: MockStaff[];
 } = {}) {
   const updateResult = overrides.updateResult ?? {
     data: { id: "comment-uuid-001", card_id: "card-001", project_id: "proj-001" },
     error: null,
   };
-  const staff = overrides.staff ?? [];
+  const readResult = overrides.readResult ?? updateResult;
+  const staff = (overrides.staff ?? []).map((s) => ({ handle: null, role: "designer", ...s }));
+  const members = staff.map((s) => ({ staff_id: s.id, active_until: null }));
 
   return {
     from: (table: string) => {
-      if (table === "staff") {
+      if (table === "staff" || table === "project_staff") {
         return {
           select: (_cols: string) => ({
-            eq: (_col: string, _val: unknown) => Promise.resolve({ data: staff, error: null }),
+            eq: (_col: string, _val: unknown) =>
+              Promise.resolve({ data: table === "staff" ? staff : members, error: null }),
           }),
         };
       }
-      // card_comments
+      // card_comments — editComment reads the row (select) then updates it
       return {
+        select: (_cols: string) => ({
+          eq: (_col: string, _val: unknown) => ({
+            single: () => Promise.resolve(readResult),
+          }),
+        }),
         update: (_patch: unknown) => ({
           eq: (_col: string, _val: unknown) => ({
             select: (_cols?: string) => ({

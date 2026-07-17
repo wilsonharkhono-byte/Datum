@@ -104,7 +104,13 @@ function makeRequest(body: unknown): Request {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeInsertChain(error: unknown = null) {
-  return { insert: vi.fn().mockResolvedValue({ data: null, error }) };
+  return {
+    // staff-core's handle generation reads existing handles before inserting
+    select: vi.fn().mockReturnValue({
+      like: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }),
+    insert: vi.fn().mockResolvedValue({ data: null, error }),
+  };
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -225,10 +231,10 @@ describe("POST /api/staff/create", () => {
   });
 
   it("500 — staff insert fails → rolls back auth user", async () => {
-    // First call (staff table insert) fails; admin.from('staff') returns error
-    mockAdminClient.from.mockReturnValue({
-      insert: vi.fn().mockResolvedValue({ data: null, error: { message: "constraint violation" } }),
-    });
+    // The staff-table insert fails; admin.from('staff') returns error
+    mockAdminClient.from.mockReturnValue(
+      makeInsertChain({ message: "constraint violation" }),
+    );
 
     const res = await POST(makeRequest(VALID_BODY));
 

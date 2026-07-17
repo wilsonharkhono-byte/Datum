@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useAddComment } from "@/lib/query/mutations";
+import { MentionTextarea, type MentionCandidate } from "./MentionTextarea";
 
 export function CommentInput({
   cardId,
@@ -9,6 +10,7 @@ export function CommentInput({
   cardSlug,
   cardCode,
   cardQuerySlug,
+  mentionCandidates,
 }: {
   cardId: string;
   projectId: string;
@@ -19,6 +21,8 @@ export function CommentInput({
       so the optimistic ghost lands in the same cache entry the list reads. */
   cardCode: string;
   cardQuerySlug: string;
+  /** People who can see this card — offered by the @mention autocomplete. */
+  mentionCandidates: MentionCandidate[];
 }) {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +56,14 @@ export function CommentInput({
 
   return (
     <form onSubmit={submit} className="mt-3">
-      <textarea
+      <MentionTextarea
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={setBody}
+        candidates={mentionCandidates}
         disabled={pending}
         rows={2}
         maxLength={4000}
-        placeholder="Tambah komentar…"
+        placeholder="Tambah komentar… (@nama untuk menyebut)"
         className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:border-[var(--sand-dark)] focus:outline-none"
       />
       {error ? <div className="mt-1 text-[11px] text-[var(--flag-critical)]">{error}</div> : null}

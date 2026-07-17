@@ -37,7 +37,7 @@ export type DeleteCommentResult =
 // ─── Mention helpers ──────────────────────────────────────────────────────────
 
 /**
- * Pure: extract all @<first-name> tokens from a comment body.
+ * Pure: extract all @<handle-or-first-name> tokens from a comment body.
  * Returns lowercase, deduplicated tokens (the leading @ is stripped).
  */
 export function extractMentionTokens(body: string): string[] {
@@ -47,23 +47,56 @@ export function extractMentionTokens(body: string): string[] {
   ));
 }
 
+/** Roles whose RLS grants read on every project — always mentionable. */
+const CROSS_PROJECT_READ_ROLES: ReadonlyArray<string> = ["principal", "admin", "estimator"];
+
 /**
- * Resolve mention tokens to active staff IDs by case-insensitive first-name match.
- * Requires a Supabase client (reads the `staff` table).
+ * Resolve mention tokens to active staff IDs, scoped to people who can actually
+ * open the card: active project members plus cross-project-read roles.
+ *
+ * Per token: a unique-handle match wins (Trello-username semantics); when no
+ * handle matches, fall back to case-insensitive first-name matching (legacy
+ * behavior — may resolve to several people who share the name).
  */
 export async function resolveMentionStaffIds(
   supabase: SC,
   tokens: string[],
+  projectId: string,
 ): Promise<string[]> {
   if (tokens.length === 0) return [];
-  const { data: candidates } = await supabase
-    .from("staff")
-    .select("id, full_name")
-    .eq("active", true);
+
+  const [membersRes, staffRes] = await Promise.all([
+    supabase
+      .from("project_staff")
+      .select("staff_id, active_until")
+      .eq("project_id", projectId),
+    supabase
+      .from("staff")
+      .select("id, full_name, handle, role")
+      .eq("active", true),
+  ]);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const memberIds = new Set(
+    (membersRes.data ?? [])
+      .filter((m) => !m.active_until || m.active_until >= today)
+      .map((m) => m.staff_id),
+  );
+  const eligible = (staffRes.data ?? []).filter(
+    (s) => memberIds.has(s.id) || CROSS_PROJECT_READ_ROLES.includes(s.role),
+  );
+
   const ids = new Set<string>();
-  for (const cand of candidates ?? []) {
-    const first = (cand.full_name ?? "").split(/\s+/)[0]?.toLowerCase();
-    if (first && tokens.includes(first)) ids.add(cand.id);
+  for (const token of tokens) {
+    const handleMatch = eligible.find((s) => (s.handle ?? "").toLowerCase() === token);
+    if (handleMatch) {
+      ids.add(handleMatch.id);
+      continue;
+    }
+    for (const s of eligible) {
+      const first = (s.full_name ?? "").split(/\s+/)[0]?.toLowerCase();
+      if (first && first === token) ids.add(s.id);
+    }
   }
   return Array.from(ids);
 }
@@ -93,7 +126,7 @@ export async function createComment(
   if (!parsed.success) return { ok: false, error: "Komentar tidak boleh kosong" };
 
   const tokens = extractMentionTokens(args.body);
-  const mentionedStaffIds = await resolveMentionStaffIds(supabase, tokens);
+  const mentionedStaffIds = await resolveMentionStaffIds(supabase, tokens, args.projectId);
 
   const { data: inserted, error } = await supabase
     .from("card_comments")
@@ -127,8 +160,17 @@ export async function editComment(
   const parsed = EditCommentInput.safeParse(args);
   if (!parsed.success) return { ok: false, error: "Form tidak valid" };
 
+  // Mention resolution is project-scoped, so read the comment's project first.
+  const { data: existing, error: readErr } = await supabase
+    .from("card_comments")
+    .select("id, card_id, project_id")
+    .eq("id", args.commentId)
+    .single();
+  if (readErr) return { ok: false, error: readErr.message };
+  if (!existing?.project_id) return { ok: false, error: "Komentar tidak ditemukan" };
+
   const tokens = extractMentionTokens(args.body);
-  const mentionedStaffIds = await resolveMentionStaffIds(supabase, tokens);
+  const mentionedStaffIds = await resolveMentionStaffIds(supabase, tokens, existing.project_id);
 
   const { data: updated, error } = await supabase
     .from("card_comments")
