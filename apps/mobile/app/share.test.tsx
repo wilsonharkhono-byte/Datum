@@ -18,7 +18,7 @@
  */
 
 import React from "react";
-import { render, fireEvent, waitFor, screen } from "@testing-library/react-native";
+import { render, fireEvent, waitFor, screen, act } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -337,6 +337,40 @@ describe("ShareScreen — Add to card", () => {
     expect(mockReplace).not.toHaveBeenCalled();
     expect(mockResetShareIntent).not.toHaveBeenCalled();
     expect(screen.getByTestId("card-row-c1")).toBeTruthy();
+  });
+
+  // ── re-entrancy guard: two rapid taps (same tick, before re-render) submit once ──
+  it("submits exactly once when a card row is pressed twice in the same tick", async () => {
+    let resolveShare!: (v: unknown) => void;
+    mockShareToExistingCard.mockImplementation(
+      () => new Promise((resolve) => { resolveShare = resolve; }),
+    );
+    wrap(<ShareScreen />);
+    await waitFor(() => expect(screen.getByTestId("card-row-c1")).toBeTruthy());
+
+    // Grab the onPress handler once and invoke it twice within a single tick —
+    // this reproduces a real double-tap racing ahead of React's re-render
+    // (two separate fireEvent.press calls each flush via act() in between,
+    // which would mask a stale-closure `submitting` check).
+    const row = screen.getByTestId("card-row-c1");
+    // Walk up from the host node to find the composite Pressable's onPress
+    // prop, mirroring how RNTL's fireEvent resolves the handler internally.
+    let node: typeof row | null = row;
+    let onPress: (() => void) | undefined;
+    while (node && !onPress) {
+      if (typeof node.props?.onPress === "function") onPress = node.props.onPress;
+      node = node.parent;
+    }
+    if (!onPress) throw new Error("onPress handler not found on card row");
+    await act(async () => {
+      onPress();
+      onPress();
+    });
+
+    expect(mockShareToExistingCard).toHaveBeenCalledTimes(1);
+
+    resolveShare(OK_CLEAN);
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
   });
 
   // ── close (batal) resets intent + goes back ──

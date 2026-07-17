@@ -59,6 +59,10 @@ export default function ShareScreen() {
   const [newCardTitle, setNewCardTitle] = useState("");
 
   // ── Submission state ──
+  // submittingRef guards re-entrancy synchronously: `submitting` state is
+  // stale within the same event tick (two fast taps can both read it as
+  // false before React re-renders), so the boolean alone isn't enough.
+  const submittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
@@ -120,20 +124,22 @@ export default function ShareScreen() {
   }
 
   // ── Submission ──
-  function finish(res: ShareToCardResult) {
+  async function finish(res: ShareToCardResult) {
     if (!res.ok) {
       setError(res.error);
       setSubmitting(false);
+      submittingRef.current = false;
       return;
     }
     const nav: PendingNav = { code: selectedCode, cardSlug: res.cardSlug };
     const { skipped, failed } = res.outcome;
-    void setLastShareTarget({
+    await setLastShareTarget({
       projectId: selectedProjectId!,
       projectCode: selectedCode,
       topicId: selectedTopicId!,
     });
     setSubmitting(false);
+    submittingRef.current = false;
     if (skipped.length > 0 || failed.length > 0) {
       // Show the summary first; navigate on acknowledgement.
       const parts: string[] = [`${res.outcome.uploaded} foto terunggah`];
@@ -160,22 +166,31 @@ export default function ShareScreen() {
   }
 
   async function submitToCard(card: { id: string; slug: string }) {
+    if (submittingRef.current) return;
     if (!staff || assets.length === 0 || !selectedProjectId || submitting) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     setSummary(null);
-    const res = await shareToExistingCard(supabase, {
-      projectId: selectedProjectId,
-      cardId: card.id,
-      cardSlug: card.slug,
-      note: note.trim() || undefined,
-      assets,
-      loggedByStaffId: staff.id,
-    });
-    finish(res);
+    try {
+      const res = await shareToExistingCard(supabase, {
+        projectId: selectedProjectId,
+        cardId: card.id,
+        cardSlug: card.slug,
+        note: note.trim() || undefined,
+        assets,
+        loggedByStaffId: staff.id,
+      });
+      await finish(res);
+    } catch {
+      setError("Gagal menyimpan. Coba lagi.");
+      setSubmitting(false);
+      submittingRef.current = false;
+    }
   }
 
   async function submitNewCard() {
+    if (submittingRef.current) return;
     const title = newCardTitle.trim();
     if (
       !staff ||
@@ -186,18 +201,25 @@ export default function ShareScreen() {
       submitting
     )
       return;
+    submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     setSummary(null);
-    const res = await shareToNewCard(supabase, {
-      projectId: selectedProjectId,
-      topicId: selectedTopicId,
-      title,
-      note: note.trim() || undefined,
-      assets,
-      loggedByStaffId: staff.id,
-    });
-    finish(res);
+    try {
+      const res = await shareToNewCard(supabase, {
+        projectId: selectedProjectId,
+        topicId: selectedTopicId,
+        title,
+        note: note.trim() || undefined,
+        assets,
+        loggedByStaffId: staff.id,
+      });
+      await finish(res);
+    } catch {
+      setError("Gagal menyimpan. Coba lagi.");
+      setSubmitting(false);
+      submittingRef.current = false;
+    }
   }
 
   function cancel() {
@@ -356,7 +378,7 @@ export default function ShareScreen() {
                           onPress={() =>
                             !submitting && setSelectedTopicId(t.id)
                           }
-                          className={`min-h-[36px] justify-center rounded-full px-3 py-1.5 ${
+                          className={`min-h-[44px] justify-center rounded-full px-3 py-1.5 ${
                             active
                               ? "bg-primary"
                               : "border border-border bg-surface"

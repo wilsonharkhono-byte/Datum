@@ -46,6 +46,7 @@ export function useDevelopments() {
 export function useBoard(code: string) {
   return useQuery({
     queryKey: keys.board(code),
+    enabled: !!code,
     queryFn: () => getBoardForProject(supabase, code),
   });
 }
