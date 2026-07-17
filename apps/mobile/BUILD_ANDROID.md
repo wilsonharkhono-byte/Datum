@@ -27,7 +27,7 @@ this is a direct sideload, not a Play Store install).
 
 - **development** — dev-client APK, for use with `expo start` during active development.
 - **preview** — internal-distribution APK. This is the one Wilson installs to test.
-- **production** — same shape as preview today (no Play Store submission wired up yet); `autoIncrement: true` bumps the Android `versionCode` automatically on each build.
+- **production** — has no `distribution`/`buildType` override yet, so it currently defaults to a store-format app bundle (.aab), **not** an installable APK — treat it as a placeholder until Play Store submission is wired up; `autoIncrement: true` bumps the Android `versionCode` automatically on each build.
 
 ## Environment values baked into the build
 
