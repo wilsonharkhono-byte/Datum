@@ -108,7 +108,7 @@ export function MessageInput({ mode, disabled, sending, onSend }: Props) {
             onPress={() => void pickFile()}
             disabled={disabled || sending}
             accessibilityLabel="Lampirkan file"
-            className="mb-1 h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-surface-alt active:opacity-70"
+            className="mb-1 h-11 w-11 items-center justify-center rounded-full border border-border/50 bg-surface-alt active:opacity-70"
           >
             <AttachIcon />
           </Pressable>
@@ -137,7 +137,7 @@ export function MessageInput({ mode, disabled, sending, onSend }: Props) {
           testID="send-button"
           accessibilityRole="button"
           accessibilityLabel="Kirim"
-          className={`mb-0.5 h-9 w-9 items-center justify-center rounded-full ${
+          className={`mb-0.5 h-11 w-11 items-center justify-center rounded-full ${
             canSend ? "bg-primary active:opacity-80" : "bg-surface-alt"
           }`}
         >

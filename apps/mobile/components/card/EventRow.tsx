@@ -10,12 +10,15 @@
  *  - per-event attachment thumbnails / caption
  */
 
-import { View, Pressable, Linking } from "react-native";
+import { useState } from "react";
+import { View, Pressable, Linking, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import type { CardEvent, CardAttachment } from "@datum/db";
 import { summarize, extractUrls, looksLikeImage, safeHostname } from "@datum/core";
 import { Text } from "@/components/ui/Text";
 import { Badge } from "@/components/ui/Badge";
+import { useSignedAttachmentUrl } from "@/lib/attachments/useSignedAttachmentUrl";
+import { AttachmentViewer } from "./AttachmentViewer";
 
 // ─── Kind label map (Bahasa Indonesia) ────────────────────────────────────────
 
@@ -140,16 +143,42 @@ function AttachmentItem({ attachment }: { attachment: CardAttachment }) {
   const { storage_path, ai_caption, ai_status, mime_type } = attachment;
   const isImg = mime_type?.startsWith("image/") ?? looksLikeImage(storage_path ?? "");
 
+  // storage_path is a schemeless bucket path — resolve to a signed URL before
+  // handing it to expo-image, else the thumbnail never loads. Only sign images.
+  const { url, isLoading } = useSignedAttachmentUrl(isImg ? storage_path : null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
   return (
     <View className="flex-row items-start gap-2">
-      {isImg ? (
-        <Image
-          source={{ uri: storage_path ?? undefined }}
-          style={{ width: 64, height: 64, borderRadius: 6 }}
-          contentFit="cover"
-          accessibilityLabel={ai_caption ?? "Lampiran gambar"}
-        />
+      {isImg && url ? (
+        <>
+          <Pressable
+            onPress={() => setViewerOpen(true)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={ai_caption ? `Lihat foto: ${ai_caption}` : "Lihat foto lampiran"}
+          >
+            <Image
+              source={{ uri: url }}
+              style={{ width: 64, height: 64, borderRadius: 6 }}
+              contentFit="cover"
+            />
+          </Pressable>
+          <AttachmentViewer
+            visible={viewerOpen}
+            url={url}
+            caption={ai_caption}
+            onClose={() => setViewerOpen(false)}
+          />
+        </>
+      ) : isImg && isLoading ? (
+        <View
+          className="h-16 w-16 items-center justify-center rounded bg-surface-alt"
+          accessibilityLabel="Memuat foto"
+        >
+          <ActivityIndicator size="small" color="#9C8B75" />
+        </View>
       ) : (
+        // Non-image attachment, or an image whose signing failed — dead paperclip tile.
         <View className="h-12 w-12 items-center justify-center rounded bg-surface-alt">
           <Text className="text-[20px]">📎</Text>
         </View>

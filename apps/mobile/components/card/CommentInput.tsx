@@ -131,12 +131,13 @@ export function DeletableCommentItem({
         <Text className="text-[12px] font-semibold text-text-sec">
           {`Staff ${comment.created_by_staff_id?.slice(0, 6) ?? "?"}`}
         </Text>
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row items-center gap-3">
           <Text className="text-[11px] text-text-muted">{dateStr}</Text>
           {isOwn && !editing ? (
             <>
               <Pressable
                 onPress={() => { setEditing(true); setEditBody(comment.body); }}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 className="min-h-[32px] min-w-[32px] items-center justify-center"
                 accessibilityLabel="Edit komentar"
               >
@@ -145,6 +146,7 @@ export function DeletableCommentItem({
               <Pressable
                 onPress={handleDelete}
                 disabled={deleteComment.isPending}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 className="min-h-[32px] min-w-[32px] items-center justify-center"
                 accessibilityLabel="Hapus komentar"
               >

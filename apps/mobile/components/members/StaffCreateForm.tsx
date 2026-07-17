@@ -29,6 +29,11 @@ import {
   Clipboard,
   Alert,
 } from "react-native";
+// NOTE: StaffCreateForm itself renders no outer ScrollView — it is always
+// mounted inside the screen's own scrollable container (members.tsx), and a
+// same-axis (vertical) ScrollView nested inside another breaks reliable
+// keyboard-avoidance/scroll-to-focused-input. The role picker below is a
+// horizontal ScrollView, a different axis, so it's unaffected and stays.
 import { CreateStaffInput, STAFF_ROLES } from "@datum/core";
 import { Text } from "@/components/ui/Text";
 import { Button } from "@/components/ui/Button";
@@ -252,7 +257,7 @@ export function StaffCreateForm({ onCreated }: Props) {
     !loading;
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <View>
       <Text variant="secondary" className="mb-4">
         Buat akun staf baru. Admin akan menerima password sementara yang bisa
         dibagikan via WhatsApp — staf bisa menggantinya setelah masuk pertama kali.
@@ -330,6 +335,6 @@ export function StaffCreateForm({ onCreated }: Props) {
         disabled={!canSubmit}
         loading={loading}
       />
-    </ScrollView>
+    </View>
   );
 }

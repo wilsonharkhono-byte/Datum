@@ -71,7 +71,7 @@ export function AddColumnSlide({ projectId, projectCode }: Props) {
         <Pressable
           onPress={submit}
           disabled={addColumn.isPending || name.trim().length === 0}
-          className={`flex-row items-center justify-center rounded px-3 py-1.5 ${
+          className={`min-h-[44px] flex-row items-center justify-center rounded px-3 ${
             addColumn.isPending || name.trim().length === 0 ? "bg-surface-alt" : "bg-primary"
           }`}
           accessibilityRole="button"
@@ -87,7 +87,7 @@ export function AddColumnSlide({ projectId, projectCode }: Props) {
         <Pressable
           onPress={() => { setOpen(false); setName(""); setError(null); }}
           disabled={addColumn.isPending}
-          className="rounded px-3 py-1.5"
+          className="min-h-[44px] items-center justify-center rounded px-3"
           accessibilityRole="button"
         >
           <Text className="text-[10px] font-medium text-text-sec">Batal</Text>

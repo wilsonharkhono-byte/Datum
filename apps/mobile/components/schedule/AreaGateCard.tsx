@@ -112,7 +112,7 @@ function GateRow({ gateCode, cell, scheduledCell, onAdvance }: GateRowProps) {
         {isAdvanceable ? (
           <Pressable
             onPress={() => onAdvance(gateCode)}
-            className="mt-1 rounded border border-ok/50 bg-ok-bg px-2 py-0.5 active:opacity-70"
+            className="mt-1 min-h-[44px] items-center justify-center rounded border border-ok/50 bg-ok-bg px-2 active:opacity-70"
             accessibilityRole="button"
             accessibilityLabel={`Tandai Gate ${gateCode} selesai`}
           >
@@ -193,6 +193,7 @@ export function AreaGateCard({
               setEditingTarget((v) => !v);
               setDraftDate(targetDate ?? "");
             }}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
             className={`rounded-sm px-2 py-0.5 ${isOverdue ? "bg-critical-bg" : "bg-info-bg"} active:opacity-70`}
             accessibilityRole="button"
             accessibilityLabel={`Target serah terima ${dateFmt}`}
@@ -209,6 +210,7 @@ export function AreaGateCard({
               setEditingTarget((v) => !v);
               setDraftDate("");
             }}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
             className="rounded-sm border border-dashed border-border px-2 py-0.5 active:opacity-70"
             accessibilityRole="button"
             accessibilityLabel="Set target serah terima"

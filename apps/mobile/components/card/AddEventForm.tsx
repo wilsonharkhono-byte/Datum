@@ -204,6 +204,14 @@ export function MobileAddEventForm({
   const [attachWarning, setAttachWarning] = useState<string | null>(null);
   const [pendingAsset, setPendingAsset] = useState<PickedAsset | null>(null);
   const [pickingFile, setPickingFile] = useState(false);
+  // When set, the event was created but its attachment upload failed. The form
+  // stays in a dedicated failure state — retry uploads ONLY, never re-creates the
+  // event. `retryable` is false for skip results (oversize/unsupported) where a
+  // retry can't succeed.
+  const [uploadFailure, setUploadFailure] = useState<
+    { eventId: string; retryable: boolean } | null
+  >(null);
+  const [retrying, setRetrying] = useState(false);
 
   const addEvent = useAddEvent(code, slug);
 
@@ -213,6 +221,7 @@ export function MobileAddEventForm({
     setError(null);
     setAttachWarning(null);
     setPendingAsset(null);
+    setUploadFailure(null);
   }
 
   function handleKindChange(newKind: EventKind) {
@@ -235,6 +244,28 @@ export function MobileAddEventForm({
     } finally {
       setPickingFile(false);
     }
+  }
+
+  /**
+   * Upload the pending attachment against an already-created event.
+   * Returns true on success (or when there's nothing to upload); on failure it
+   * records the warning + failure state and returns false so the caller keeps
+   * the form open instead of silently dropping the photo.
+   */
+  async function runAttachmentUpload(eventId: string): Promise<boolean> {
+    if (!pendingAsset) return true;
+    const uploadRes = await uploadCardAttachment(supabase, {
+      projectId,
+      cardId,
+      cardEventId: eventId,
+      asset: pendingAsset,
+    });
+    if (uploadRes.ok) return true;
+    const isSkip = "skipped" in uploadRes && uploadRes.skipped;
+    // Skip results (oversize/unsupported) can't be fixed by retrying.
+    setAttachWarning(isSkip ? uploadRes.reason : uploadRes.error);
+    setUploadFailure({ eventId, retryable: !isSkip });
+    return false;
   }
 
   async function handleSubmit() {
@@ -263,24 +294,34 @@ export function MobileAddEventForm({
       return;
     }
 
-    // Upload attachment if one was picked — best-effort, never blocks event save.
-    if (pendingAsset) {
-      const uploadRes = await uploadCardAttachment(supabase, {
-        projectId,
-        cardId,
-        cardEventId: eventId,
-        asset: pendingAsset,
-      });
-      if (!uploadRes.ok) {
-        // Skipped (oversize/unsupported) or upload error — warn but don't fail.
-        setAttachWarning(
-          "skipped" in uploadRes && uploadRes.skipped
-            ? uploadRes.reason
-            : uploadRes.error,
-        );
-      }
-    }
+    // Upload attachment if one was picked. The event is already saved, so on
+    // failure we must NOT let the user re-submit (that would double-create the
+    // event) — keep the form in the failure state for an upload-only retry.
+    const uploaded = await runAttachmentUpload(eventId);
+    if (!uploaded) return;
 
+    setOpen(false);
+    resetForm();
+  }
+
+  /** Retry ONLY the attachment upload against the same event — never re-create it. */
+  async function handleRetryUpload() {
+    if (!uploadFailure) return;
+    setRetrying(true);
+    setAttachWarning(null);
+    try {
+      const uploaded = await runAttachmentUpload(uploadFailure.eventId);
+      if (uploaded) {
+        setOpen(false);
+        resetForm();
+      }
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  /** Abandon the attachment explicitly — the event stays saved, form closes. */
+  function handleAbandonUpload() {
     setOpen(false);
     resetForm();
   }
@@ -294,6 +335,51 @@ export function MobileAddEventForm({
       >
         <Text className="text-[13px] text-text-sec">+ Catat aktivitas</Text>
       </Pressable>
+    );
+  }
+
+  // Dedicated "upload failed" state. The event is already saved; the only paths
+  // out are retrying the upload (if retryable) or abandoning the attachment.
+  // There is deliberately NO Simpan button here — re-submitting would double
+  // the event.
+  if (uploadFailure) {
+    return (
+      <View className="mt-2 rounded border border-warning/50 bg-surface p-3">
+        <Text className="mb-1 text-[13px] font-medium text-text">
+          Aktivitas tersimpan, tetapi lampiran gagal diunggah
+        </Text>
+        {attachWarning ? (
+          <Text className="mb-3 text-[12px] text-warning">{attachWarning}</Text>
+        ) : null}
+        <View className="flex-row gap-2">
+          {uploadFailure.retryable ? (
+            <Pressable
+              onPress={() => void handleRetryUpload()}
+              disabled={retrying}
+              className={`flex-1 min-h-[44px] items-center justify-center rounded ${
+                retrying ? "bg-surface-alt" : "bg-primary active:opacity-90"
+              }`}
+              accessibilityLabel="Coba unggah lagi"
+            >
+              {retrying ? (
+                <ActivityIndicator color="#FDFAF6" />
+              ) : (
+                <Text className="text-[13px] font-medium text-[#FDFAF6]">Coba unggah lagi</Text>
+              )}
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={handleAbandonUpload}
+            disabled={retrying}
+            className={`min-h-[44px] items-center justify-center rounded px-4 bg-surface-alt active:opacity-70 ${
+              uploadFailure.retryable ? "" : "flex-1"
+            }`}
+            accessibilityLabel="Tutup tanpa lampiran"
+          >
+            <Text className="text-[13px] text-text-sec">Tutup</Text>
+          </Pressable>
+        </View>
+      </View>
     );
   }
 

@@ -359,7 +359,10 @@ import { MobileEventRow } from "./EventRow";
 describe("MobileEventRow", () => {
   it("renders kind label and summary for a note event", () => {
     const event = FIXTURE_DETAIL.events[0]!;
-    const { getByText } = render(<MobileEventRow event={event} />);
+    // Attachment thumbnails resolve signed URLs via useQuery — wrap in a client.
+    const { getByText } = render(<MobileEventRow event={event} />, {
+      wrapper: wrapper(makeClient()),
+    });
     expect(getByText("Catatan")).toBeTruthy();
     expect(getByText("Mulai pengerjaan hari ini.")).toBeTruthy();
   });
@@ -369,6 +372,7 @@ describe("MobileEventRow", () => {
     const attachments = FIXTURE_ATTACHMENTS.get("event-2")!;
     const { getByText } = render(
       <MobileEventRow event={event} attachments={attachments} />,
+      { wrapper: wrapper(makeClient()) },
     );
     expect(getByText("Pemasangan keramik lantai ruang tamu.")).toBeTruthy();
   });

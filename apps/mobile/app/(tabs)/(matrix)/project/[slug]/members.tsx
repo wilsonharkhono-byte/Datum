@@ -240,7 +240,11 @@ export default function MembersScreen() {
       ) : !settingsQ.data ? (
         <EmptyState message={`Proyek tidak ditemukan: ${slug}`} />
       ) : (
-        <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 32, paddingTop: 16 }}>
+        <ScrollView
+          className="flex-1 px-4"
+          contentContainerStyle={{ paddingBottom: 32, paddingTop: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Project header */}
           <Text variant="label" className="mb-0.5">
             {settingsQ.data.project_code}
