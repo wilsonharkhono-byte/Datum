@@ -27,6 +27,34 @@ export type CreateStaffResult =
   | { ok: true; staffId: string; email: string }
   | { ok: false; error: string };
 
+/** Lowercase first name stripped to [a-z0-9_], letter-start guaranteed,
+    truncated so a dedupe suffix still fits the 31-char handle limit. */
+function baseHandleFromName(fullName: string): string {
+  const first = fullName.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  const clean = first.replace(/[^a-z0-9_]/g, "");
+  const letterStart = /^[a-z]/.test(clean) ? clean : `staf${clean}`;
+  return letterStart.slice(0, 24) || "staf";
+}
+
+/** Pick the first free handle: base, base2, base3 … (mirrors the migration's
+    backfill numbering). Reads with the admin client so RLS can't hide rows. */
+async function generateUniqueHandle(
+  admin: AdminClient,
+  fullName: string,
+): Promise<string> {
+  const base = baseHandleFromName(fullName);
+  const { data } = await admin
+    .from("staff")
+    .select("handle")
+    .like("handle", `${base}%`);
+  const taken = new Set((data ?? []).map((r) => r.handle));
+  if (!taken.has(base)) return base;
+  for (let n = 2; n < 1000; n++) {
+    if (!taken.has(`${base}${n}`)) return `${base}${n}`;
+  }
+  return `${base}${Math.floor(Math.random() * 1_000_000)}`;
+}
+
 /**
  * Core staff-creation logic: auth.admin.createUser + staff insert +
  * optional project_staff assignment. Takes the admin client + validated
@@ -54,12 +82,14 @@ export async function createStaffWithPasswordCore(
   }
 
   const newUserId = authData.user.id;
+  const handle = await generateUniqueHandle(admin, input.fullName);
 
   const { error: staffErr } = await admin.from("staff").insert({
     id:           newUserId,
     full_name:    input.fullName,
     role:         input.role,
     email:        input.email,
+    handle,
     cost_visible: input.costVisible ?? false,
     active:       true,
   });

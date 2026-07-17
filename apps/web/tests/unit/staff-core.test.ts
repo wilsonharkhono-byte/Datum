@@ -37,8 +37,18 @@ const BASE_INPUT = {
   password:    "SecurePass123!",
 };
 
-function makeInsertChain(error: unknown = null) {
-  return { insert: vi.fn().mockResolvedValue({ data: null, error }) };
+/** Mock for a from("staff"/"project_staff") chain: supports the handle-lookup
+    read (select().like()) and the row insert. */
+function makeInsertChain(
+  error: unknown = null,
+  existingHandles: Array<{ handle: string | null }> = [],
+) {
+  return {
+    select: vi.fn().mockReturnValue({
+      like: vi.fn().mockResolvedValue({ data: existingHandles, error: null }),
+    }),
+    insert: vi.fn().mockResolvedValue({ data: null, error }),
+  };
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -91,12 +101,9 @@ describe("createStaffWithPasswordCore", () => {
   });
 
   it("staff insert fails → rolls back auth user + returns ok:false", async () => {
-    mockAdminFrom.mockReturnValue({
-      insert: vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: "constraint violation", code: "23503" },
-      }),
-    });
+    mockAdminFrom.mockReturnValue(
+      makeInsertChain({ message: "constraint violation", code: "23503" }),
+    );
 
     const result = await createStaffWithPasswordCore(mockAdminClient as never, BASE_INPUT);
 
@@ -105,12 +112,9 @@ describe("createStaffWithPasswordCore", () => {
   });
 
   it("staff insert fails with 23505 → ok:false with sudah terdaftar di tabel staf", async () => {
-    mockAdminFrom.mockReturnValue({
-      insert: vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: "duplicate key", code: "23505" },
-      }),
-    });
+    mockAdminFrom.mockReturnValue(
+      makeInsertChain({ message: "duplicate key", code: "23505" }),
+    );
 
     const result = await createStaffWithPasswordCore(mockAdminClient as never, BASE_INPUT);
 
@@ -127,17 +131,18 @@ describe("createStaffWithPasswordCore", () => {
       roleOnProject: "pic",
     };
 
-    // First call = staff insert (ok), second call = project_staff insert (ok)
+    // Calls: staff (handle lookup), staff (insert), project_staff (insert)
     mockAdminFrom
+      .mockReturnValueOnce(makeInsertChain())
       .mockReturnValueOnce(makeInsertChain())
       .mockReturnValueOnce(makeInsertChain());
 
     const result = await createStaffWithPasswordCore(mockAdminClient as never, inputWithProject);
 
     expect(result.ok).toBe(true);
-    expect(mockAdminFrom).toHaveBeenCalledTimes(2);
-    const secondCall = mockAdminFrom.mock.calls[1]?.[0];
-    expect(secondCall).toBe("project_staff");
+    expect(mockAdminFrom).toHaveBeenCalledTimes(3);
+    const thirdCall = mockAdminFrom.mock.calls[2]?.[0];
+    expect(thirdCall).toBe("project_staff");
   });
 
   it("project_staff insert fails → ok:false with staf dibuat message", async () => {
@@ -148,7 +153,8 @@ describe("createStaffWithPasswordCore", () => {
     };
 
     mockAdminFrom
-      .mockReturnValueOnce(makeInsertChain()) // staff OK
+      .mockReturnValueOnce(makeInsertChain()) // staff handle lookup
+      .mockReturnValueOnce(makeInsertChain()) // staff insert OK
       .mockReturnValueOnce(makeInsertChain({ message: "fk violation" })); // project_staff fails
 
     const result = await createStaffWithPasswordCore(mockAdminClient as never, inputWithProject);
@@ -158,10 +164,33 @@ describe("createStaffWithPasswordCore", () => {
     expect(result.error).toMatch(/staf dibuat tapi gagal/i);
   });
 
-  it("without projectId — only inserts staff row (no project_staff call)", async () => {
+  it("without projectId — only touches the staff table (no project_staff call)", async () => {
     await createStaffWithPasswordCore(mockAdminClient as never, BASE_INPUT);
 
-    expect(mockAdminFrom).toHaveBeenCalledTimes(1);
-    expect(mockAdminFrom.mock.calls[0]?.[0]).toBe("staff");
+    // Two staff-table calls: handle lookup + insert; never project_staff.
+    expect(mockAdminFrom).toHaveBeenCalledTimes(2);
+    expect(mockAdminFrom.mock.calls.every((c) => c[0] === "staff")).toBe(true);
+  });
+
+  it("generates a lowercase first-name handle on insert", async () => {
+    const chain = makeInsertChain();
+    mockAdminFrom.mockReturnValue(chain);
+
+    await createStaffWithPasswordCore(mockAdminClient as never, BASE_INPUT);
+
+    expect(chain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ handle: "staf" }), // "Staf Baru" → "staf"
+    );
+  });
+
+  it("suffixes the handle when the base is already taken", async () => {
+    const chain = makeInsertChain(null, [{ handle: "staf" }, { handle: "staf2" }]);
+    mockAdminFrom.mockReturnValue(chain);
+
+    await createStaffWithPasswordCore(mockAdminClient as never, BASE_INPUT);
+
+    expect(chain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ handle: "staf3" }),
+    );
   });
 });

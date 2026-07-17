@@ -2,6 +2,7 @@
 import type { CardCommentWithAuthor } from "@datum/core";
 import { CommentItem } from "./CommentItem";
 import { CommentInput } from "./CommentInput";
+import type { MentionCandidate } from "./MentionTextarea";
 
 // Client component: the comment list is sourced from the cached card query
 // (via CardDetailClient → useCard) instead of a per-render server fetch, so it
@@ -18,6 +19,7 @@ export function CommentsSection({
   cardQuerySlug,
   currentStaffId,
   comments,
+  mentionCandidates,
 }: {
   cardId: string;
   projectId: string;
@@ -30,6 +32,8 @@ export function CommentsSection({
   cardQuerySlug: string;
   currentStaffId: string | null;
   comments: CardCommentWithAuthor[];
+  /** People who can see this card — offered by the @mention autocomplete. */
+  mentionCandidates: MentionCandidate[];
 }) {
   return (
     <section className="mt-8">
@@ -62,6 +66,7 @@ export function CommentsSection({
         cardSlug={cardSlug}
         cardCode={cardCode}
         cardQuerySlug={cardQuerySlug}
+        mentionCandidates={mentionCandidates}
       />
     </section>
   );
