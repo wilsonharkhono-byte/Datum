@@ -14,8 +14,8 @@
 | Low | 6 |
 | **Total** | **31** |
 
-**Fixed on this branch (feat/mobile-share-to-card):** V-1 (signed URLs — the one true High), plus the photo-journey and touch-comfort Mediums marked ✅ below.
-**Logged for follow-up:** camera capture, push-tap routing, offline mutation resume, realtime refetch-on-recover, and the remaining Medium/Low polish items.
+**Fixed on this branch:** V-1 signed-URL thumbnails (the one true High) + full-screen photo viewer + AddEventForm upload-failure retry (commits 9e43c82, 91e7058); all touch-target items (AreaGateCard, AddCardForm, AreaManagerRow, MessageInput, BoardTabs, AddColumnSlide, CommentInput), card-detail keyboardShouldPersistTaps, login return-key chaining, StaffCreateForm nested-ScrollView removal (commit 38d34e3).
+**Logged for follow-up (not fixed here):** camera capture (needs launchCameraAsync + permission), push-notification tap routing, offline mutation resume-on-restart, realtime refetch-on-recover, back-nav affordance on deep screens, AddEventForm multi-photo, FlatList conversions (Column, schedule accordion), share-screen photo deselect + per-photo progress, AI-caption failure state, isInternetReachable check, GateAdvanceSheet keyboard avoidance, ProjectInfoForm return keys, card-detail sub-section retry.
 
 ## Verified findings (were claimed Critical/High; every one CONFIRMED by an adversarial verifier)
 
