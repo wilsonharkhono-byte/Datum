@@ -215,11 +215,13 @@ export function AreaManagerRow({
       className="mb-2 flex-row items-center gap-2 rounded border border-border/40 bg-surface px-3 py-2.5"
       accessibilityLabel={`Area ${area.area_name}`}
     >
-      {/* Reorder buttons */}
-      <View className="gap-0.5">
+      {/* Reorder buttons — gap-6 (24px) keeps each button's vertical hitSlop
+          from overlapping its neighbor's (10px top + 10px bottom = 20px < 24px). */}
+      <View className="gap-6">
         <Pressable
           onPress={onMoveUp}
           disabled={isFirst || isReordering || isMutating}
+          hitSlop={{ top: 10, bottom: 10, left: 14, right: 14 }}
           className="items-center justify-center rounded p-1 active:opacity-60 disabled:opacity-30"
           accessibilityRole="button"
           accessibilityLabel={`Pindah ${area.area_name} ke atas`}
@@ -230,6 +232,7 @@ export function AreaManagerRow({
         <Pressable
           onPress={onMoveDown}
           disabled={isLast || isReordering || isMutating}
+          hitSlop={{ top: 10, bottom: 10, left: 14, right: 14 }}
           className="items-center justify-center rounded p-1 active:opacity-60 disabled:opacity-30"
           accessibilityRole="button"
           accessibilityLabel={`Pindah ${area.area_name} ke bawah`}

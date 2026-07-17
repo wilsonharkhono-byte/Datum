@@ -73,7 +73,7 @@ export function AddCardForm({ projectId, topicId, projectCode }: Props) {
         <Pressable
           onPress={submit}
           disabled={addCard.isPending || title.trim().length === 0}
-          className={`flex-row items-center justify-center rounded px-3 py-1 ${
+          className={`min-h-[44px] flex-row items-center justify-center rounded px-3 ${
             addCard.isPending || title.trim().length === 0 ? "bg-surface-alt" : "bg-primary"
           }`}
           accessibilityRole="button"
@@ -94,7 +94,7 @@ export function AddCardForm({ projectId, topicId, projectCode }: Props) {
             setError(null);
           }}
           disabled={addCard.isPending}
-          className="rounded px-3 py-1"
+          className="min-h-[44px] items-center justify-center rounded px-3"
           accessibilityRole="button"
           accessibilityLabel="Batal"
         >

@@ -172,6 +172,7 @@ export default function CardDetailScreen() {
         className="flex-1"
         contentContainerClassName="px-4 pb-8 pt-3"
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* ── Card header ── */}
         <View className="mb-1 flex-row items-start gap-2">

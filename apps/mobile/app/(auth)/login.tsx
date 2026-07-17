@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { View, Text, TextInput, Pressable, Alert } from "react-native";
 import { supabase } from "@/lib/supabase/client";
 import messages from "@/messages/id.json";
@@ -7,6 +7,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   async function submit() {
     setPending(true);
@@ -25,14 +26,22 @@ export default function LoginScreen() {
         autoCapitalize="none"
         keyboardType="email-address"
         autoComplete="email"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        blurOnSubmit={false}
+        testID="login-email-input"
         style={{ borderWidth: 1, borderColor: "#d6d3d1", borderRadius: 6, padding: 12, marginBottom: 16, backgroundColor: "#fff" }}
       />
       <Text style={{ marginBottom: 4 }}>{messages.login.password}</Text>
       <TextInput
+        ref={passwordRef}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
         autoComplete="current-password"
+        returnKeyType="done"
+        onSubmitEditing={submit}
+        testID="login-password-input"
         style={{ borderWidth: 1, borderColor: "#d6d3d1", borderRadius: 6, padding: 12, marginBottom: 24, backgroundColor: "#fff" }}
       />
       <Pressable

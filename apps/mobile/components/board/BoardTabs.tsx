@@ -53,7 +53,7 @@ export function BoardTabs({ tabs, activeId, onSelect }: Props) {
               else chipRefs.current.delete(tab.id);
             }}
             onPress={() => onSelect(tab.id)}
-            className={`flex-row items-center gap-1 rounded-full border px-3 py-1 ${
+            className={`min-h-[44px] flex-row items-center gap-1 rounded-full border px-3 ${
               on ? "border-accent bg-accent-dark" : "border-border bg-surface"
             }`}
             accessibilityRole="button"
