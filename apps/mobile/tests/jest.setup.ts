@@ -1,5 +1,5 @@
 /**
- * jest.setup.ts — global test setup, run via setupFilesAfterEach so jest.mock
+ * jest.setup.ts — global test setup, run via setupFilesAfterEnv so jest.mock
  * calls apply to every suite. Mocks the native expo-share-intent module so
  * suites that render the root layout don't hit real native code.
  */
