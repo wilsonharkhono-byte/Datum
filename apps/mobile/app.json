@@ -20,6 +20,8 @@
       ]
     ],
     "experiments": { "typedRoutes": true },
+    "owner": "wilsonharkhono",
+    "extra": { "eas": { "projectId": "0d461458-44f9-4f03-9aeb-ea72cff85a7f" } },
     "ios": { "supportsTablet": false, "bundleIdentifier": "studio.wha.datum" },
     "android": {
       "package": "studio.wha.datum",
