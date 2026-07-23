@@ -10,3 +10,6 @@ allowBuilds:
   '@sentry/cli': true
 minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk@0.104.2'
+  - expo-dev-client@56.0.24
+  - expo-dev-launcher@56.0.25
+  - expo-dev-menu@56.0.21
