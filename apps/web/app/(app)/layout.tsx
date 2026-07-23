@@ -14,7 +14,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <Providers userId={staff.id}>
-      <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+      {/* pb keeps the bottom row (assistant dock) clear of the iOS home
+          indicator now that viewport-fit=cover lets content extend under it. */}
+      <div className="h-app-shell flex flex-col overflow-hidden bg-[var(--background)] pb-[env(safe-area-inset-bottom)] text-[var(--foreground)]">
         <header className="shrink-0 border-b border-[var(--border)] bg-[var(--surface)]">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2 sm:px-8 sm:py-4">
             <div className="flex items-center gap-4">

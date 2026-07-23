@@ -402,6 +402,25 @@ body {
   }
 }
 
+/* === MOBILE VIEWPORT (dvh with vh fallback) =============================
+   100vh overshoots on phones — the browser's collapsing URL bar hides the
+   bottom of the shell (where the assistant dock lives). 100dvh tracks the
+   *visible* viewport; the vh line is the fallback for pre-dvh engines. */
+.h-app-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+/* Full-screen fixed sheet: explicit height wins over `bottom`, so the sheet
+   never extends behind the collapsed browser toolbar. */
+.sheet-fill {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* === PRINT (PDF export via browser ctrl-P) ============================== */
 @media print {
   :root {

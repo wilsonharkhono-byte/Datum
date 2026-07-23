@@ -515,11 +515,13 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           </div>
         </div>
 
-        {/* Layer 2 — warm-white message canvas. Only rendered once there's
-            actual conversation; the empty-state placeholder lives in the
-            input row's helper text instead so the dock collapses to a thin
-            strip and gives the board page more real estate. */}
-        {hasContent ? (
+        {/* Layer 2 — warm-white message canvas. On desktop it's only rendered
+            once there's actual conversation, so the empty dock collapses to a
+            thin strip and gives the board page more real estate. The mobile
+            sheet (onClose present) always renders it: the canvas fills the
+            screen, shows the mode hint, and pushes the input down to thumb
+            reach at the bottom edge. */}
+        {hasContent || onClose ? (
           <MessageList
             messages={messages}
             pending={pending}
@@ -529,7 +531,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         ) : null}
 
         {/* Layer 3 — sand-tinted input footer band, anchored to the bottom */}
-        <div className="border-t border-[var(--border)] bg-[var(--surface-alt)]">
+        <div className="mt-auto border-t border-[var(--border)] bg-[var(--surface-alt)]">
           <MessageInput
             onSend={send}
             disabled={busy}
@@ -554,7 +556,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="flex h-12 w-full items-center justify-between border-t border-[var(--foreground)] bg-[var(--foreground)] px-4 text-xs text-[var(--text-inverse)] md:hidden"
+          className="flex h-14 w-full shrink-0 items-center justify-between border-t border-[var(--foreground)] bg-[var(--foreground)] px-4 text-xs text-[var(--text-inverse)] md:hidden"
           aria-label="Buka asisten"
         >
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sand)]">
@@ -570,7 +572,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           of the notch/status bar and the input clear of the home indicator. */}
       {mobileOpen ? (
         <div
-          className="sheet-in fixed inset-0 z-50 flex flex-col bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] md:hidden"
+          className="sheet-in sheet-fill z-50 flex flex-col bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] md:hidden"
         >
           {renderDock(() => setMobileOpen(false))}
         </div>
@@ -580,7 +582,7 @@ export function ChatDock({ projectId, projectCode }: { projectId: string; projec
           (more board area for cards); expands to 34vh once messages or
           proposals exist so SIMPAN and replies have room to breathe. */}
       <div
-        className={`hidden flex-col border-t border-[var(--border)] bg-[var(--surface)] shadow-[0_-6px_18px_-10px_rgba(20,18,16,0.18)] transition-[height] duration-200 ease-out md:flex ${
+        className={`hidden shrink-0 flex-col border-t border-[var(--border)] bg-[var(--surface)] shadow-[0_-6px_18px_-10px_rgba(20,18,16,0.18)] transition-[height] duration-200 ease-out md:flex ${
           hasContent ? "h-[34vh]" : "h-auto"
         }`}
       >
