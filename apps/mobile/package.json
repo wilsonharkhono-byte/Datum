@@ -8,6 +8,7 @@
     "@datum/types": "workspace:*",
     "@expo-google-fonts/space-grotesk": "^0.4.1",
     "@expo/ui": "~56.0.15",
+    "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-community/netinfo": "12.0.1",
     "@supabase/supabase-js": "^2.106.2",

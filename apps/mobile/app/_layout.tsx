@@ -2,9 +2,21 @@ import "../global.css";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { ShareIntentProvider, useShareIntentContext } from "expo-share-intent";
+import {
+  useFonts,
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from "@expo-google-fonts/space-grotesk";
+import * as SplashScreen from "expo-splash-screen";
 import { SessionProvider, useSession } from "@/lib/session/session";
 import { QueryProvider } from "@/lib/query/provider";
 import { shouldRedirectToShare } from "@/lib/share/intent";
+
+// Hold the splash until Space Grotesk is ready — the whole visual system
+// (tailwind font-sans/medium/semibold/bold) maps to these font files.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export function Gate({ children }: { children: React.ReactNode }) {
   const { status, staff } = useSession();
@@ -50,6 +62,17 @@ function ShareIntentRedirect() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+  });
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded]);
+  if (!fontsLoaded) return null;
+
   return (
     <ShareIntentProvider>
       <SessionProvider>
