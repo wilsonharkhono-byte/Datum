@@ -53,14 +53,17 @@ export function BoardTabs({ tabs, activeId, onSelect }: Props) {
               else chipRefs.current.delete(tab.id);
             }}
             onPress={() => onSelect(tab.id)}
-            className={`min-h-[44px] flex-row items-center gap-1 rounded-full border px-3 ${
+            className={`max-w-[240px] min-h-[44px] flex-row items-center gap-1 rounded-full border px-3 ${
               on ? "border-accent bg-accent-dark" : "border-border bg-surface"
             }`}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
             accessibilityLabel={`${tab.name}, ${tab.count} kartu`}
           >
-            <Text className={`text-[11px] font-medium ${on ? "text-[#FDFAF6]" : "text-text-sec"}`}>
+            <Text
+              numberOfLines={1}
+              className={`shrink text-[11px] font-medium ${on ? "text-surface" : "text-text-sec"}`}
+            >
               {tab.name}
             </Text>
             <Text className={`text-[10px] opacity-70 ${on ? "text-[#FDFAF6]" : "text-text-muted"}`}>
