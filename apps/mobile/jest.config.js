@@ -17,6 +17,7 @@ module.exports = {
   ],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "\\.css$": "<rootDir>/tests/style-mock.js",
   },
   setupFilesAfterEnv: ["<rootDir>/tests/jest.setup.ts"],
 };

@@ -6,7 +6,7 @@ import { SessionProvider, useSession } from "@/lib/session/session";
 import { QueryProvider } from "@/lib/query/provider";
 import { shouldRedirectToShare } from "@/lib/share/intent";
 
-function Gate({ children }: { children: React.ReactNode }) {
+export function Gate({ children }: { children: React.ReactNode }) {
   const { status, staff } = useSession();
   const router = useRouter();
   const segments = useSegments();
@@ -16,10 +16,19 @@ function Gate({ children }: { children: React.ReactNode }) {
     if (status === "unauthenticated" && !inAuth) router.replace("/(auth)/login");
     if (status === "authenticated" && inAuth) router.replace("/(tabs)/(matrix)");
   }, [status, segments, router]);
-  if (status === "authenticated" && staff) {
-    return <QueryProvider userId={staff.id}>{children}</QueryProvider>;
-  }
-  return <>{children}</>;
+  // Hold the tree until the session state is known — prevents the initial
+  // route from mounting (and firing queries) before the login redirect runs.
+  if (status === "loading") return null;
+  // ALWAYS provide a QueryClient: expo-router mounts the initial (tabs) route
+  // for a frame before the redirect effect runs, and TabsLayout calls useQuery
+  // (inbox badge) — without a client that frame hard-crashes release builds.
+  // Keyed per identity so each login gets a fresh client (no cache bleed).
+  const staffId = status === "authenticated" && staff ? staff.id : null;
+  return (
+    <QueryProvider key={staffId ?? "anon"} userId={staffId}>
+      {children}
+    </QueryProvider>
+  );
 }
 
 /**
